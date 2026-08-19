@@ -1,6 +1,6 @@
-from flask import Flask  # creating smallest possible flask server
+from backend import create_app
 
-app = Flask(__name__)
+app = create_app()
 
 
 @app.route("/")
