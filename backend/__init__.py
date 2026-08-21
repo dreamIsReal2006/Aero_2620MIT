@@ -23,6 +23,8 @@ def create_app():
     )
 
     from backend.auth import auth_bp
+    from backend.auth import routes
+
     app.register_blueprint(auth_bp)
 
     with app.app_context():
