@@ -22,6 +22,9 @@ def create_app():
         Like
     )
 
+    from backend.auth import auth_bp
+    app.register_blueprint(auth_bp)
+
     with app.app_context():
         db.create_all()
 
