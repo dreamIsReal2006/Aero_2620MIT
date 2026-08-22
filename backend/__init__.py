@@ -27,6 +27,11 @@ def create_app():
 
     app.register_blueprint(auth_bp)
 
+    from backend.interact import interact_bp
+    from backend.interact import routes as interact_routes
+
+    app.register_blueprint(interact_bp)
+
     with app.app_context():
         db.create_all()
 
