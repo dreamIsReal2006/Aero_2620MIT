@@ -691,6 +691,134 @@ const AeroAPI = {
         this.renderFeed();
     },
 
+    async submitReport(targetId, reason, targetType = 'post') {
+        const res = await fetch(`${API_BASE}/reports`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('aero_token')}`
+            },
+            body: JSON.stringify({ target_type: targetType, target_id: targetId, reason })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Unable to submit report');
+        return data;
+    },
+
+    async getAdminStats() {
+        const res = await fetch(`${API_BASE}/admin/stats`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Unable to load admin statistics');
+        return data;
+    },
+
+    async getAdminReports() {
+        const res = await fetch(`${API_BASE}/admin/reports`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Unable to load reports');
+        return data;
+    },
+
+    async adminDeletePost(postId) {
+        const res = await fetch(`${API_BASE}/admin/posts/${postId}/delete`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Unable to delete post');
+        return data;
+    },
+
+    async adminToggleBan(userId) {
+        const res = await fetch(`${API_BASE}/admin/users/${userId}/ban`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Unable to update user status');
+        return data;
+    },
+
+    showReportModal(postId) {
+        let overlay = document.getElementById('report-modal-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'report-modal-overlay';
+            overlay.className = 'report-modal-overlay';
+            overlay.innerHTML = `<div class="report-modal" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
+                <div class="report-modal-header"><h2 id="report-modal-title">Report post</h2><button type="button" class="report-close" aria-label="Close report dialog">&times;</button></div>
+                <form class="report-form"><label for="report-reason">Why are you reporting this?</label><textarea id="report-reason" maxlength="1000" required placeholder="Tell us what is wrong..."></textarea><div class="report-form-actions"><button type="button" class="btn report-cancel">Cancel</button><button type="submit" class="btn btn-primary">Submit report</button></div></form>
+            </div>`;
+            document.body.appendChild(overlay);
+            const close = () => overlay.classList.remove('is-open');
+            overlay.querySelector('.report-close').addEventListener('click', close);
+            overlay.querySelector('.report-cancel').addEventListener('click', close);
+            overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
+        }
+        const form = overlay.querySelector('.report-form');
+        const reasonInput = overlay.querySelector('#report-reason');
+        form.onsubmit = async event => {
+            event.preventDefault();
+            const reason = reasonInput.value.trim();
+            if (!reason) return;
+            try {
+                await this.submitReport(postId, reason);
+                overlay.classList.remove('is-open');
+                reasonInput.value = '';
+                showNotice('Report submitted successfully.', 'success');
+            } catch (error) {
+                showNotice(error.message, 'error');
+            }
+        };
+        overlay.classList.add('is-open');
+        reasonInput.focus();
+    },
+
+    async likePost(postId) {
+        const res = await fetch(`${API_ORIGIN}/interact/posts/${postId}/like`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Unable to like post');
+        return data;
+    },
+
+    async cancelLikePost(postId) {
+        const res = await fetch(`${API_ORIGIN}/interact/posts/${postId}/like`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Unable to remove like');
+        return data;
+    },
+
+    async getComments(postId) {
+        const res = await fetch(`${API_ORIGIN}/interact/posts/${postId}/comments`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Unable to load comments');
+        return data.comments || [];
+    },
+
+    async sendComment(postId, content, parentId = null) {
+        const res = await fetch(`${API_ORIGIN}/interact/posts/${postId}/comments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('aero_token')}`
+            },
+            body: JSON.stringify({ content, parentId })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Unable to send comment');
+        return data;
+    },
+
     // Feed rendering and DOM updates
     async renderFeed() {
         const feedContainer = document.getElementById('posts-feed');
@@ -724,6 +852,27 @@ const AeroAPI = {
                 deleteButton.addEventListener('click', () => this.deletePost(post.id));
                 header.appendChild(deleteButton);
             }
+            const moreButton = document.createElement('button');
+            moreButton.className = 'icon-btn post-more-btn';
+            moreButton.type = 'button';
+            moreButton.setAttribute('aria-label', 'Post options');
+            moreButton.title = 'Post options';
+            moreButton.textContent = '\u22ee';
+            const reportMenu = document.createElement('div');
+            reportMenu.className = 'post-menu hidden';
+            const reportButton = document.createElement('button');
+            reportButton.type = 'button';
+            reportButton.textContent = 'Report';
+            reportMenu.appendChild(reportButton);
+            moreButton.addEventListener('click', event => {
+                event.stopPropagation();
+                reportMenu.classList.toggle('hidden');
+            });
+            reportButton.addEventListener('click', () => {
+                reportMenu.classList.add('hidden');
+                this.showReportModal(post.id);
+            });
+            header.append(moreButton, reportMenu);
             const content = document.createElement('div');
             content.className = 'post-content';
             content.textContent = post.content;
@@ -745,19 +894,150 @@ const AeroAPI = {
             const likeButton = document.createElement('button');
             likeButton.className = 'post-action-btn';
             likeButton.type = 'button';
-            likeButton.setAttribute('aria-label', 'Like post');
-            likeButton.title = 'Like post';
+            likeButton.classList.toggle('is-liked', Boolean(post.is_liked));
+            likeButton.setAttribute('aria-label', post.is_liked ? 'Unlike post' : 'Like post');
+            likeButton.title = post.is_liked ? 'Unlike post' : 'Like post';
             likeButton.appendChild(createIcon('<path d="M20.8 8.8c0 5.2-8.8 10.2-8.8 10.2S3.2 14 3.2 8.8A4.8 4.8 0 0 1 12 6.1a4.8 4.8 0 0 1 8.8 2.7Z"></path>', 'Like post'));
-            likeButton.append(` ${post.likes || 0}`);
+            const likeCount = document.createElement('span');
+            likeCount.textContent = post.likes_count ?? post.likes ?? 0;
+            likeButton.append(' ', likeCount);
+            likeButton.addEventListener('click', async () => {
+                if (likeButton.disabled) return;
+                const wasLiked = Boolean(post.is_liked);
+                const previousCount = Number(likeCount.textContent) || 0;
+                post.is_liked = !wasLiked;
+                likeCount.textContent = Math.max(0, previousCount + (wasLiked ? -1 : 1));
+                likeButton.classList.toggle('is-liked', post.is_liked);
+                likeButton.setAttribute('aria-label', post.is_liked ? 'Unlike post' : 'Like post');
+                likeButton.title = post.is_liked ? 'Unlike post' : 'Like post';
+                likeButton.disabled = true;
+                try {
+                    const result = wasLiked
+                        ? await this.cancelLikePost(post.id)
+                        : await this.likePost(post.id);
+                    likeCount.textContent = result.like_count;
+                } catch (error) {
+                    post.is_liked = wasLiked;
+                    likeCount.textContent = previousCount;
+                    likeButton.classList.toggle('is-liked', wasLiked);
+                    likeButton.setAttribute('aria-label', wasLiked ? 'Unlike post' : 'Like post');
+                    likeButton.title = wasLiked ? 'Unlike post' : 'Like post';
+                    showNotice(error.message, 'error');
+                } finally {
+                    likeButton.disabled = false;
+                }
+            });
             const commentButton = document.createElement('button');
             commentButton.className = 'post-action-btn';
             commentButton.type = 'button';
             commentButton.setAttribute('aria-label', 'Comment on post');
             commentButton.title = 'Comment on post';
             commentButton.appendChild(createIcon('<path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.5-.7L4 20l1.7-3.6A7.2 7.2 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z"></path>', 'Comment on post'));
-            commentButton.append(` ${post.comments || 0}`);
+            const commentCount = document.createElement('span');
+            commentCount.textContent = post.comments_count ?? post.comments ?? 0;
+            commentButton.append(' ', commentCount);
             actions.append(likeButton, commentButton);
             postEl.appendChild(actions);
+
+            const commentsPanel = document.createElement('section');
+            commentsPanel.className = 'comments-panel hidden';
+            const commentsList = document.createElement('div');
+            commentsList.className = 'comments-list';
+            const replyStatus = document.createElement('div');
+            replyStatus.className = 'reply-status hidden';
+            const replyStatusText = document.createElement('span');
+            const cancelReplyButton = document.createElement('button');
+            cancelReplyButton.type = 'button';
+            cancelReplyButton.className = 'cancel-reply-btn';
+            cancelReplyButton.setAttribute('aria-label', 'Cancel reply');
+            cancelReplyButton.textContent = 'x';
+            replyStatus.append(replyStatusText, cancelReplyButton);
+            const composer = document.createElement('form');
+            composer.className = 'comment-composer';
+            composer.innerHTML = '<input type="text" maxlength="1000" placeholder="Write a comment..." aria-label="Comment text"><button type="submit" class="btn btn-primary">Send</button>';
+            commentsPanel.append(commentsList, replyStatus, composer);
+            const composerInput = composer.querySelector('input');
+            let replyTarget = null;
+
+            const clearReplyTarget = () => {
+                replyTarget = null;
+                replyStatus.classList.add('hidden');
+                replyStatusText.textContent = '';
+                composerInput.placeholder = 'Write a comment...';
+            };
+
+            const setReplyTarget = comment => {
+                replyTarget = comment;
+                replyStatusText.textContent = `Replying to @${comment.username || 'user'}`;
+                replyStatus.classList.remove('hidden');
+                composerInput.placeholder = `Reply to ${comment.username || 'user'}...`;
+                composerInput.focus();
+            };
+
+            cancelReplyButton.addEventListener('click', () => {
+                clearReplyTarget();
+                composerInput.focus();
+            });
+            composerInput.addEventListener('input', () => {
+                if (!composerInput.value.trim() && replyTarget) clearReplyTarget();
+            });
+            postEl.appendChild(commentsPanel);
+
+            const renderComment = (comment, depth = 0) => {
+                const item = document.createElement('article');
+                item.className = depth ? 'reply-item' : 'comment-item';
+                const meta = document.createElement('strong');
+                meta.textContent = comment.username || `User ${comment.user_id}`;
+                const body = document.createElement('p');
+                body.textContent = comment.content;
+                const replyButton = document.createElement('button');
+                replyButton.type = 'button';
+                replyButton.className = 'comment-reply-btn';
+                replyButton.textContent = 'Reply';
+                item.append(meta, body, replyButton);
+                replyButton.addEventListener('click', () => setReplyTarget(comment));
+                if (comment.replies && comment.replies.length) {
+                    const replies = document.createElement('div');
+                    replies.className = 'comment-replies';
+                    comment.replies.forEach(reply => replies.appendChild(renderComment(reply, depth + 1)));
+                    item.appendChild(replies);
+                }
+                return item;
+            };
+
+            const loadComments = async () => {
+                commentsList.innerHTML = '<p class="comments-loading">Loading comments...</p>';
+                try {
+                    const comments = await this.getComments(post.id);
+                    commentsList.innerHTML = '';
+                    if (!comments.length) {
+                        commentsList.innerHTML = '<p class="comments-empty">No comments yet.</p>';
+                    } else {
+                        comments.forEach(comment => commentsList.appendChild(renderComment(comment)));
+                    }
+                } catch (error) {
+                    commentsList.innerHTML = `<p class="comments-empty">${escapeHtml(error.message)}</p>`;
+                }
+            };
+
+            composer.addEventListener('submit', async event => {
+                event.preventDefault();
+                const content = composerInput.value.trim();
+                if (!content) return;
+                try {
+                    await this.sendComment(post.id, content, replyTarget ? replyTarget.id : null);
+                    composerInput.value = '';
+                    clearReplyTarget();
+                    commentCount.textContent = (Number(commentCount.textContent) || 0) + 1;
+                    await loadComments();
+                } catch (error) {
+                    showNotice(error.message, 'error');
+                }
+            });
+            commentButton.addEventListener('click', async () => {
+                const isHidden = commentsPanel.classList.toggle('hidden');
+                if (!isHidden) await loadComments();
+            });
             feedContainer.appendChild(postEl);
         });
     },
@@ -765,6 +1045,8 @@ const AeroAPI = {
     initAppState() {
         const token = localStorage.getItem('aero_token');
         const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
+        const adminLink = document.getElementById('admin-dashboard-link');
+        if (adminLink) adminLink.classList.toggle('hidden', user.is_admin !== true);
         
         const authOverlay = document.getElementById('auth-overlay');
         const mainApp = document.getElementById('main-app');
@@ -786,6 +1068,8 @@ const AeroAPI = {
         if (!authOverlay || !mainApp) return;
 
         const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
+        const adminLink = document.getElementById('admin-dashboard-link');
+        if (adminLink) adminLink.classList.toggle('hidden', user.is_admin !== true);
         authOverlay.classList.remove('hidden');
         mainApp.classList.remove('hidden');
         mainApp.classList.add('app-entering');
