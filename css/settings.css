@@ -2,60 +2,36 @@
     box-sizing: border-box;
 }
 
-
 :root {
-
     --background: #f5f6f8;
-    --surface: #ffffff;
-    --surface-hover: #f0f1f3;
-
-    --text: #181a1f;
-    --muted: #747981;
-
-    --border: #e4e6e9;
-
+    --card: #ffffff;
+    --text: #17191d;
+    --muted: #777d87;
+    --border: #e3e5e8;
+    --hover: #f0f1f3;
     --primary: #17191d;
     --primary-text: #ffffff;
-
-    --danger: #e5484d;
-
-    --shadow:
-        0 10px 35px rgba(0, 0, 0, 0.06);
-
-    --radius: 16px;
-
+    --danger: #dc4545;
+    --shadow: 0 10px 35px rgba(0, 0, 0, 0.07);
 }
 
-
-body.dark {
-
-    --background: #111214;
-    --surface: #1c1e22;
-    --surface-hover: #272a2f;
-
-    --text: #f4f5f6;
-    --muted: #9b9fa7;
-
-    --border: #303339;
-
-    --primary: #ffffff;
-    --primary-text: #111214;
-
-    --shadow:
-        0 10px 35px rgba(0, 0, 0, 0.3);
-
+body.dark-mode {
+    --background: #101114;
+    --card: #191b20;
+    --text: #f4f5f7;
+    --muted: #9da2aa;
+    --border: #30333a;
+    --hover: #24272d;
+    --primary: #f4f5f7;
+    --primary-text: #101114;
+    --danger: #ef5555;
+    --shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
 }
-
 
 body {
-
     margin: 0;
 
     min-height: 100vh;
-
-    background: var(--background);
-
-    color: var(--text);
 
     font-family:
         Inter,
@@ -64,19 +40,21 @@ body {
         "Segoe UI",
         sans-serif;
 
-    transition:
-        background 0.2s ease,
-        color 0.2s ease;
+    background: var(--background);
 
+    color: var(--text);
+
+    transition:
+        background 0.25s ease,
+        color 0.25s ease;
 }
 
 
-/* =========================================
+/* =================================
    HEADER
-========================================= */
+================================= */
 
 .settings-header {
-
     height: 70px;
 
     display: grid;
@@ -87,164 +65,132 @@ body {
 
     padding: 0 40px;
 
-    border-bottom:
-        1px solid var(--border);
+    background: var(--card);
 
-    background: var(--surface);
+    border-bottom: 1px solid var(--border);
 
     position: sticky;
 
     top: 0;
 
     z-index: 20;
-
 }
-
 
 .logo {
-
-    font-size: 21px;
+    font-size: 22px;
 
     font-weight: 700;
-
 }
 
-
-.back-button {
-
-    display: inline-flex;
-
-    align-items: center;
-
-    gap: 8px;
-
-    width: fit-content;
-
-    color: var(--text);
-
-    text-decoration: none;
-
-    font-size: 14px;
-
-}
-
-
-.back-button:hover {
-
-    opacity: 0.6;
-
-}
-
-
-.back-icon {
-
-    font-size: 20px;
-
-}
-
-
-.logout-button {
-
-    justify-self: end;
-
+.back-button,
+.sign-out-button {
     border: 0;
 
-    border-radius: 9px;
-
-    padding: 9px 14px;
-
-    background: var(--surface-hover);
+    background: transparent;
 
     color: var(--text);
 
     cursor: pointer;
 
-    font-size: 13px;
+    font-size: 14px;
+
+    padding: 9px 12px;
+
+    border-radius: 9px;
+
+    transition: background 0.2s ease;
+}
+
+.back-button {
+    justify-self: start;
+}
+
+.sign-out-button {
+    justify-self: end;
+
+    background: var(--hover);
 
     font-weight: 600;
+}
 
+.back-button:hover,
+.sign-out-button:hover {
+    background: var(--hover);
 }
 
 
-/* =========================================
+/* =================================
    MAIN
-========================================= */
+================================= */
 
 .settings-container {
-
-    width: min(1080px, calc(100% - 40px));
+    width: min(1100px, calc(100% - 40px));
 
     margin: 45px auto 80px;
-
 }
 
-
-.page-heading {
-
+.settings-heading {
     margin-bottom: 30px;
-
 }
 
-
-.page-heading h1 {
-
+.settings-heading h1 {
     margin: 0 0 7px;
 
     font-size: 32px;
-
 }
 
-
-.page-heading p {
-
+.settings-heading p {
     margin: 0;
 
     color: var(--muted);
 
     font-size: 14px;
-
 }
 
 
-/* =========================================
+/* =================================
    LAYOUT
-========================================= */
+================================= */
 
 .settings-layout {
-
     display: grid;
 
-    grid-template-columns: 210px 1fr;
+    grid-template-columns: 220px 1fr;
 
-    gap: 35px;
+    gap: 30px;
 
     align-items: start;
-
 }
 
 
-/* =========================================
+/* =================================
    SIDEBAR
-========================================= */
+================================= */
 
 .settings-sidebar {
+    position: sticky;
+
+    top: 100px;
 
     display: flex;
 
     flex-direction: column;
 
     gap: 4px;
-
-    position: sticky;
-
-    top: 100px;
-
 }
 
-
-.settings-link {
-
+.settings-tab {
     width: 100%;
+
+    border: 0;
+
+    background: transparent;
+
+    color: var(--muted);
+
+    padding: 13px 15px;
+
+    border-radius: 11px;
 
     display: flex;
 
@@ -252,286 +198,209 @@ body {
 
     gap: 12px;
 
-    padding: 12px 14px;
-
-    border: 0;
-
-    border-radius: 10px;
-
-    background: transparent;
-
-    color: var(--muted);
-
-    cursor: pointer;
-
     text-align: left;
+
+    font: inherit;
 
     font-size: 14px;
 
-    transition:
-        background 0.15s ease,
-        color 0.15s ease;
+    cursor: pointer;
 
+    transition:
+        background 0.2s ease,
+        color 0.2s ease;
 }
 
-
-.settings-link:hover {
-
-    background: var(--surface-hover);
+.settings-tab:hover {
+    background: var(--hover);
 
     color: var(--text);
-
 }
 
-
-.settings-link.active {
-
-    background: var(--surface-hover);
+.settings-tab.active {
+    background: var(--hover);
 
     color: var(--text);
 
     font-weight: 600;
-
 }
 
 
-.settings-icon {
+/* =================================
+   SETTINGS PAGES
+================================= */
 
-    width: 22px;
-
-    text-align: center;
-
-}
-
-
-/* =========================================
-   PAGE
-========================================= */
-
-.settings-page {
-
+.settings-section {
     display: none;
 
+    animation: pageIn 0.2s ease;
 }
 
-
-.settings-page.active {
-
+.settings-section.active {
     display: block;
-
-    animation:
-        page-in 0.18s ease;
-
 }
 
-
-@keyframes page-in {
+@keyframes pageIn {
 
     from {
-
         opacity: 0;
 
-        transform: translateY(6px);
-
+        transform: translateY(5px);
     }
 
     to {
-
         opacity: 1;
 
         transform: translateY(0);
-
     }
-
 }
-
-
-/* =========================================
-   SECTION
-========================================= */
 
 .section-heading {
-
     margin-bottom: 18px;
-
 }
-
 
 .section-heading h2 {
-
-    margin: 0 0 5px;
+    margin: 0 0 6px;
 
     font-size: 22px;
-
 }
 
-
 .section-heading p {
-
     margin: 0;
 
     color: var(--muted);
 
     font-size: 14px;
-
 }
 
 
-/* =========================================
+/* =================================
    CARD
-========================================= */
+================================= */
 
 .settings-card {
+    background: var(--card);
 
-    background: var(--surface);
+    border: 1px solid var(--border);
 
-    border:
-        1px solid var(--border);
-
-    border-radius: var(--radius);
+    border-radius: 18px;
 
     padding: 25px;
 
     box-shadow: var(--shadow);
-
 }
 
 
-/* =========================================
+/* =================================
    PROFILE
-========================================= */
+================================= */
 
-.profile-header {
-
+.profile-preview {
     display: flex;
 
     align-items: center;
 
     gap: 14px;
 
-    padding-bottom: 24px;
+    padding-bottom: 23px;
 
-    margin-bottom: 24px;
+    margin-bottom: 23px;
 
-    border-bottom:
-        1px solid var(--border);
-
+    border-bottom: 1px solid var(--border);
 }
 
+.avatar {
+    width: 56px;
 
-.profile-avatar {
-
-    width: 58px;
-
-    height: 58px;
-
-    border-radius: 50%;
+    height: 56px;
 
     display: flex;
 
+    align-items: center;
+
     justify-content: center;
 
-    align-items: center;
+    border-radius: 50%;
 
     background: var(--primary);
 
     color: var(--primary-text);
 
-    font-size: 20px;
-
     font-weight: 700;
 
+    font-size: 20px;
 }
 
-
-.profile-header h3 {
-
+.profile-preview h3 {
     margin: 0 0 4px;
 
     font-size: 16px;
-
 }
 
-
-.profile-header p {
-
+.profile-preview p {
     margin: 0;
 
     color: var(--muted);
 
     font-size: 13px;
-
 }
 
 
-/* =========================================
+/* =================================
    FORMS
-========================================= */
+================================= */
 
 .form-group {
-
-    position: relative;
-
     margin-bottom: 20px;
 
+    position: relative;
 }
 
-
 .form-group label {
-
     display: block;
 
-    margin-bottom: 7px;
+    margin-bottom: 8px;
 
     font-size: 13px;
 
     font-weight: 600;
-
 }
 
-
 .form-group input,
-.form-group textarea {
-
+.form-group textarea,
+.setting-row select {
     width: 100%;
 
-    border:
-        1px solid var(--border);
+    padding: 11px 13px;
+
+    border: 1px solid var(--border);
 
     border-radius: 10px;
 
-    padding: 12px 13px;
-
-    outline: none;
-
-    background: var(--surface-hover);
+    background: var(--hover);
 
     color: var(--text);
 
     font: inherit;
 
-}
+    outline: none;
 
+    transition: border 0.2s ease;
+}
 
 .form-group input:focus,
-.form-group textarea:focus {
-
+.form-group textarea:focus,
+.setting-row select:focus {
     border-color: var(--text);
-
 }
 
-
 .form-group textarea {
-
     min-height: 110px;
 
     resize: vertical;
-
 }
 
-
 .character-count {
-
     position: absolute;
 
     right: 10px;
@@ -541,16 +410,16 @@ body {
     color: var(--muted);
 
     font-size: 11px;
-
 }
 
 
-/* =========================================
+/* =================================
    BUTTONS
-========================================= */
+================================= */
 
-.button {
-
+.primary-button,
+.secondary-button,
+.danger-button {
     border: 0;
 
     border-radius: 9px;
@@ -566,71 +435,49 @@ body {
     cursor: pointer;
 
     transition:
-        transform 0.15s ease,
-        opacity 0.15s ease;
-
+        opacity 0.2s ease,
+        transform 0.15s ease;
 }
 
-
-.button:hover {
+.primary-button:hover,
+.secondary-button:hover,
+.danger-button:hover {
+    opacity: 0.85;
 
     transform: translateY(-1px);
-
 }
 
-
-.button.primary {
-
+.primary-button {
     background: var(--primary);
 
     color: var(--primary-text);
-
 }
 
-
-.button.secondary {
-
-    background: var(--surface-hover);
+.secondary-button {
+    background: var(--hover);
 
     color: var(--text);
 
-    border:
-        1px solid var(--border);
-
+    border: 1px solid var(--border);
 }
 
-
-.button.danger {
-
+.danger-button {
     background: var(--danger);
 
-    color: #ffffff;
-
+    color: white;
 }
-
 
 .full-width {
-
     width: 100%;
-
 }
 
 
-.button-row {
+/* =================================
+   SETTING ROWS
+================================= */
 
-    display: flex;
-
-    justify-content: flex-end;
-
-}
-
-
-/* =========================================
-   SETTINGS ROW
-========================================= */
-
-.setting-row {
-
+.setting-row,
+.security-row {
     display: flex;
 
     align-items: center;
@@ -641,124 +488,81 @@ body {
 
     padding: 18px 0;
 
-    border-bottom:
-        1px solid var(--border);
-
+    border-bottom: 1px solid var(--border);
 }
 
-
-.setting-row:first-child {
-
+.setting-row:first-child,
+.security-row:first-child {
     padding-top: 0;
-
 }
 
-
-.setting-row:last-child {
-
-    padding-bottom: 0;
-
+.setting-row:last-child,
+.security-row:last-child {
     border-bottom: 0;
-
 }
 
-
-.setting-information h3 {
-
+.setting-row h3,
+.security-row h3,
+.danger-zone h3 {
     margin: 0 0 5px;
 
     font-size: 14px;
-
 }
 
-
-.setting-information p {
-
+.setting-row p,
+.security-row p,
+.danger-zone p {
     margin: 0;
 
     color: var(--muted);
 
     font-size: 12px;
 
+    line-height: 1.5;
+}
+
+.setting-row select {
+    width: 150px;
 }
 
 
-/* =========================================
-   SELECT
-========================================= */
-
-.select-control {
-
-    min-width: 130px;
-
-    padding: 9px 12px;
-
-    border:
-        1px solid var(--border);
-
-    border-radius: 9px;
-
-    background: var(--surface-hover);
-
-    color: var(--text);
-
-    outline: none;
-
-}
-
-
-/* =========================================
+/* =================================
    SWITCH
-========================================= */
+================================= */
 
 .switch {
-
-    position: relative;
-
-    display: inline-block;
-
     width: 45px;
 
     height: 25px;
 
-    flex-shrink: 0;
+    position: relative;
 
+    flex-shrink: 0;
 }
 
-
 .switch input {
-
-    opacity: 0;
-
     width: 0;
 
     height: 0;
 
+    opacity: 0;
 }
 
-
 .slider {
-
     position: absolute;
 
     inset: 0;
 
     border-radius: 30px;
 
-    background: var(--surface-hover);
+    background: var(--hover);
 
-    border:
-        1px solid var(--border);
+    border: 1px solid var(--border);
 
     cursor: pointer;
-
-    transition: 0.2s;
-
 }
 
-
 .slider::before {
-
     content: "";
 
     position: absolute;
@@ -776,115 +580,91 @@ body {
     background: var(--muted);
 
     transition: 0.2s;
-
 }
-
 
 .switch input:checked + .slider {
-
     background: var(--primary);
-
 }
-
 
 .switch input:checked + .slider::before {
-
-    transform:
-        translateX(20px);
+    transform: translateX(20px);
 
     background: var(--primary-text);
+}
 
+.switch input:disabled + .slider {
+    cursor: not-allowed;
+
+    opacity: 0.45;
 }
 
 
-/* =========================================
+/* =================================
    SECURITY
-========================================= */
+================================= */
 
 .security-row {
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: space-between;
-
-    gap: 20px;
-
-    padding: 18px 0;
-
-    border-bottom:
-        1px solid var(--border);
-
+    padding: 20px 0;
 }
-
-
-.security-row:first-child {
-
-    padding-top: 0;
-
-}
-
-
-.security-row h3,
-.danger-zone h3 {
-
-    margin: 0 0 5px;
-
-    font-size: 14px;
-
-}
-
-
-.security-row p,
-.danger-zone p {
-
-    margin: 0;
-
-    color: var(--muted);
-
-    font-size: 12px;
-
-}
-
 
 .danger-zone {
-
     display: flex;
 
-    align-items: center;
-
     justify-content: space-between;
+
+    align-items: center;
 
     gap: 20px;
 
     padding-top: 25px;
 
+    margin-top: 5px;
+
+    border-top: 1px solid var(--border);
 }
 
 
-/* =========================================
+/* =================================
+   COMING SOON
+================================= */
+
+.coming-soon {
+    margin-top: 20px;
+
+    padding: 12px;
+
+    border-radius: 9px;
+
+    background: var(--hover);
+
+    color: var(--muted);
+
+    font-size: 12px;
+
+    text-align: center;
+}
+
+
+/* =================================
    TOAST
-========================================= */
+================================= */
 
 .toast {
-
     position: fixed;
 
     left: 50%;
 
     bottom: 30px;
 
-    transform:
-        translate(-50%, 20px);
+    transform: translate(-50%, 20px);
 
-    padding: 11px 17px;
-
-    border-radius: 9px;
+    padding: 12px 18px;
 
     background: var(--primary);
 
     color: var(--primary-text);
+
+    border-radius: 10px;
 
     font-size: 13px;
 
@@ -897,26 +677,20 @@ body {
         transform 0.2s ease;
 
     z-index: 100;
-
 }
-
 
 .toast.show {
-
     opacity: 1;
 
-    transform:
-        translate(-50%, 0);
-
+    transform: translate(-50%, 0);
 }
 
 
-/* =========================================
-   MODAL
-========================================= */
+/* =================================
+   MODALS
+================================= */
 
 .modal-overlay {
-
     position: fixed;
 
     inset: 0;
@@ -927,69 +701,57 @@ body {
 
     justify-content: center;
 
-    background:
-        rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.5);
 
     backdrop-filter: blur(5px);
 
     z-index: 200;
-
 }
-
 
 .modal-overlay.hidden {
-
     display: none;
-
 }
 
-
 .modal {
+    width: min(430px, calc(100% - 30px));
 
-    width: min(440px, calc(100% - 30px));
+    background: var(--card);
 
-    padding: 25px;
+    color: var(--text);
 
-    border:
-        1px solid var(--border);
+    border: 1px solid var(--border);
 
     border-radius: 18px;
 
-    background: var(--surface);
-
-    box-shadow:
-        0 20px 60px rgba(0, 0, 0, 0.2);
+    padding: 25px;
 
     position: relative;
 
+    box-shadow: var(--shadow);
 }
-
 
 .modal h2 {
+    margin: 0 0 10px;
 
-    margin: 0 0 8px;
-
+    font-size: 20px;
 }
 
-
 .modal > p {
-
     margin: 0 0 22px;
 
     color: var(--muted);
 
     font-size: 13px;
 
+    line-height: 1.6;
 }
 
-
 .modal-close {
-
     position: absolute;
 
-    top: 10px;
+    right: 15px;
 
-    right: 14px;
+    top: 11px;
 
     border: 0;
 
@@ -1000,128 +762,62 @@ body {
     font-size: 25px;
 
     cursor: pointer;
-
 }
 
-
-.modal-buttons {
-
+.modal-actions {
     display: flex;
 
     justify-content: flex-end;
 
     gap: 10px;
-
-    margin-top: 20px;
-
 }
 
 
-/* =========================================
-   COMPACT MODE
-========================================= */
-
-body.compact .settings-card {
-
-    padding: 18px;
-
-}
-
-
-body.compact .setting-row {
-
-    padding: 12px 0;
-
-}
-
-
-body.compact .security-row {
-
-    padding: 12px 0;
-
-}
-
-
-/* =========================================
-   MOBILE
-========================================= */
+/* =================================
+   RESPONSIVE
+================================= */
 
 @media (max-width: 750px) {
 
     .settings-header {
-
         padding: 0 20px;
-
     }
-
 
     .settings-container {
-
-        width:
-            calc(100% - 24px);
+        width: calc(100% - 25px);
 
         margin-top: 30px;
-
     }
-
 
     .settings-layout {
-
         grid-template-columns: 1fr;
-
-        gap: 20px;
-
     }
 
-
     .settings-sidebar {
-
         position: static;
 
         display: grid;
 
-        grid-template-columns:
-            repeat(2, 1fr);
-
+        grid-template-columns: repeat(2, 1fr);
     }
 
-
-    .settings-link {
-
+    .settings-tab {
         justify-content: center;
-
     }
-
 
     .setting-row,
     .security-row,
     .danger-zone {
-
         align-items: flex-start;
 
         flex-direction: column;
-
     }
 
-
-    .select-control {
-
+    .setting-row select {
         width: 100%;
-
     }
 
-
-    .button-row {
-
-        justify-content: stretch;
-
+    .danger-zone {
+        gap: 15px;
     }
-
-
-    .button-row .button {
-
-        width: 100%;
-
-    }
-
 }

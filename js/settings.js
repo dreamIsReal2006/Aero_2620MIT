@@ -1,27 +1,23 @@
 document.addEventListener("DOMContentLoaded", () => {
 
     /* =========================================
-       STORAGE
-    ========================================== */
+       ELEMENTS
+    ========================================= */
 
-    const DEFAULT_SETTINGS = {
+    const tabs =
+        document.querySelectorAll(".settings-tab");
 
+    const sections =
+        document.querySelectorAll(".settings-section");
+
+
+    /* =========================================
+       SETTINGS STORAGE
+    ========================================= */
+
+    const defaultSettings = {
         theme: "light",
-
-        compactMode: false,
-
-        pushNotifications: true,
-
-        likeNotifications: true,
-
-        commentNotifications: true,
-
-        followNotifications: true,
-
-        privateAccount: false,
-
-        onlineStatus: true
-
+        compactMode: false
     };
 
 
@@ -31,24 +27,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const saved =
                 JSON.parse(
-                    localStorage.getItem(
-                        "aero_settings"
-                    )
+                    localStorage.getItem("aero_settings")
                 );
 
             return {
-                ...DEFAULT_SETTINGS,
+                ...defaultSettings,
                 ...(saved || {})
             };
 
         } catch {
 
             return {
-                ...DEFAULT_SETTINGS
+                ...defaultSettings
             };
 
         }
-
     }
 
 
@@ -64,154 +57,91 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* =========================================
        TOAST
-    ========================================== */
+    ========================================= */
 
     function showToast(message) {
 
         const toast =
             document.getElementById("toast");
 
-        const text =
-            document.getElementById(
-                "toast-message"
-            );
+        const messageElement =
+            document.getElementById("toast-message");
 
-
-        text.textContent = message;
+        messageElement.textContent = message;
 
         toast.classList.add("show");
 
+        clearTimeout(window.toastTimer);
 
-        clearTimeout(
-            window.aeroToastTimer
-        );
-
-
-        window.aeroToastTimer =
+        window.toastTimer =
             setTimeout(() => {
 
-                toast.classList.remove(
-                    "show"
-                );
+                toast.classList.remove("show");
 
-            }, 2200);
-
+            }, 2500);
     }
 
 
     /* =========================================
-       SETTINGS PAGE NAVIGATION
-    ========================================== */
+       SETTINGS SECTION NAVIGATION
+       NO PAGE REFRESH
+    ========================================= */
 
-    const links =
-        document.querySelectorAll(
-            ".settings-link"
-        );
-
-
-    const pages =
-        document.querySelectorAll(
-            ".settings-page"
-        );
-
-
-    function getCurrentPage() {
-
-        return (
-            window.location.hash
-                .replace("#", "")
-                .trim()
-            || "account"
-        );
-
-    }
-
-
-    function showPage(
-        pageName,
-        addHistory = true
+    function showSection(
+        sectionName,
+        updateHistory = true
     ) {
 
-        const page =
+        const section =
             document.getElementById(
-                `page-${pageName}`
+                `section-${sectionName}`
             );
 
-
-        const link =
+        const tab =
             document.querySelector(
-                `[data-page="${pageName}"]`
+                `[data-section="${sectionName}"]`
             );
 
 
-        /*
-         * Invalid page
-         */
+        if (!section || !tab) {
 
-        if (!page || !link) {
+            sectionName = "account";
 
-            pageName = "account";
-
-            return showPage(
-                pageName,
-                addHistory
+            return showSection(
+                sectionName,
+                updateHistory
             );
 
         }
 
 
-        /*
-         * Hide pages
-         */
+        sections.forEach(item => {
 
-        pages.forEach(page => {
-
-            page.classList.remove(
-                "active"
-            );
+            item.classList.remove("active");
 
         });
 
 
-        /*
-         * Remove active links
-         */
+        tabs.forEach(item => {
 
-        links.forEach(link => {
-
-            link.classList.remove(
-                "active"
-            );
+            item.classList.remove("active");
 
         });
 
 
-        /*
-         * Show selected page
-         */
+        section.classList.add("active");
 
-        page.classList.add(
-            "active"
-        );
+        tab.classList.add("active");
 
 
-        link.classList.add(
-            "active"
-        );
-
-
-        /*
-         * Update URL WITHOUT reload
-         */
-
-        if (addHistory) {
+        if (updateHistory) {
 
             history.pushState(
                 {
-                    page: pageName
+                    section: sectionName
                 },
                 "",
-                `#${pageName}`
+                `#${sectionName}`
             );
 
         }
@@ -219,36 +149,31 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-    /*
-     * Sidebar clicks
-     */
+    tabs.forEach(tab => {
 
-    links.forEach(link => {
+        tab.addEventListener("click", () => {
 
-        link.addEventListener(
-            "click",
-            () => {
+            showSection(
+                tab.dataset.section
+            );
 
-                showPage(
-                    link.dataset.page
-                );
-
-            }
-        );
+        });
 
     });
 
 
-    /*
-     * Browser Back / Forward
-     */
+    /* Browser Back / Forward */
 
     window.addEventListener(
         "popstate",
         () => {
 
-            showPage(
-                getCurrentPage(),
+            const section =
+                window.location.hash
+                    .replace("#", "");
+
+            showSection(
+                section || "account",
                 false
             );
 
@@ -256,591 +181,349 @@ document.addEventListener("DOMContentLoaded", () => {
     );
 
 
-    /*
-     * Handle hash changes
-     */
+    /* Initial section */
 
-    window.addEventListener(
-        "hashchange",
-        () => {
+    const initialSection =
+        window.location.hash
+            .replace("#", "");
 
-            showPage(
-                getCurrentPage(),
-                false
-            );
-
-        }
-    );
-
-
-    /*
-     * Initial page
-     */
-
-    showPage(
-        getCurrentPage(),
+    showSection(
+        initialSection || "account",
         false
     );
 
 
-
     /* =========================================
-       THEME
-    ========================================== */
+       ACCOUNT
+    ========================================= */
 
-    /* =========================================
-   APPEARANCE
-========================================= */
+    const usernameInput =
+        document.getElementById("username");
 
-const themeSelect =
-    document.getElementById("theme");
+    const emailInput =
+        document.getElementById("email");
 
-const compactMode =
-    document.getElementById(
-        "compact-mode"
-    );
+    const bioInput =
+        document.getElementById("bio");
 
+    const bioCount =
+        document.getElementById("bio-count");
 
-/*
- * Apply theme
- */
 
-function applyTheme(theme) {
-
-    if (theme === "dark") {
-
-        document.body.classList.add(
-            "dark"
-        );
-
-        return;
-
-    }
-
-
-    if (theme === "light") {
-
-        document.body.classList.remove(
-            "dark"
-        );
-
-        return;
-
-    }
-
-
-    /*
-     * System theme
-     */
-
-    const systemDark =
-        window.matchMedia(
-            "(prefers-color-scheme: dark)"
-        ).matches;
-
-
-    document.body.classList.toggle(
-        "dark",
-        systemDark
-    );
-
-}
-
-
-/*
- * Load saved appearance
- */
-
-function loadAppearance() {
-
-    const savedTheme =
-        localStorage.getItem(
-            "aero_theme"
-        ) || "system";
-
-
-    const savedCompact =
-        localStorage.getItem(
-            "aero_compact"
-        ) === "true";
-
-
-    themeSelect.value =
-        savedTheme;
-
-
-    compactMode.checked =
-        savedCompact;
-
-
-    applyTheme(
-        savedTheme
-    );
-
-
-    document.body.classList.toggle(
-        "compact",
-        savedCompact
-    );
-
-}
-
-
-/*
- * Change theme
- */
-
-themeSelect.addEventListener(
-    "change",
-    () => {
-
-        const theme =
-            themeSelect.value;
-
-
-        localStorage.setItem(
-            "aero_theme",
-            theme
-        );
-
-
-        applyTheme(
-            theme
-        );
-
-
-        showToast(
-            "Theme updated"
-        );
-
-    }
-);
-
-
-/*
- * Compact mode
- */
-
-compactMode.addEventListener(
-    "change",
-    () => {
-
-        const enabled =
-            compactMode.checked;
-
-
-        localStorage.setItem(
-            "aero_compact",
-            enabled
-        );
-
-
-        document.body.classList.toggle(
-            "compact",
-            enabled
-        );
-
-
-        showToast(
-            enabled
-                ? "Compact mode enabled"
-                : "Compact mode disabled"
-        );
-
-    }
-);
-
-
-/*
- * If system theme changes
- */
-
-window
-    .matchMedia(
-        "(prefers-color-scheme: dark)"
-    )
-    .addEventListener(
-        "change",
-        () => {
-
-            if (
-                themeSelect.value ===
-                "system"
-            ) {
-
-                applyTheme(
-                    "system"
-                );
-
-            }
-
-        }
-    );
-
-
-loadAppearance();
-
-
-    /* =========================================
-       TOGGLE SETTINGS
-    ========================================== */
-
-    const toggleMap = {
-
-        "compact-mode":
-            "compactMode",
-
-        "push-notifications":
-            "pushNotifications",
-
-        "like-notifications":
-            "likeNotifications",
-
-        "comment-notifications":
-            "commentNotifications",
-
-        "follow-notifications":
-            "followNotifications",
-
-        "private-account":
-            "privateAccount",
-
-        "online-status":
-            "onlineStatus"
-
-    };
-
-
-    Object.entries(toggleMap)
-        .forEach(
-            ([elementId, settingName]) => {
-
-                const element =
-                    document.getElementById(
-                        elementId
-                    );
-
-
-                if (!element) return;
-
-
-                element.addEventListener(
-                    "change",
-                    () => {
-
-                        const settings =
-                            getSettings();
-
-
-                        settings[settingName] =
-                            element.checked;
-
-
-                        saveSettings(
-                            settings
-                        );
-
-
-                        if (
-                            settingName ===
-                            "compactMode"
-                        ) {
-
-                            document.body.classList.toggle(
-                                "compact",
-                                element.checked
-                            );
-
-                        }
-
-
-                        showToast(
-                            element.checked
-                                ? "Setting enabled"
-                                : "Setting disabled"
-                        );
-
-                    }
-                );
-
-            }
-        );
-
-
-
-    /* =========================================
-   ACCOUNT
-========================================= */
-
-const usernameInput =
-    document.getElementById("username");
-
-const emailInput =
-    document.getElementById("email");
-
-const bioInput =
-    document.getElementById("bio");
-
-const profileName =
-    document.getElementById("profile-name");
-
-const profileEmail =
-    document.getElementById(
-        "profile-email-display"
-    );
-
-const profileAvatar =
-    document.getElementById(
-        "profile-avatar"
-    );
-
-const bioCount =
-    document.getElementById("bio-count");
-
-
-/*
- * Update bio character counter
- */
-
-bioInput.addEventListener(
-    "input",
-    () => {
+    function updateBioCount() {
 
         bioCount.textContent =
             `${bioInput.value.length} / 150`;
 
     }
-);
 
 
-/*
- * Load account information
- */
-
-async function loadAccount() {
-
-    try {
-
-        const response =
-            await fetch(
-                "/api/account",
-                {
-                    method: "GET",
-
-                    credentials: "include",
-
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    }
-                }
-            );
+    bioInput.addEventListener(
+        "input",
+        updateBioCount
+    );
 
 
-        if (!response.ok) {
+    function loadUser() {
 
-            throw new Error(
-                "Unable to load account"
-            );
+        let user = null;
+
+
+        /*
+         * Try the storage used by the Aero
+         * frontend.
+         */
+
+        try {
+
+            user =
+                JSON.parse(
+                    localStorage.getItem(
+                        "aero_user"
+                    )
+                );
+
+        } catch {
+
+            user = null;
 
         }
 
 
-        const user =
-            await response.json();
+        if (!user) {
+
+            try {
+
+                user =
+                    JSON.parse(
+                        localStorage.getItem(
+                            "currentUser"
+                        )
+                    );
+
+            } catch {
+
+                user = null;
+
+            }
+
+        }
+
+
+        if (!user) {
+
+            updateBioCount();
+
+            return;
+
+        }
 
 
         usernameInput.value =
             user.username || "";
 
-
         emailInput.value =
             user.email || "";
-
 
         bioInput.value =
             user.bio || "";
 
 
-        profileName.textContent =
+        document.getElementById(
+            "account-name"
+        ).textContent =
             user.username || "User";
 
 
-        profileEmail.textContent =
+        document.getElementById(
+            "account-email"
+        ).textContent =
             user.email || "";
+
+
+        const avatar =
+            document.getElementById(
+                "account-avatar"
+            );
 
 
         if (user.avatar_url) {
 
-            profileAvatar.style.backgroundImage =
+            avatar.style.backgroundImage =
                 `url("${user.avatar_url}")`;
 
-            profileAvatar.style.backgroundSize =
+            avatar.style.backgroundSize =
                 "cover";
 
-            profileAvatar.style.backgroundPosition =
+            avatar.style.backgroundPosition =
                 "center";
 
-            profileAvatar.textContent =
-                "";
+            avatar.textContent = "";
 
         } else {
 
-            profileAvatar.textContent =
-                (
-                    user.username ||
-                    "U"
-                )
-                .charAt(0)
-                .toUpperCase();
+            avatar.textContent =
+                (user.username || "U")
+                    .charAt(0)
+                    .toUpperCase();
 
         }
 
 
-        bioCount.textContent =
-            `${bioInput.value.length} / 150`;
+        updateBioCount();
 
     }
 
-    catch (error) {
 
-        console.error(error);
-
-        showToast(
-            "Unable to load account information"
-        );
-
-    }
-
-}
+    loadUser();
 
 
-/*
- * Save account
- */
+    /* Save Account */
 
-document
-    .getElementById("save-profile")
-    .addEventListener(
-        "click",
-        async () => {
+    document
+        .getElementById("save-account-button")
+        .addEventListener(
+            "click",
+            () => {
 
-            const username =
-                usernameInput.value.trim();
-
-            const bio =
-                bioInput.value.trim();
+                let user = {};
 
 
-            if (!username) {
+                try {
 
-                showToast(
-                    "Username cannot be empty"
-                );
+                    user =
+                        JSON.parse(
+                            localStorage.getItem(
+                                "aero_user"
+                            )
+                        ) || {};
 
-                return;
+                } catch {
 
-            }
-
-
-            try {
-
-                const button =
-                    document.getElementById(
-                        "save-profile"
-                    );
-
-
-                button.disabled = true;
-
-                button.textContent =
-                    "Saving...";
-
-
-                const response =
-                    await fetch(
-                        "/api/account",
-                        {
-                            method: "PUT",
-
-                            credentials: "include",
-
-                            headers: {
-                                "Content-Type":
-                                    "application/json"
-                            },
-
-                            body: JSON.stringify({
-
-                                username:
-                                    username,
-
-                                bio:
-                                    bio
-
-                            })
-
-                        }
-                    );
-
-
-                const data =
-                    await response.json();
-
-
-                if (!response.ok) {
-
-                    throw new Error(
-                        data.message ||
-                        "Unable to update account"
-                    );
+                    user = {};
 
                 }
 
 
-                profileName.textContent =
-                    username;
+                user.username =
+                    usernameInput.value.trim();
+
+                user.email =
+                    emailInput.value.trim();
+
+                user.bio =
+                    bioInput.value.trim();
 
 
-                showToast(
-                    "Account updated successfully"
+                localStorage.setItem(
+                    "aero_user",
+                    JSON.stringify(user)
                 );
 
-            }
 
-            catch (error) {
+                document.getElementById(
+                    "account-name"
+                ).textContent =
+                    user.username || "User";
 
-                console.error(error);
 
-                showToast(
-                    error.message ||
-                    "Failed to update account"
-                );
+                document.getElementById(
+                    "account-email"
+                ).textContent =
+                    user.email || "";
 
-            }
 
-            finally {
-
-                const button =
+                const avatar =
                     document.getElementById(
-                        "save-profile"
+                        "account-avatar"
                     );
 
 
-                button.disabled = false;
+                avatar.textContent =
+                    (
+                        user.username || "U"
+                    )
+                        .charAt(0)
+                        .toUpperCase();
 
-                button.textContent =
-                    "Save Changes";
+
+                showToast(
+                    "Account information saved"
+                );
 
             }
+        );
+
+
+    /* =========================================
+       APPEARANCE
+    ========================================= */
+
+    const themeSelect =
+        document.getElementById(
+            "theme-select"
+        );
+
+    const compactMode =
+        document.getElementById(
+            "compact-mode"
+        );
+
+
+    function applyTheme(theme) {
+
+        let actualTheme = theme;
+
+
+        if (theme === "system") {
+
+            actualTheme =
+                window.matchMedia(
+                    "(prefers-color-scheme: dark)"
+                ).matches
+                    ? "dark"
+                    : "light";
+
+        }
+
+
+        document.body.classList.toggle(
+            "dark-mode",
+            actualTheme === "dark"
+        );
+
+    }
+
+
+    themeSelect.addEventListener(
+        "change",
+        () => {
+
+            const settings =
+                getSettings();
+
+            settings.theme =
+                themeSelect.value;
+
+            saveSettings(settings);
+
+            applyTheme(
+                settings.theme
+            );
+
+            showToast(
+                "Theme updated"
+            );
 
         }
     );
 
 
+    compactMode.addEventListener(
+        "change",
+        () => {
+
+            const settings =
+                getSettings();
+
+            settings.compactMode =
+                compactMode.checked;
+
+            saveSettings(settings);
+
+            document.body.classList.toggle(
+                "compact-mode",
+                compactMode.checked
+            );
+
+            showToast(
+                compactMode.checked
+                    ? "Compact mode enabled"
+                    : "Compact mode disabled"
+            );
+
+        }
+    );
+
+
+    const savedSettings =
+        getSettings();
+
+
+    themeSelect.value =
+        savedSettings.theme;
+
+    compactMode.checked =
+        savedSettings.compactMode;
+
+    applyTheme(
+        savedSettings.theme
+    );
+
+
     /* =========================================
-       PASSWORD MODAL
-    ========================================== */
+       SECURITY
+    ========================================= */
 
     const passwordModal =
         document.getElementById(
@@ -848,8 +531,10 @@ document
         );
 
 
+    /* Open Change Password */
+
     document
-        .getElementById("change-password")
+        .getElementById("change-password-button")
         .addEventListener(
             "click",
             () => {
@@ -861,6 +546,8 @@ document
             }
         );
 
+
+    /* Close Change Password */
 
     document
         .getElementById("close-password")
@@ -876,38 +563,29 @@ document
         );
 
 
+    /* Save Password */
+
     document
-        .getElementById("update-password")
+        .getElementById("save-password-button")
         .addEventListener(
             "click",
             () => {
-
-                const current =
-                    document.getElementById(
-                        "current-password"
-                    ).value;
-
 
                 const newPassword =
                     document.getElementById(
                         "new-password"
                     ).value;
 
-
-                const confirmation =
+                const confirmPassword =
                     document.getElementById(
                         "confirm-password"
                     ).value;
 
 
-                if (
-                    !current ||
-                    !newPassword ||
-                    !confirmation
-                ) {
+                if (!newPassword) {
 
                     showToast(
-                        "Please fill in all fields"
+                        "Please enter a password"
                     );
 
                     return;
@@ -915,12 +593,10 @@ document
                 }
 
 
-                if (
-                    newPassword.length < 8
-                ) {
+                if (newPassword.length < 8) {
 
                     showToast(
-                        "Password must contain at least 8 characters"
+                        "Password must be at least 8 characters"
                     );
 
                     return;
@@ -930,7 +606,7 @@ document
 
                 if (
                     newPassword !==
-                    confirmation
+                    confirmPassword
                 ) {
 
                     showToast(
@@ -943,9 +619,10 @@ document
 
 
                 /*
-                 * Backend integration should go here.
+                 * Frontend placeholder.
                  *
-                 * Do NOT store passwords in localStorage.
+                 * Connect this to the Flask
+                 * password endpoint later.
                  */
 
                 passwordModal.classList.add(
@@ -954,14 +631,8 @@ document
 
 
                 document.getElementById(
-                    "current-password"
-                ).value = "";
-
-
-                document.getElementById(
                     "new-password"
                 ).value = "";
-
 
                 document.getElementById(
                     "confirm-password"
@@ -976,29 +647,25 @@ document
         );
 
 
-
-    /* =========================================
-       ACTIVE SESSIONS
-    ========================================== */
+    /* Active Sessions */
 
     document
-        .getElementById("view-sessions")
+        .getElementById("sessions-button")
         .addEventListener(
             "click",
             () => {
 
                 showToast(
-                    "You are currently signed in on this device"
+                    "Session management coming soon"
                 );
 
             }
         );
 
 
-
     /* =========================================
        DELETE ACCOUNT
-    ========================================== */
+    ========================================= */
 
     const deleteModal =
         document.getElementById(
@@ -1007,7 +674,7 @@ document
 
 
     document
-        .getElementById("delete-account")
+        .getElementById("delete-account-button")
         .addEventListener(
             "click",
             () => {
@@ -1052,31 +719,34 @@ document
         .getElementById("confirm-delete")
         .addEventListener(
             "click",
-            async () => {
+            () => {
 
                 /*
                  * IMPORTANT:
                  *
-                 * Replace this with your
-                 * DELETE /api/account request
-                 * when the backend endpoint exists.
+                 * This is currently frontend-only.
+                 * Do NOT use this as the real
+                 * account deletion mechanism.
+                 *
+                 * Connect it to the backend
+                 * DELETE /api/account endpoint.
                  */
-
 
                 localStorage.removeItem(
                     "aero_user"
                 );
 
-
                 localStorage.removeItem(
                     "currentUser"
                 );
 
+                localStorage.removeItem(
+                    "aero_settings"
+                );
 
                 localStorage.removeItem(
                     "aero_token"
                 );
-
 
                 localStorage.removeItem(
                     "token"
@@ -1093,14 +763,13 @@ document
         );
 
 
-
     /* =========================================
-       LOGOUT CONFIRMATION
-    ========================================== */
+       SIGN OUT CONFIRMATION
+    ========================================= */
 
-    const logoutModal =
+    const signOutModal =
         document.getElementById(
-            "logout-modal"
+            "sign-out-modal"
         );
 
 
@@ -1109,12 +778,12 @@ document
      */
 
     document
-        .getElementById("logout-button")
+        .getElementById("sign-out-button")
         .addEventListener(
             "click",
             () => {
 
-                logoutModal.classList.remove(
+                signOutModal.classList.remove(
                     "hidden"
                 );
 
@@ -1123,16 +792,30 @@ document
 
 
     /*
-     * Close with X
+     * Close confirmation
      */
 
     document
-        .getElementById("close-logout")
+        .getElementById("close-sign-out")
         .addEventListener(
             "click",
             () => {
 
-                logoutModal.classList.add(
+                signOutModal.classList.add(
+                    "hidden"
+                );
+
+            }
+        );
+
+
+    document
+        .getElementById("cancel-sign-out")
+        .addEventListener(
+            "click",
+            () => {
+
+                signOutModal.classList.add(
                     "hidden"
                 );
 
@@ -1141,32 +824,18 @@ document
 
 
     /*
-     * Cancel
+     * Confirm Sign Out
      */
 
     document
-        .getElementById("cancel-logout")
+        .getElementById("confirm-sign-out")
         .addEventListener(
             "click",
             () => {
 
-                logoutModal.classList.add(
-                    "hidden"
-                );
-
-            }
-        );
-
-
-    /*
-     * Confirm logout
-     */
-
-    document
-        .getElementById("confirm-logout")
-        .addEventListener(
-            "click",
-            () => {
+                /*
+                 * Remove authentication/session data.
+                 */
 
                 localStorage.removeItem(
                     "aero_token"
@@ -1184,8 +853,13 @@ document
                     "currentUser"
                 );
 
+
                 sessionStorage.clear();
 
+
+                /*
+                 * Return to login/home page.
+                 */
 
                 window.location.href =
                     "index.html";
@@ -1194,50 +868,32 @@ document
         );
 
 
-
     /* =========================================
-       INITIALISE SETTINGS
-    ========================================== */
+       BACK BUTTON
+    ========================================= */
 
-    const settings =
-        getSettings();
+    document
+        .getElementById("back-button")
+        .addEventListener(
+            "click",
+            () => {
 
+                /*
+                 * Go back to the previous page.
+                 */
 
-    theme.value =
-        settings.theme;
+                if (document.referrer) {
 
+                    window.history.back();
 
-    Object.entries(toggleMap)
-        .forEach(
-            ([elementId, settingName]) => {
+                } else {
 
-                const element =
-                    document.getElementById(
-                        elementId
-                    );
-
-
-                if (element) {
-
-                    element.checked =
-                        Boolean(
-                            settings[settingName]
-                        );
+                    window.location.href =
+                        "index.html";
 
                 }
 
             }
         );
-
-
-    applyTheme(
-        settings.theme
-    );
-
-
-    document.body.classList.toggle(
-        "compact",
-        settings.compactMode
-    );
 
 });
