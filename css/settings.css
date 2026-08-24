@@ -31,24 +31,23 @@ body.dark-mode {
 body {
     margin: 0;
 
-    min-height: 100vh;
+min-height: 100vh;
 
-    font-family:
+font-family:
         Inter,
         -apple-system,
         BlinkMacSystemFont,
         "Segoe UI",
         sans-serif;
 
-    background: var(--background);
+background: var(--background);
 
-    color: var(--text);
+color: var(--text);
 
-    transition:
+transition:
         background 0.25s ease,
         color 0.25s ease;
 }
-
 
 /* =================================
    HEADER
@@ -57,48 +56,48 @@ body {
 .settings-header {
     height: 70px;
 
-    display: grid;
+display: grid;
 
-    grid-template-columns: 1fr auto 1fr;
+grid-template-columns: 1fr auto 1fr;
 
-    align-items: center;
+align-items: center;
 
-    padding: 0 40px;
+padding: 0 40px;
 
-    background: var(--card);
+background: var(--card);
 
-    border-bottom: 1px solid var(--border);
+border-bottom: 1px solid var(--border);
 
-    position: sticky;
+position: sticky;
 
-    top: 0;
+top: 0;
 
-    z-index: 20;
+z-index: 20;
 }
 
 .logo {
     font-size: 22px;
 
-    font-weight: 700;
+font-weight: 700;
 }
 
 .back-button,
 .sign-out-button {
     border: 0;
 
-    background: transparent;
+background: transparent;
 
-    color: var(--text);
+color: var(--text);
 
-    cursor: pointer;
+cursor: pointer;
 
-    font-size: 14px;
+font-size: 14px;
 
-    padding: 9px 12px;
+padding: 9px 12px;
 
-    border-radius: 9px;
+border-radius: 9px;
 
-    transition: background 0.2s ease;
+transition: background 0.2s ease;
 }
 
 .back-button {
@@ -108,16 +107,15 @@ body {
 .sign-out-button {
     justify-self: end;
 
-    background: var(--hover);
+background: var(--hover);
 
-    font-weight: 600;
+font-weight: 600;
 }
 
 .back-button:hover,
 .sign-out-button:hover {
     background: var(--hover);
 }
-
 
 /* =================================
    MAIN
@@ -126,7 +124,7 @@ body {
 .settings-container {
     width: min(1100px, calc(100% - 40px));
 
-    margin: 45px auto 80px;
+margin: 45px auto 80px;
 }
 
 .settings-heading {
@@ -136,17 +134,16 @@ body {
 .settings-heading h1 {
     margin: 0 0 7px;
 
-    font-size: 32px;
+font-size: 32px;
 }
 
 .settings-heading p {
     margin: 0;
 
-    color: var(--muted);
+color: var(--muted);
 
-    font-size: 14px;
+font-size: 14px;
 }
-
 
 /* =================================
    LAYOUT
@@ -155,13 +152,12 @@ body {
 .settings-layout {
     display: grid;
 
-    grid-template-columns: 220px 1fr;
+grid-template-columns: 220px 1fr;
 
-    gap: 30px;
+gap: 30px;
 
-    align-items: start;
+align-items: start;
 }
-
 
 /* =================================
    SIDEBAR
@@ -170,43 +166,43 @@ body {
 .settings-sidebar {
     position: sticky;
 
-    top: 100px;
+top: 100px;
 
-    display: flex;
+display: flex;
 
-    flex-direction: column;
+flex-direction: column;
 
-    gap: 4px;
+gap: 4px;
 }
 
 .settings-tab {
     width: 100%;
 
-    border: 0;
+border: 0;
 
-    background: transparent;
+background: transparent;
 
-    color: var(--muted);
+color: var(--muted);
 
-    padding: 13px 15px;
+padding: 13px 15px;
 
-    border-radius: 11px;
+border-radius: 11px;
 
-    display: flex;
+display: flex;
 
-    align-items: center;
+align-items: center;
 
-    gap: 12px;
+gap: 12px;
 
-    text-align: left;
+text-align: left;
 
-    font: inherit;
+font: inherit;
 
-    font-size: 14px;
+font-size: 14px;
 
-    cursor: pointer;
+cursor: pointer;
 
-    transition:
+transition:
         background 0.2s ease,
         color 0.2s ease;
 }
@@ -214,17 +210,16 @@ body {
 .settings-tab:hover {
     background: var(--hover);
 
-    color: var(--text);
+color: var(--text);
 }
 
 .settings-tab.active {
     background: var(--hover);
 
-    color: var(--text);
+color: var(--text);
 
-    font-weight: 600;
+font-weight: 600;
 }
-
 
 /* =================================
    SETTINGS PAGES
@@ -233,7 +228,7 @@ body {
 .settings-section {
     display: none;
 
-    animation: pageIn 0.2s ease;
+animation: pageIn 0.2s ease;
 }
 
 .settings-section.active {
@@ -242,16 +237,16 @@ body {
 
 @keyframes pageIn {
 
-    from {
+from {
         opacity: 0;
 
-        transform: translateY(5px);
+transform: translateY(5px);
     }
 
-    to {
+to {
         opacity: 1;
 
-        transform: translateY(0);
+transform: translateY(0);
     }
 }
 
@@ -262,17 +257,16 @@ body {
 .section-heading h2 {
     margin: 0 0 6px;
 
-    font-size: 22px;
+font-size: 22px;
 }
 
 .section-heading p {
     margin: 0;
 
-    color: var(--muted);
+color: var(--muted);
 
-    font-size: 14px;
+font-size: 14px;
 }
-
 
 /* =================================
    CARD
@@ -281,15 +275,50 @@ body {
 .settings-card {
     background: var(--card);
 
-    border: 1px solid var(--border);
+border: 1px solid var(--border);
 
-    border-radius: 18px;
+border-radius: 18px;
 
-    padding: 25px;
+padding: 25px;
 
-    box-shadow: var(--shadow);
+box-shadow: var(--shadow);
 }
 
+body.compact-mode .settings-container {
+    margin-top: 30px;
+    margin-bottom: 55px;
+}
+
+body.compact-mode .settings-heading {
+    margin-bottom: 20px;
+}
+
+body.compact-mode .settings-card {
+    padding: 18px;
+    border-radius: 12px;
+}
+
+body.compact-mode .profile-preview {
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+}
+
+body.compact-mode .form-group {
+    margin-bottom: 14px;
+}
+
+body.compact-mode .setting-row,
+body.compact-mode .security-row {
+    padding: 12px 0;
+}
+
+body.compact-mode .security-row {
+    padding: 14px 0;
+}
+
+body.compact-mode .danger-zone {
+    padding-top: 18px;
+}
 
 /* =================================
    PROFILE
@@ -298,53 +327,52 @@ body {
 .profile-preview {
     display: flex;
 
-    align-items: center;
+align-items: center;
 
-    gap: 14px;
+gap: 14px;
 
-    padding-bottom: 23px;
+padding-bottom: 23px;
 
-    margin-bottom: 23px;
+margin-bottom: 23px;
 
-    border-bottom: 1px solid var(--border);
+border-bottom: 1px solid var(--border);
 }
 
 .avatar {
     width: 56px;
 
-    height: 56px;
+height: 56px;
 
-    display: flex;
+display: flex;
 
-    align-items: center;
+align-items: center;
 
-    justify-content: center;
+justify-content: center;
 
-    border-radius: 50%;
+border-radius: 50%;
 
-    background: var(--primary);
+background: var(--primary);
 
-    color: var(--primary-text);
+color: var(--primary-text);
 
-    font-weight: 700;
+font-weight: 700;
 
-    font-size: 20px;
+font-size: 20px;
 }
 
 .profile-preview h3 {
     margin: 0 0 4px;
 
-    font-size: 16px;
+font-size: 16px;
 }
 
 .profile-preview p {
     margin: 0;
 
-    color: var(--muted);
+color: var(--muted);
 
-    font-size: 13px;
+font-size: 13px;
 }
-
 
 /* =================================
    FORMS
@@ -353,17 +381,17 @@ body {
 .form-group {
     margin-bottom: 20px;
 
-    position: relative;
+position: relative;
 }
 
 .form-group label {
     display: block;
 
-    margin-bottom: 8px;
+margin-bottom: 8px;
 
-    font-size: 13px;
+font-size: 13px;
 
-    font-weight: 600;
+font-weight: 600;
 }
 
 .form-group input,
@@ -371,21 +399,21 @@ body {
 .setting-row select {
     width: 100%;
 
-    padding: 11px 13px;
+padding: 11px 13px;
 
-    border: 1px solid var(--border);
+border: 1px solid var(--border);
 
-    border-radius: 10px;
+border-radius: 10px;
 
-    background: var(--hover);
+background: var(--hover);
 
-    color: var(--text);
+color: var(--text);
 
-    font: inherit;
+font: inherit;
 
-    outline: none;
+outline: none;
 
-    transition: border 0.2s ease;
+transition: border 0.2s ease;
 }
 
 .form-group input:focus,
@@ -397,21 +425,20 @@ body {
 .form-group textarea {
     min-height: 110px;
 
-    resize: vertical;
+resize: vertical;
 }
 
 .character-count {
     position: absolute;
 
-    right: 10px;
+right: 10px;
 
-    bottom: 9px;
+bottom: 9px;
 
-    color: var(--muted);
+color: var(--muted);
 
-    font-size: 11px;
+font-size: 11px;
 }
-
 
 /* =================================
    BUTTONS
@@ -422,19 +449,19 @@ body {
 .danger-button {
     border: 0;
 
-    border-radius: 9px;
+border-radius: 9px;
 
-    padding: 10px 16px;
+padding: 10px 16px;
 
-    font: inherit;
+font: inherit;
 
-    font-size: 13px;
+font-size: 13px;
 
-    font-weight: 600;
+font-weight: 600;
 
-    cursor: pointer;
+cursor: pointer;
 
-    transition:
+transition:
         opacity 0.2s ease,
         transform 0.15s ease;
 }
@@ -444,33 +471,32 @@ body {
 .danger-button:hover {
     opacity: 0.85;
 
-    transform: translateY(-1px);
+transform: translateY(-1px);
 }
 
 .primary-button {
     background: var(--primary);
 
-    color: var(--primary-text);
+color: var(--primary-text);
 }
 
 .secondary-button {
     background: var(--hover);
 
-    color: var(--text);
+color: var(--text);
 
-    border: 1px solid var(--border);
+border: 1px solid var(--border);
 }
 
 .danger-button {
     background: var(--danger);
 
-    color: white;
+color: white;
 }
 
 .full-width {
     width: 100%;
 }
-
 
 /* =================================
    SETTING ROWS
@@ -480,15 +506,15 @@ body {
 .security-row {
     display: flex;
 
-    align-items: center;
+align-items: center;
 
-    justify-content: space-between;
+justify-content: space-between;
 
-    gap: 20px;
+gap: 20px;
 
-    padding: 18px 0;
+padding: 18px 0;
 
-    border-bottom: 1px solid var(--border);
+border-bottom: 1px solid var(--border);
 }
 
 .setting-row:first-child,
@@ -506,7 +532,7 @@ body {
 .danger-zone h3 {
     margin: 0 0 5px;
 
-    font-size: 14px;
+font-size: 14px;
 }
 
 .setting-row p,
@@ -514,17 +540,16 @@ body {
 .danger-zone p {
     margin: 0;
 
-    color: var(--muted);
+color: var(--muted);
 
-    font-size: 12px;
+font-size: 12px;
 
-    line-height: 1.5;
+line-height: 1.5;
 }
 
 .setting-row select {
     width: 150px;
 }
-
 
 /* =================================
    SWITCH
@@ -533,53 +558,53 @@ body {
 .switch {
     width: 45px;
 
-    height: 25px;
+height: 25px;
 
-    position: relative;
+position: relative;
 
-    flex-shrink: 0;
+flex-shrink: 0;
 }
 
 .switch input {
     width: 0;
 
-    height: 0;
+height: 0;
 
-    opacity: 0;
+opacity: 0;
 }
 
 .slider {
     position: absolute;
 
-    inset: 0;
+inset: 0;
 
-    border-radius: 30px;
+border-radius: 30px;
 
-    background: var(--hover);
+background: var(--hover);
 
-    border: 1px solid var(--border);
+border: 1px solid var(--border);
 
-    cursor: pointer;
+cursor: pointer;
 }
 
 .slider::before {
     content: "";
 
-    position: absolute;
+position: absolute;
 
-    width: 19px;
+width: 19px;
 
-    height: 19px;
+height: 19px;
 
-    left: 2px;
+left: 2px;
 
-    top: 2px;
+top: 2px;
 
-    border-radius: 50%;
+border-radius: 50%;
 
-    background: var(--muted);
+background: var(--muted);
 
-    transition: 0.2s;
+transition: 0.2s;
 }
 
 .switch input:checked + .slider {
@@ -589,15 +614,14 @@ body {
 .switch input:checked + .slider::before {
     transform: translateX(20px);
 
-    background: var(--primary-text);
+background: var(--primary-text);
 }
 
 .switch input:disabled + .slider {
     cursor: not-allowed;
 
-    opacity: 0.45;
+opacity: 0.45;
 }
-
 
 /* =================================
    SECURITY
@@ -610,19 +634,18 @@ body {
 .danger-zone {
     display: flex;
 
-    justify-content: space-between;
+justify-content: space-between;
 
-    align-items: center;
+align-items: center;
 
-    gap: 20px;
+gap: 20px;
 
-    padding-top: 25px;
+padding-top: 25px;
 
-    margin-top: 5px;
+margin-top: 5px;
 
-    border-top: 1px solid var(--border);
+border-top: 1px solid var(--border);
 }
-
 
 /* =================================
    COMING SOON
@@ -631,19 +654,18 @@ body {
 .coming-soon {
     margin-top: 20px;
 
-    padding: 12px;
+padding: 12px;
 
-    border-radius: 9px;
+border-radius: 9px;
 
-    background: var(--hover);
+background: var(--hover);
 
-    color: var(--muted);
+color: var(--muted);
 
-    font-size: 12px;
+font-size: 12px;
 
-    text-align: center;
+text-align: center;
 }
-
 
 /* =================================
    TOAST
@@ -652,39 +674,38 @@ body {
 .toast {
     position: fixed;
 
-    left: 50%;
+left: 50%;
 
-    bottom: 30px;
+bottom: 30px;
 
-    transform: translate(-50%, 20px);
+transform: translate(-50%, 20px);
 
-    padding: 12px 18px;
+padding: 12px 18px;
 
-    background: var(--primary);
+background: var(--primary);
 
-    color: var(--primary-text);
+color: var(--primary-text);
 
-    border-radius: 10px;
+border-radius: 10px;
 
-    font-size: 13px;
+font-size: 13px;
 
-    opacity: 0;
+opacity: 0;
 
-    pointer-events: none;
+pointer-events: none;
 
-    transition:
+transition:
         opacity 0.2s ease,
         transform 0.2s ease;
 
-    z-index: 100;
+z-index: 100;
 }
 
 .toast.show {
     opacity: 1;
 
-    transform: translate(-50%, 0);
+transform: translate(-50%, 0);
 }
-
 
 /* =================================
    MODALS
@@ -693,19 +714,19 @@ body {
 .modal-overlay {
     position: fixed;
 
-    inset: 0;
+inset: 0;
 
-    display: flex;
+display: flex;
 
-    align-items: center;
+align-items: center;
 
-    justify-content: center;
+justify-content: center;
 
-    background: rgba(0, 0, 0, 0.5);
+background: rgba(0, 0, 0, 0.5);
 
-    backdrop-filter: blur(5px);
+backdrop-filter: blur(5px);
 
-    z-index: 200;
+z-index: 200;
 }
 
 .modal-overlay.hidden {
@@ -715,63 +736,62 @@ body {
 .modal {
     width: min(430px, calc(100% - 30px));
 
-    background: var(--card);
+background: var(--card);
 
-    color: var(--text);
+color: var(--text);
 
-    border: 1px solid var(--border);
+border: 1px solid var(--border);
 
-    border-radius: 18px;
+border-radius: 18px;
 
-    padding: 25px;
+padding: 25px;
 
-    position: relative;
+position: relative;
 
-    box-shadow: var(--shadow);
+box-shadow: var(--shadow);
 }
 
 .modal h2 {
     margin: 0 0 10px;
 
-    font-size: 20px;
+font-size: 20px;
 }
 
 .modal > p {
     margin: 0 0 22px;
 
-    color: var(--muted);
+color: var(--muted);
 
-    font-size: 13px;
+font-size: 13px;
 
-    line-height: 1.6;
+line-height: 1.6;
 }
 
 .modal-close {
     position: absolute;
 
-    right: 15px;
+right: 15px;
 
-    top: 11px;
+top: 11px;
 
-    border: 0;
+border: 0;
 
-    background: transparent;
+background: transparent;
 
-    color: var(--muted);
+color: var(--muted);
 
-    font-size: 25px;
+font-size: 25px;
 
-    cursor: pointer;
+cursor: pointer;
 }
 
 .modal-actions {
     display: flex;
 
-    justify-content: flex-end;
+justify-content: flex-end;
 
-    gap: 10px;
+gap: 10px;
 }
-
 
 /* =================================
    RESPONSIVE
@@ -779,45 +799,45 @@ body {
 
 @media (max-width: 750px) {
 
-    .settings-header {
+.settings-header {
         padding: 0 20px;
     }
 
-    .settings-container {
+.settings-container {
         width: calc(100% - 25px);
 
-        margin-top: 30px;
+margin-top: 30px;
     }
 
-    .settings-layout {
+.settings-layout {
         grid-template-columns: 1fr;
     }
 
-    .settings-sidebar {
+.settings-sidebar {
         position: static;
 
-        display: grid;
+display: grid;
 
-        grid-template-columns: repeat(2, 1fr);
+grid-template-columns: repeat(2, 1fr);
     }
 
-    .settings-tab {
+.settings-tab {
         justify-content: center;
     }
 
-    .setting-row,
+.setting-row,
     .security-row,
     .danger-zone {
         align-items: flex-start;
 
-        flex-direction: column;
+flex-direction: column;
     }
 
-    .setting-row select {
+.setting-row select {
         width: 100%;
     }
 
-    .danger-zone {
+.danger-zone {
         gap: 15px;
     }
 }

@@ -4,57 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Aero - Settings</title>
+<title>Aero - Settings</title>
 
-    <link rel="stylesheet" href="css/settings.css">
+<link rel="stylesheet" href="css/settings.css">
 </head>
 
 <body>
 
-    <!-- =========================
+<!-- =========================
          SETTINGS NAVBAR
     ========================== -->
 
-    <header class="settings-header">
+<header class="settings-header">
 
-        <button class="back-button" id="back-button">
+<button class="back-button" id="back-button">
             <span>←</span>
             <span>Back</span>
         </button>
 
-        <div class="logo">
+<div class="logo">
             Aero
         </div>
 
-        <button class="sign-out-button" id="sign-out-button">
+<button class="sign-out-button" id="sign-out-button">
             Sign Out
         </button>
 
-    </header>
+</header>
 
-
-    <!-- =========================
+<!-- =========================
          MAIN SETTINGS
     ========================== -->
 
-    <main class="settings-container">
+<main class="settings-container">
 
-        <div class="settings-heading">
+<div class="settings-heading">
             <h1>Settings</h1>
             <p>Manage your Aero account and preferences.</p>
         </div>
 
+<div class="settings-layout">
 
-        <div class="settings-layout">
-
-
-            <!-- =========================
+<!-- =========================
                  SIDEBAR
             ========================== -->
 
-            <aside class="settings-sidebar">
+<aside class="settings-sidebar">
 
-                <button
+<button
                     class="settings-tab active"
                     data-section="account"
                 >
@@ -62,8 +59,7 @@
                     <span>Account</span>
                 </button>
 
-
-                <button
+<button
                     class="settings-tab"
                     data-section="appearance"
                 >
@@ -71,8 +67,7 @@
                     <span>Appearance</span>
                 </button>
 
-
-                <button
+<button
                     class="settings-tab"
                     data-section="notifications"
                 >
@@ -80,8 +75,7 @@
                     <span>Notifications</span>
                 </button>
 
-
-                <button
+<button
                     class="settings-tab"
                     data-section="privacy"
                 >
@@ -89,8 +83,7 @@
                     <span>Privacy</span>
                 </button>
 
-
-                <button
+<button
                     class="settings-tab"
                     data-section="security"
                 >
@@ -98,714 +91,658 @@
                     <span>Security</span>
                 </button>
 
-            </aside>
+</aside>
 
-
-
-            <!-- =========================
+<!-- =========================
                  SETTINGS CONTENT
             ========================== -->
 
-            <section class="settings-content">
+<section class="settings-content">
 
-
-                <!-- =====================
+<!-- =====================
                      ACCOUNT
                 ====================== -->
 
-                <div
+<div
                     class="settings-section active"
                     id="section-account"
                 >
 
-                    <div class="section-heading">
+<div class="section-heading">
 
-                        <h2>Account</h2>
+<h2>Account</h2>
 
-                        <p>
+<p>
                             Manage your account information.
                         </p>
 
-                    </div>
+</div>
 
+<div class="settings-card">
 
-                    <div class="settings-card">
+<div class="profile-preview">
 
-                        <div class="profile-preview">
-
-                            <div
+<div
                                 class="avatar"
                                 id="account-avatar"
                             >
                                 U
                             </div>
 
-                            <div>
+<div>
 
-                                <h3 id="account-name">
+<h3 id="account-name">
                                     User
                                 </h3>
 
-                                <p id="account-email">
+<p id="account-email">
                                     user@example.com
                                 </p>
 
-                            </div>
+</div>
 
-                        </div>
+</div>
 
+<div class="form-group">
 
-                        <div class="form-group">
-
-                            <label for="username">
+<label for="username">
                                 Username
                             </label>
 
-                            <input
+<input
                                 type="text"
                                 id="username"
                                 placeholder="Enter username"
                             >
 
-                        </div>
+</div>
 
+<div class="form-group">
 
-                        <div class="form-group">
-
-                            <label for="email">
+<label for="email">
                                 Email
                             </label>
 
-                            <input
+<input
                                 type="email"
                                 id="email"
                                 placeholder="Enter email"
                             >
 
-                        </div>
+</div>
 
+<div class="form-group">
 
-                        <div class="form-group">
-
-                            <label for="bio">
+<label for="bio">
                                 Bio
                             </label>
 
-                            <textarea
+<textarea
                                 id="bio"
                                 maxlength="150"
                                 placeholder="Tell people about yourself..."
                             ></textarea>
 
-                            <span
+<span
                                 class="character-count"
                                 id="bio-count"
                             >
                                 0 / 150
                             </span>
 
-                        </div>
+</div>
 
-
-                        <button
+<button
                             class="primary-button"
                             id="save-account-button"
                         >
                             Save Changes
                         </button>
 
-                    </div>
+</div>
 
-                </div>
+</div>
 
-
-
-                <!-- =====================
+<!-- =====================
                      APPEARANCE
                 ====================== -->
 
-                <div
+<div
                     class="settings-section"
                     id="section-appearance"
                 >
 
-                    <div class="section-heading">
+<div class="section-heading">
 
-                        <h2>Appearance</h2>
+<h2>Appearance</h2>
 
-                        <p>
+<p>
                             Customize the way Aero looks.
                         </p>
 
-                    </div>
+</div>
 
+<div class="settings-card">
 
-                    <div class="settings-card">
+<div class="setting-row">
 
-                        <div class="setting-row">
+<div>
 
-                            <div>
+<h3>Theme</h3>
 
-                                <h3>Theme</h3>
-
-                                <p>
+<p>
                                     Choose between light, dark,
                                     or your system theme.
                                 </p>
 
-                            </div>
+</div>
 
+<select id="theme-select">
 
-                            <select id="theme-select">
-
-                                <option value="light">
+<option value="light">
                                     Light
                                 </option>
 
-                                <option value="dark">
+<option value="dark">
                                     Dark
                                 </option>
 
-                                <option value="system">
+<option value="system">
                                     System
                                 </option>
 
-                            </select>
+</select>
 
-                        </div>
+</div>
 
+<div class="setting-row">
 
-                        <div class="setting-row">
+<div>
 
-                            <div>
+<h3>Compact Mode</h3>
 
-                                <h3>Compact Mode</h3>
-
-                                <p>
+<p>
                                     Reduce spacing throughout
                                     the interface.
                                 </p>
 
-                            </div>
+</div>
 
+<label class="switch">
 
-                            <label class="switch">
-
-                                <input
+<input
                                     type="checkbox"
                                     id="compact-mode"
                                 >
 
-                                <span class="slider"></span>
+<span class="slider"></span>
 
-                            </label>
+</label>
 
-                        </div>
+</div>
 
-                    </div>
+</div>
 
-                </div>
+</div>
 
-
-
-                <!-- =====================
+<!-- =====================
                      NOTIFICATIONS
                 ====================== -->
 
-                <div
+<div
                     class="settings-section"
                     id="section-notifications"
                 >
 
-                    <div class="section-heading">
+<div class="section-heading">
 
-                        <h2>Notifications</h2>
+<h2>Notifications</h2>
 
-                        <p>
+<p>
                             Manage your notification preferences.
                         </p>
 
-                    </div>
+</div>
 
+<div class="settings-card">
 
-                    <div class="settings-card">
+<div class="setting-row">
 
-                        <div class="setting-row">
+<div>
 
-                            <div>
+<h3>Push Notifications</h3>
 
-                                <h3>Push Notifications</h3>
-
-                                <p>
+<p>
                                     Receive notifications from Aero.
                                 </p>
 
-                            </div>
+</div>
 
+<label class="switch">
 
-                            <label class="switch">
-
-                                <input
+<input
                                     type="checkbox"
                                     disabled
                                 >
 
-                                <span class="slider"></span>
+<span class="slider"></span>
 
-                            </label>
+</label>
 
-                        </div>
+</div>
 
+<div class="setting-row">
 
-                        <div class="setting-row">
+<div>
 
-                            <div>
+<h3>Likes</h3>
 
-                                <h3>Likes</h3>
-
-                                <p>
+<p>
                                     Notify me when someone likes
                                     my post.
                                 </p>
 
-                            </div>
+</div>
 
+<label class="switch">
 
-                            <label class="switch">
-
-                                <input
+<input
                                     type="checkbox"
                                     disabled
                                 >
 
-                                <span class="slider"></span>
+<span class="slider"></span>
 
-                            </label>
+</label>
 
-                        </div>
+</div>
 
+<div class="setting-row">
 
-                        <div class="setting-row">
+<div>
 
-                            <div>
+<h3>Comments</h3>
 
-                                <h3>Comments</h3>
-
-                                <p>
+<p>
                                     Notify me when someone comments.
                                 </p>
 
-                            </div>
+</div>
 
+<label class="switch">
 
-                            <label class="switch">
-
-                                <input
+<input
                                     type="checkbox"
                                     disabled
                                 >
 
-                                <span class="slider"></span>
+<span class="slider"></span>
 
-                            </label>
+</label>
 
-                        </div>
+</div>
 
-                        <div class="coming-soon">
+<div class="coming-soon">
                             Notification settings coming soon.
                         </div>
 
-                    </div>
+</div>
 
-                </div>
+</div>
 
-
-
-                <!-- =====================
+<!-- =====================
                      PRIVACY
                 ====================== -->
 
-                <div
+<div
                     class="settings-section"
                     id="section-privacy"
                 >
 
-                    <div class="section-heading">
+<div class="section-heading">
 
-                        <h2>Privacy</h2>
+<h2>Privacy</h2>
 
-                        <p>
+<p>
                             Manage your privacy preferences.
                         </p>
 
-                    </div>
+</div>
 
+<div class="settings-card">
 
-                    <div class="settings-card">
+<div class="setting-row">
 
-                        <div class="setting-row">
+<div>
 
-                            <div>
+<h3>Private Account</h3>
 
-                                <h3>Private Account</h3>
-
-                                <p>
+<p>
                                     Only approved users can view
                                     your posts.
                                 </p>
 
-                            </div>
+</div>
 
+<label class="switch">
 
-                            <label class="switch">
-
-                                <input
+<input
                                     type="checkbox"
                                     disabled
                                 >
 
-                                <span class="slider"></span>
+<span class="slider"></span>
 
-                            </label>
+</label>
 
-                        </div>
+</div>
 
+<div class="setting-row">
 
-                        <div class="setting-row">
+<div>
 
-                            <div>
+<h3>Online Status</h3>
 
-                                <h3>Online Status</h3>
-
-                                <p>
+<p>
                                     Allow other users to see
                                     your online status.
                                 </p>
 
-                            </div>
+</div>
 
+<label class="switch">
 
-                            <label class="switch">
-
-                                <input
+<input
                                     type="checkbox"
                                     disabled
                                 >
 
-                                <span class="slider"></span>
+<span class="slider"></span>
 
-                            </label>
+</label>
 
-                        </div>
+</div>
 
-
-                        <div class="coming-soon">
+<div class="coming-soon">
                             Privacy settings coming soon.
                         </div>
 
-                    </div>
+</div>
 
-                </div>
+</div>
 
-
-
-                <!-- =====================
+<!-- =====================
                      SECURITY
                 ====================== -->
 
-                <div
+<div
                     class="settings-section"
                     id="section-security"
                 >
 
-                    <div class="section-heading">
+<div class="section-heading">
 
-                        <h2>Security</h2>
+<h2>Security</h2>
 
-                        <p>
+<p>
                             Manage your account security.
                         </p>
 
-                    </div>
+</div>
 
+<div class="settings-card">
 
-                    <div class="settings-card">
+<!-- CHANGE PASSWORD -->
 
+<div class="security-row">
 
-                        <!-- CHANGE PASSWORD -->
+<div>
 
-                        <div class="security-row">
+<h3>Password</h3>
 
-                            <div>
-
-                                <h3>Password</h3>
-
-                                <p>
+<p>
                                     Change your Aero password.
                                 </p>
 
-                            </div>
+</div>
 
-
-                            <button
+<button
                                 class="secondary-button"
                                 id="change-password-button"
                             >
                                 Change Password
                             </button>
 
-                        </div>
+</div>
 
+<!-- ACTIVE SESSIONS -->
 
+<div class="security-row">
 
-                        <!-- ACTIVE SESSIONS -->
+<div>
 
-                        <div class="security-row">
+<h3>Active Sessions</h3>
 
-                            <div>
-
-                                <h3>Active Sessions</h3>
-
-                                <p>
+<p>
                                     View devices currently
                                     signed into your account.
                                 </p>
 
-                            </div>
+</div>
 
-
-                            <button
+<button
                                 class="secondary-button"
                                 id="sessions-button"
                             >
                                 View Sessions
                             </button>
 
-                        </div>
+</div>
 
+<!-- DELETE ACCOUNT -->
 
+<div class="danger-zone">
 
-                        <!-- DELETE ACCOUNT -->
+<div>
 
-                        <div class="danger-zone">
+<h3>Delete Account</h3>
 
-                            <div>
-
-                                <h3>Delete Account</h3>
-
-                                <p>
+<p>
                                     Permanently delete your
                                     Aero account and data.
                                 </p>
 
-                            </div>
+</div>
 
-
-                            <button
+<button
                                 class="danger-button"
                                 id="delete-account-button"
                             >
                                 Delete Account
                             </button>
 
-                        </div>
+</div>
 
-                    </div>
+</div>
 
-                </div>
+</div>
 
-            </section>
+</section>
 
-        </div>
+</div>
 
-    </main>
+</main>
 
-
-
-    <!-- =========================
+<!-- =========================
          TOAST
     ========================== -->
 
-    <div
+<div
         class="toast"
         id="toast"
     >
         <span id="toast-message"></span>
     </div>
 
-
-
-    <!-- =========================
+<!-- =========================
          SIGN OUT CONFIRMATION
     ========================== -->
 
-    <div
+<div
         class="modal-overlay hidden"
         id="sign-out-modal"
     >
 
-        <div class="modal">
+<div class="modal">
 
-            <button
+<button
                 class="modal-close"
                 id="close-sign-out"
             >
                 ×
             </button>
 
-            <h2>Sign out?</h2>
+<h2>Sign out?</h2>
 
-            <p>
+<p>
                 Are you sure you want to sign out
                 of your Aero account?
             </p>
 
+<div class="modal-actions">
 
-            <div class="modal-actions">
-
-                <button
+<button
                     class="secondary-button"
                     id="cancel-sign-out"
                 >
                     Cancel
                 </button>
 
-
-                <button
+<button
                     class="danger-button"
                     id="confirm-sign-out"
                 >
                     Sign Out
                 </button>
 
-            </div>
+</div>
 
-        </div>
+</div>
 
-    </div>
+</div>
 
-
-
-    <!-- =========================
+<!-- =========================
          CHANGE PASSWORD
     ========================== -->
 
-    <div
+<div
         class="modal-overlay hidden"
         id="password-modal"
     >
 
-        <div class="modal">
+<div class="modal">
 
-            <button
+<button
                 class="modal-close"
                 id="close-password"
             >
                 ×
             </button>
 
-            <h2>Change Password</h2>
+<h2>Change Password</h2>
 
-            <p>
+<p>
                 Enter your new password.
             </p>
 
+<div class="form-group">
 
-            <div class="form-group">
-
-                <label for="new-password">
+<label for="new-password">
                     New Password
                 </label>
 
-                <input
+<input
                     type="password"
                     id="new-password"
                     placeholder="Minimum 8 characters"
                 >
 
-            </div>
+</div>
 
+<div class="form-group">
 
-            <div class="form-group">
-
-                <label for="confirm-password">
+<label for="confirm-password">
                     Confirm Password
                 </label>
 
-                <input
+<input
                     type="password"
                     id="confirm-password"
                     placeholder="Confirm password"
                 >
 
-            </div>
+</div>
 
-
-            <button
+<button
                 class="primary-button full-width"
                 id="save-password-button"
             >
                 Update Password
             </button>
 
-        </div>
+</div>
 
-    </div>
+</div>
 
-
-
-    <!-- =========================
+<!-- =========================
          DELETE ACCOUNT
     ========================== -->
 
-    <div
+<div
         class="modal-overlay hidden"
         id="delete-modal"
     >
 
-        <div class="modal">
+<div class="modal">
 
-            <button
+<button
                 class="modal-close"
                 id="close-delete"
             >
                 ×
             </button>
 
-            <h2>Delete Account?</h2>
+<h2>Delete Account?</h2>
 
-            <p>
+<p>
                 This action cannot be undone.
                 Your account and associated data
                 will be permanently deleted.
             </p>
 
+<div class="modal-actions">
 
-            <div class="modal-actions">
-
-                <button
+<button
                     class="secondary-button"
                     id="cancel-delete"
                 >
                     Cancel
                 </button>
 
-
-                <button
+<button
                     class="danger-button"
                     id="confirm-delete"
                 >
                     Delete Account
                 </button>
 
-            </div>
+</div>
 
-        </div>
+</div>
 
-    </div>
+</div>
 
-
-    <script src="js/settings.js"></script>
+<script src="js/settings.js"></script>
 
 </body>
 </html>
