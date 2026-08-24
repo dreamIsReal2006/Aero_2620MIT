@@ -176,119 +176,118 @@
                     ================================== -->
 
                     <div
-                        class="settings-page active"
-                        id="page-account"
-                    >
+    class="settings-page active"
+    id="page-account"
+>
 
-                        <div class="section-heading">
+    <div class="section-heading">
 
-                            <h2>
-                                Account
-                            </h2>
+        <h2>Account</h2>
 
-                            <p>
-                                Manage your profile information.
-                            </p>
+        <p>
+            Manage your profile information.
+        </p>
 
-                        </div>
+    </div>
 
 
-                        <div class="settings-card">
+    <div class="settings-card">
 
-                            <div class="profile-header">
+        <div class="profile-header">
 
-                                <div
-                                    class="profile-avatar"
-                                    id="profile-avatar"
-                                >
-                                    U
-                                </div>
+            <div
+                class="profile-avatar"
+                id="profile-avatar"
+            >
+                U
+            </div>
 
-                                <div>
+            <div>
 
-                                    <h3
-                                        id="profile-name"
-                                    >
-                                        User
-                                    </h3>
+                <h3 id="profile-name">
+                    User
+                </h3>
 
-                                    <p
-                                        id="profile-email-display"
-                                    >
-                                        user@example.com
-                                    </p>
+                <p id="profile-email-display">
+                    Loading...
+                </p>
 
-                                </div>
+            </div>
 
-                            </div>
+        </div>
 
 
-                            <div class="form-group">
+        <div class="form-group">
 
-                                <label for="username">
-                                    Username
-                                </label>
+            <label for="username">
+                Username
+            </label>
 
-                                <input
-                                    type="text"
-                                    id="username"
-                                    placeholder="Username"
-                                >
+            <input
+                type="text"
+                id="username"
+                placeholder="Username"
+            >
 
-                            </div>
-
-
-                            <div class="form-group">
-
-                                <label for="email">
-                                    Email
-                                </label>
-
-                                <input
-                                    type="email"
-                                    id="email"
-                                    placeholder="Email"
-                                >
-
-                            </div>
+        </div>
 
 
-                            <div class="form-group">
+        <div class="form-group">
 
-                                <label for="bio">
-                                    Bio
-                                </label>
+            <label for="email">
+                Email
+            </label>
 
-                                <textarea
-                                    id="bio"
-                                    maxlength="150"
-                                    placeholder="Tell people about yourself..."
-                                ></textarea>
+            <input
+                type="email"
+                id="email"
+                placeholder="Email"
+                disabled
+            >
 
-                                <span
-                                    class="character-count"
-                                    id="bio-count"
-                                >
-                                    0 / 150
-                                </span>
+            <small>
+                Email cannot be changed here.
+            </small>
 
-                            </div>
+        </div>
 
 
-                            <div class="button-row">
+        <div class="form-group">
 
-                                <button
-                                    class="button primary"
-                                    id="save-profile"
-                                >
-                                    Save Changes
-                                </button>
+            <label for="bio">
+                Bio
+            </label>
 
-                            </div>
+            <textarea
+                id="bio"
+                maxlength="150"
+                placeholder="Tell people about yourself..."
+            ></textarea>
 
-                        </div>
+            <span
+                class="character-count"
+                id="bio-count"
+            >
+                0 / 150
+            </span>
 
-                    </div>
+        </div>
+
+
+        <div class="button-row">
+
+            <button
+                class="button primary"
+                id="save-profile"
+            >
+                Save Changes
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
 
 
 
@@ -891,7 +890,53 @@
 
     </div>
 
+    <!-- =========================================
+        LOGOUT CONFIRMATION MODAL
+    ========================================== -->
 
+<div
+    class="modal-overlay hidden"
+    id="logout-modal"
+>
+
+    <div class="modal">
+
+        <button
+            class="modal-close"
+            id="close-logout"
+        >
+            ×
+        </button>
+
+        <h2>
+            Sign Out?
+        </h2>
+
+        <p>
+            Are you sure you want to sign out of your Aero account?
+        </p>
+
+        <div class="modal-buttons">
+
+            <button
+                class="button secondary"
+                id="cancel-logout"
+            >
+                Cancel
+            </button>
+
+            <button
+                class="button primary"
+                id="confirm-logout"
+            >
+                Sign Out
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
 
     <script src="js/settings.js"></script>
 

@@ -1456,10 +1456,10 @@ document.addEventListener('click', event => {
     }
 });
 
-document
-    .getElementById("settings-btn")
-    .addEventListener("click", () => {
-
-        window.location.href = "settings.html";
-
+// Settings navigation
+const settingsButton = document.getElementById('settings-btn');
+if (settingsButton) {
+    settingsButton.addEventListener('click', () => {
+        window.location.href = 'settings.html';
     });
+}

@@ -439,145 +439,124 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     /* =========================================
-       PROFILE
-    ========================================== */
+   ACCOUNT
+========================================= */
 
-    const username =
-        document.getElementById(
-            "username"
-        );
+const usernameInput =
+    document.getElementById("username");
 
+const emailInput =
+    document.getElementById("email");
 
-    const email =
-        document.getElementById(
-            "email"
-        );
+const bioInput =
+    document.getElementById("bio");
 
+const profileName =
+    document.getElementById("profile-name");
 
-    const bio =
-        document.getElementById(
-            "bio"
-        );
-
-
-    const bioCount =
-        document.getElementById(
-            "bio-count"
-        );
-
-
-    function updateBioCount() {
-
-        bioCount.textContent =
-            `${bio.value.length} / 150`;
-
-    }
-
-
-    bio.addEventListener(
-        "input",
-        updateBioCount
+const profileEmail =
+    document.getElementById(
+        "profile-email-display"
     );
 
+const profileAvatar =
+    document.getElementById(
+        "profile-avatar"
+    );
 
-    function getStoredUser() {
-
-        const keys = [
-
-            "aero_user",
-
-            "currentUser"
-
-        ];
+const bioCount =
+    document.getElementById("bio-count");
 
 
-        for (const key of keys) {
+/*
+ * Update bio character counter
+ */
 
-            try {
+bioInput.addEventListener(
+    "input",
+    () => {
 
-                const user =
-                    JSON.parse(
-                        localStorage.getItem(
-                            key
-                        )
-                    );
-
-
-                if (user) {
-
-                    return user;
-
-                }
-
-            } catch {}
-
-        }
-
-
-        return null;
+        bioCount.textContent =
+            `${bioInput.value.length} / 150`;
 
     }
+);
 
 
-    function loadUser() {
+/*
+ * Load account information
+ */
 
-        const user =
-            getStoredUser();
+async function loadAccount() {
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/account",
+                {
+                    method: "GET",
+
+                    credentials: "include",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    }
+                }
+            );
 
 
-        if (!user) {
+        if (!response.ok) {
 
-            return;
+            throw new Error(
+                "Unable to load account"
+            );
 
         }
 
 
-        username.value =
+        const user =
+            await response.json();
+
+
+        usernameInput.value =
             user.username || "";
 
 
-        email.value =
+        emailInput.value =
             user.email || "";
 
 
-        bio.value =
+        bioInput.value =
             user.bio || "";
 
 
-        document.getElementById(
-            "profile-name"
-        ).textContent =
+        profileName.textContent =
             user.username || "User";
 
 
-        document.getElementById(
-            "profile-email-display"
-        ).textContent =
+        profileEmail.textContent =
             user.email || "";
-
-
-        const avatar =
-            document.getElementById(
-                "profile-avatar"
-            );
 
 
         if (user.avatar_url) {
 
-            avatar.style.backgroundImage =
+            profileAvatar.style.backgroundImage =
                 `url("${user.avatar_url}")`;
 
-            avatar.style.backgroundSize =
+            profileAvatar.style.backgroundSize =
                 "cover";
 
-            avatar.style.backgroundPosition =
+            profileAvatar.style.backgroundPosition =
                 "center";
 
-            avatar.textContent = "";
+            profileAvatar.textContent =
+                "";
 
         } else {
 
-            avatar.textContent =
+            profileAvatar.textContent =
                 (
                     user.username ||
                     "U"
@@ -588,71 +567,145 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
 
-        updateBioCount();
+        bioCount.textContent =
+            `${bioInput.value.length} / 150`;
 
     }
 
+    catch (error) {
 
-    loadUser();
+        console.error(error);
 
+        showToast(
+            "Unable to load account information"
+        );
 
-    /* =========================================
-       SAVE PROFILE
-    ========================================== */
+    }
 
-    document
-        .getElementById("save-profile")
-        .addEventListener(
-            "click",
-            () => {
-
-                const existingUser =
-                    getStoredUser() || {};
+}
 
 
-                const user = {
+/*
+ * Save account
+ */
 
-                    ...existingUser,
+document
+    .getElementById("save-profile")
+    .addEventListener(
+        "click",
+        async () => {
 
-                    username:
-                        username.value.trim(),
+            const username =
+                usernameInput.value.trim();
 
-                    email:
-                        email.value.trim(),
-
-                    bio:
-                        bio.value.trim()
-
-                };
+            const bio =
+                bioInput.value.trim();
 
 
-                localStorage.setItem(
-                    "aero_user",
-                    JSON.stringify(user)
+            if (!username) {
+
+                showToast(
+                    "Username cannot be empty"
                 );
 
+                return;
 
-                document.getElementById(
-                    "profile-name"
-                ).textContent =
-                    user.username ||
-                    "User";
+            }
 
 
-                document.getElementById(
-                    "profile-email-display"
-                ).textContent =
-                    user.email ||
-                    "";
+            try {
+
+                const button =
+                    document.getElementById(
+                        "save-profile"
+                    );
+
+
+                button.disabled = true;
+
+                button.textContent =
+                    "Saving...";
+
+
+                const response =
+                    await fetch(
+                        "/api/account",
+                        {
+                            method: "PUT",
+
+                            credentials: "include",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body: JSON.stringify({
+
+                                username:
+                                    username,
+
+                                bio:
+                                    bio
+
+                            })
+
+                        }
+                    );
+
+
+                const data =
+                    await response.json();
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        data.message ||
+                        "Unable to update account"
+                    );
+
+                }
+
+
+                profileName.textContent =
+                    username;
 
 
                 showToast(
-                    "Profile saved"
+                    "Account updated successfully"
                 );
 
             }
-        );
 
+            catch (error) {
+
+                console.error(error);
+
+                showToast(
+                    error.message ||
+                    "Failed to update account"
+                );
+
+            }
+
+            finally {
+
+                const button =
+                    document.getElementById(
+                        "save-profile"
+                    );
+
+
+                button.disabled = false;
+
+                button.textContent =
+                    "Save Changes";
+
+            }
+
+        }
+    );
 
 
     /* =========================================
@@ -912,11 +965,75 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     /* =========================================
-       LOGOUT
+       LOGOUT CONFIRMATION
     ========================================== */
+
+    const logoutModal =
+        document.getElementById(
+            "logout-modal"
+        );
+
+
+    /*
+     * Open confirmation
+     */
 
     document
         .getElementById("logout-button")
+        .addEventListener(
+            "click",
+            () => {
+
+                logoutModal.classList.remove(
+                    "hidden"
+                );
+
+            }
+        );
+
+
+    /*
+     * Close with X
+     */
+
+    document
+        .getElementById("close-logout")
+        .addEventListener(
+            "click",
+            () => {
+
+                logoutModal.classList.add(
+                    "hidden"
+                );
+
+            }
+        );
+
+
+    /*
+     * Cancel
+     */
+
+    document
+        .getElementById("cancel-logout")
+        .addEventListener(
+            "click",
+            () => {
+
+                logoutModal.classList.add(
+                    "hidden"
+                );
+
+            }
+        );
+
+
+    /*
+     * Confirm logout
+     */
+
+    document
+        .getElementById("confirm-logout")
         .addEventListener(
             "click",
             () => {
@@ -925,21 +1042,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     "aero_token"
                 );
 
-
                 localStorage.removeItem(
                     "token"
                 );
-
 
                 localStorage.removeItem(
                     "aero_user"
                 );
 
-
                 localStorage.removeItem(
                     "currentUser"
                 );
-
 
                 sessionStorage.clear();
 
