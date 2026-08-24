@@ -288,67 +288,197 @@ document.addEventListener("DOMContentLoaded", () => {
        THEME
     ========================================== */
 
-    const theme =
-        document.getElementById(
-            "theme"
+    /* =========================================
+   APPEARANCE
+========================================= */
+
+const themeSelect =
+    document.getElementById("theme");
+
+const compactMode =
+    document.getElementById(
+        "compact-mode"
+    );
+
+
+/*
+ * Apply theme
+ */
+
+function applyTheme(theme) {
+
+    if (theme === "dark") {
+
+        document.body.classList.add(
+            "dark"
         );
 
-
-    function applyTheme(themeValue) {
-
-        let finalTheme =
-            themeValue;
-
-
-        if (themeValue === "system") {
-
-            finalTheme =
-                window.matchMedia(
-                    "(prefers-color-scheme: dark)"
-                ).matches
-                    ? "dark"
-                    : "light";
-
-        }
-
-
-        document.body.classList.toggle(
-            "dark",
-            finalTheme === "dark"
-        );
+        return;
 
     }
 
 
-    theme.addEventListener(
+    if (theme === "light") {
+
+        document.body.classList.remove(
+            "dark"
+        );
+
+        return;
+
+    }
+
+
+    /*
+     * System theme
+     */
+
+    const systemDark =
+        window.matchMedia(
+            "(prefers-color-scheme: dark)"
+        ).matches;
+
+
+    document.body.classList.toggle(
+        "dark",
+        systemDark
+    );
+
+}
+
+
+/*
+ * Load saved appearance
+ */
+
+function loadAppearance() {
+
+    const savedTheme =
+        localStorage.getItem(
+            "aero_theme"
+        ) || "system";
+
+
+    const savedCompact =
+        localStorage.getItem(
+            "aero_compact"
+        ) === "true";
+
+
+    themeSelect.value =
+        savedTheme;
+
+
+    compactMode.checked =
+        savedCompact;
+
+
+    applyTheme(
+        savedTheme
+    );
+
+
+    document.body.classList.toggle(
+        "compact",
+        savedCompact
+    );
+
+}
+
+
+/*
+ * Change theme
+ */
+
+themeSelect.addEventListener(
+    "change",
+    () => {
+
+        const theme =
+            themeSelect.value;
+
+
+        localStorage.setItem(
+            "aero_theme",
+            theme
+        );
+
+
+        applyTheme(
+            theme
+        );
+
+
+        showToast(
+            "Theme updated"
+        );
+
+    }
+);
+
+
+/*
+ * Compact mode
+ */
+
+compactMode.addEventListener(
+    "change",
+    () => {
+
+        const enabled =
+            compactMode.checked;
+
+
+        localStorage.setItem(
+            "aero_compact",
+            enabled
+        );
+
+
+        document.body.classList.toggle(
+            "compact",
+            enabled
+        );
+
+
+        showToast(
+            enabled
+                ? "Compact mode enabled"
+                : "Compact mode disabled"
+        );
+
+    }
+);
+
+
+/*
+ * If system theme changes
+ */
+
+window
+    .matchMedia(
+        "(prefers-color-scheme: dark)"
+    )
+    .addEventListener(
         "change",
         () => {
 
-            const settings =
-                getSettings();
+            if (
+                themeSelect.value ===
+                "system"
+            ) {
 
+                applyTheme(
+                    "system"
+                );
 
-            settings.theme =
-                theme.value;
-
-
-            saveSettings(
-                settings
-            );
-
-
-            applyTheme(
-                settings.theme
-            );
-
-
-            showToast(
-                "Theme updated"
-            );
+            }
 
         }
     );
 
+
+loadAppearance();
 
 
     /* =========================================
