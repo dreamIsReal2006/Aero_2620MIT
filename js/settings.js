@@ -229,10 +229,7 @@ document.addEventListener("DOMContentLoaded", () => {
         let user = null;
 
 
-        /*
-         * Try the storage used by the Aero
-         * frontend.
-         */
+        
 
         try {
 
@@ -623,12 +620,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
 
-                /*
-                 * Frontend placeholder.
-                 *
-                 * Connect this to the Flask
-                 * password endpoint later.
-                 */
+                
 
                 passwordModal.classList.add(
                     "hidden"
@@ -726,16 +718,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "click",
             () => {
 
-                /*
-                 * IMPORTANT:
-                 *
-                 * This is currently frontend-only.
-                 * Do NOT use this as the real
-                 * account deletion mechanism.
-                 *
-                 * Connect it to the backend
-                 * DELETE /api/account endpoint.
-                 */
+               
 
                 localStorage.removeItem(
                     "aero_user"
@@ -878,27 +861,15 @@ document.addEventListener("DOMContentLoaded", () => {
     ========================================= */
 
     document
-        .getElementById("back-button")
-        .addEventListener(
-            "click",
-            () => {
+    .getElementById("back-button")
+    .addEventListener(
+        "click",
+        () => {
 
-                /*
-                 * Go back to the previous page.
-                 */
+            window.location.href =
+                "index.html";
 
-                if (document.referrer) {
-
-                    window.history.back();
-
-                } else {
-
-                    window.location.href =
-                        "index.html";
-
-                }
-
-            }
-        );
+        }
+    );
 
 });
