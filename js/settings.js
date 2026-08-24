@@ -1,132 +1,142 @@
 document.addEventListener("DOMContentLoaded", () => {
 
-/* =========================================
+    /* =========================================
        ELEMENTS
     ========================================= */
 
-const tabs =
+    const tabs =
         document.querySelectorAll(".settings-tab");
 
-const sections =
+    const sections =
         document.querySelectorAll(".settings-section");
 
-/* =========================================
+
+    /* =========================================
        SETTINGS STORAGE
     ========================================= */
 
-const defaultSettings = {
+    const defaultSettings = {
         theme: "light",
         compactMode: false
     };
 
-function getSettings() {
 
-try {
+    function getSettings() {
 
-const saved =
+        try {
+
+            const saved =
                 JSON.parse(
                     localStorage.getItem("aero_settings")
                 );
 
-return {
+            return {
                 ...defaultSettings,
                 ...(saved || {})
             };
 
-} catch {
+        } catch {
 
-return {
+            return {
                 ...defaultSettings
             };
 
-}
+        }
     }
 
-function saveSettings(settings) {
 
-localStorage.setItem(
+    function saveSettings(settings) {
+
+        localStorage.setItem(
             "aero_settings",
             JSON.stringify(settings)
         );
 
-}
+    }
 
-/* =========================================
+
+    /* =========================================
        TOAST
     ========================================= */
 
-function showToast(message) {
+    function showToast(message) {
 
-const toast =
+        const toast =
             document.getElementById("toast");
 
-const messageElement =
+        const messageElement =
             document.getElementById("toast-message");
 
-messageElement.textContent = message;
+        messageElement.textContent = message;
 
-toast.classList.add("show");
+        toast.classList.add("show");
 
-clearTimeout(window.toastTimer);
+        clearTimeout(window.toastTimer);
 
-window.toastTimer =
+        window.toastTimer =
             setTimeout(() => {
 
-toast.classList.remove("show");
+                toast.classList.remove("show");
 
-}, 2500);
+            }, 2500);
     }
 
-/* =========================================
+
+    /* =========================================
        SETTINGS SECTION NAVIGATION
        NO PAGE REFRESH
     ========================================= */
 
-function showSection(
+    function showSection(
         sectionName,
         updateHistory = true
     ) {
 
-const section =
+        const section =
             document.getElementById(
                 `section-${sectionName}`
             );
 
-const tab =
+        const tab =
             document.querySelector(
                 `[data-section="${sectionName}"]`
             );
 
-if (!section || !tab) {
 
-sectionName = "account";
+        if (!section || !tab) {
 
-return showSection(
+            sectionName = "account";
+
+            return showSection(
                 sectionName,
                 updateHistory
             );
 
-}
+        }
 
-sections.forEach(item => {
 
-item.classList.remove("active");
+        sections.forEach(item => {
 
-});
+            item.classList.remove("active");
 
-tabs.forEach(item => {
+        });
 
-item.classList.remove("active");
 
-});
+        tabs.forEach(item => {
 
-section.classList.add("active");
+            item.classList.remove("active");
 
-tab.classList.add("active");
+        });
 
-if (updateHistory) {
 
-history.pushState(
+        section.classList.add("active");
+
+        tab.classList.add("active");
+
+
+        if (updateHistory) {
+
+            history.pushState(
                 {
                     section: sectionName
                 },
@@ -134,539 +144,589 @@ history.pushState(
                 `#${sectionName}`
             );
 
-}
+        }
 
-}
+    }
 
-tabs.forEach(tab => {
 
-tab.addEventListener("click", () => {
+    tabs.forEach(tab => {
 
-showSection(
+        tab.addEventListener("click", () => {
+
+            showSection(
                 tab.dataset.section
             );
 
-});
+        });
 
-});
+    });
 
-/* Browser Back / Forward */
 
-window.addEventListener(
+    /* Browser Back / Forward */
+
+    window.addEventListener(
         "popstate",
         () => {
 
-const section =
+            const section =
                 window.location.hash
                     .replace("#", "");
 
-showSection(
+            showSection(
                 section || "account",
                 false
             );
 
-}
+        }
     );
 
-/* Initial section */
 
-const initialSection =
+    /* Initial section */
+
+    const initialSection =
         window.location.hash
             .replace("#", "");
 
-showSection(
+    showSection(
         initialSection || "account",
         false
     );
 
-/* =========================================
+
+    /* =========================================
        ACCOUNT
     ========================================= */
 
-const usernameInput =
+    const usernameInput =
         document.getElementById("username");
 
-const emailInput =
+    const emailInput =
         document.getElementById("email");
 
-const bioInput =
+    const bioInput =
         document.getElementById("bio");
 
-const bioCount =
+    const bioCount =
         document.getElementById("bio-count");
 
-function updateBioCount() {
 
-bioCount.textContent =
+    function updateBioCount() {
+
+        bioCount.textContent =
             `${bioInput.value.length} / 150`;
 
-}
+    }
 
-bioInput.addEventListener(
+
+    bioInput.addEventListener(
         "input",
         updateBioCount
     );
 
-function loadUser() {
 
-let user = null;
+    function loadUser() {
 
-/*
+        let user = null;
+
+
+        /*
          * Try the storage used by the Aero
          * frontend.
          */
 
-try {
+        try {
 
-user =
+            user =
                 JSON.parse(
                     localStorage.getItem(
                         "aero_user"
                     )
                 );
 
-} catch {
+        } catch {
 
-user = null;
+            user = null;
 
-}
+        }
 
-if (!user) {
 
-try {
+        if (!user) {
 
-user =
+            try {
+
+                user =
                     JSON.parse(
                         localStorage.getItem(
                             "currentUser"
                         )
                     );
 
-} catch {
+            } catch {
 
-user = null;
+                user = null;
 
-}
+            }
 
-}
+        }
 
-if (!user) {
 
-updateBioCount();
+        if (!user) {
 
-return;
+            updateBioCount();
 
-}
+            return;
 
-usernameInput.value =
+        }
+
+
+        usernameInput.value =
             user.username || "";
 
-emailInput.value =
+        emailInput.value =
             user.email || "";
 
-bioInput.value =
+        bioInput.value =
             user.bio || "";
 
-document.getElementById(
+
+        document.getElementById(
             "account-name"
         ).textContent =
             user.username || "User";
 
-document.getElementById(
+
+        document.getElementById(
             "account-email"
         ).textContent =
             user.email || "";
 
-const avatar =
+
+        const avatar =
             document.getElementById(
                 "account-avatar"
             );
 
-if (user.avatar_url) {
 
-avatar.style.backgroundImage =
+        if (user.avatar_url) {
+
+            avatar.style.backgroundImage =
                 `url("${user.avatar_url}")`;
 
-avatar.style.backgroundSize =
+            avatar.style.backgroundSize =
                 "cover";
 
-avatar.style.backgroundPosition =
+            avatar.style.backgroundPosition =
                 "center";
 
-avatar.textContent = "";
+            avatar.textContent = "";
 
-} else {
+        } else {
 
-avatar.textContent =
+            avatar.textContent =
                 (user.username || "U")
                     .charAt(0)
                     .toUpperCase();
 
-}
+        }
 
-updateBioCount();
 
-}
+        updateBioCount();
 
-loadUser();
+    }
 
-/* Save Account */
 
-document
+    loadUser();
+
+
+    /* Save Account */
+
+    document
         .getElementById("save-account-button")
         .addEventListener(
             "click",
             () => {
 
-let user = {};
+                let user = {};
 
-try {
 
-user =
+                try {
+
+                    user =
                         JSON.parse(
                             localStorage.getItem(
                                 "aero_user"
                             )
                         ) || {};
 
-} catch {
+                } catch {
 
-user = {};
+                    user = {};
 
-}
+                }
 
-user.username =
+
+                user.username =
                     usernameInput.value.trim();
 
-user.email =
+                user.email =
                     emailInput.value.trim();
 
-user.bio =
+                user.bio =
                     bioInput.value.trim();
 
-localStorage.setItem(
+
+                localStorage.setItem(
                     "aero_user",
                     JSON.stringify(user)
                 );
 
-document.getElementById(
+
+                document.getElementById(
                     "account-name"
                 ).textContent =
                     user.username || "User";
 
-document.getElementById(
+
+                document.getElementById(
                     "account-email"
                 ).textContent =
                     user.email || "";
 
-const avatar =
+
+                const avatar =
                     document.getElementById(
                         "account-avatar"
                     );
 
-avatar.textContent =
+
+                avatar.textContent =
                     (
                         user.username || "U"
                     )
                         .charAt(0)
                         .toUpperCase();
 
-showToast(
+
+                showToast(
                     "Account information saved"
                 );
 
-}
+            }
         );
 
-/* =========================================
+
+    /* =========================================
        APPEARANCE
     ========================================= */
 
-const themeSelect =
+    const themeSelect =
         document.getElementById(
             "theme-select"
         );
 
-const compactMode =
+    const compactMode =
         document.getElementById(
             "compact-mode"
         );
 
-function applyTheme(theme) {
 
-let actualTheme = theme;
+    function applyTheme(theme) {
 
-if (theme === "system") {
+        let actualTheme = theme;
 
-actualTheme =
+
+        if (theme === "system") {
+
+            actualTheme =
                 window.matchMedia(
                     "(prefers-color-scheme: dark)"
                 ).matches
                     ? "dark"
                     : "light";
 
-}
+        }
 
-document.body.classList.toggle(
+
+        document.body.classList.toggle(
             "dark-mode",
             actualTheme === "dark"
         );
 
-}
+    }
 
-themeSelect.addEventListener(
+
+    themeSelect.addEventListener(
         "change",
         () => {
 
-const settings =
+            const settings =
                 getSettings();
 
-settings.theme =
+            settings.theme =
                 themeSelect.value;
 
-saveSettings(settings);
+            saveSettings(settings);
 
-applyTheme(
+            applyTheme(
                 settings.theme
             );
 
-showToast(
+            showToast(
                 "Theme updated"
             );
 
-}
+        }
     );
 
-compactMode.addEventListener(
+
+    compactMode.addEventListener(
         "change",
         () => {
 
-const settings =
+            const settings =
                 getSettings();
 
-settings.compactMode =
+            settings.compactMode =
                 compactMode.checked;
 
-saveSettings(settings);
+            saveSettings(settings);
 
-document.body.classList.toggle(
+            document.body.classList.toggle(
                 "compact-mode",
                 compactMode.checked
             );
 
-showToast(
+            showToast(
                 compactMode.checked
                     ? "Compact mode enabled"
                     : "Compact mode disabled"
             );
 
-}
+        }
     );
 
-const savedSettings =
+
+    const savedSettings =
         getSettings();
 
-themeSelect.value =
+
+    themeSelect.value =
         savedSettings.theme;
 
-compactMode.checked =
+    compactMode.checked =
         savedSettings.compactMode;
 
-document.body.classList.toggle(
+    document.body.classList.toggle(
         "compact-mode",
         savedSettings.compactMode
     );
 
-applyTheme(
+    applyTheme(
         savedSettings.theme
     );
 
-/* =========================================
+
+    /* =========================================
        SECURITY
     ========================================= */
 
-const passwordModal =
+    const passwordModal =
         document.getElementById(
             "password-modal"
         );
 
-/* Open Change Password */
 
-document
+    /* Open Change Password */
+
+    document
         .getElementById("change-password-button")
         .addEventListener(
             "click",
             () => {
 
-passwordModal.classList.remove(
+                passwordModal.classList.remove(
                     "hidden"
                 );
 
-}
+            }
         );
 
-/* Close Change Password */
 
-document
+    /* Close Change Password */
+
+    document
         .getElementById("close-password")
         .addEventListener(
             "click",
             () => {
 
-passwordModal.classList.add(
+                passwordModal.classList.add(
                     "hidden"
                 );
 
-}
+            }
         );
 
-/* Save Password */
 
-document
+    /* Save Password */
+
+    document
         .getElementById("save-password-button")
         .addEventListener(
             "click",
             () => {
 
-const newPassword =
+                const newPassword =
                     document.getElementById(
                         "new-password"
                     ).value;
 
-const confirmPassword =
+                const confirmPassword =
                     document.getElementById(
                         "confirm-password"
                     ).value;
 
-if (!newPassword) {
 
-showToast(
+                if (!newPassword) {
+
+                    showToast(
                         "Please enter a password"
                     );
 
-return;
+                    return;
 
-}
+                }
 
-if (newPassword.length < 8) {
 
-showToast(
+                if (newPassword.length < 8) {
+
+                    showToast(
                         "Password must be at least 8 characters"
                     );
 
-return;
+                    return;
 
-}
+                }
 
-if (
+
+                if (
                     newPassword !==
                     confirmPassword
                 ) {
 
-showToast(
+                    showToast(
                         "Passwords do not match"
                     );
 
-return;
+                    return;
 
-}
+                }
 
-/*
+
+                /*
                  * Frontend placeholder.
                  *
                  * Connect this to the Flask
                  * password endpoint later.
                  */
 
-passwordModal.classList.add(
+                passwordModal.classList.add(
                     "hidden"
                 );
 
-document.getElementById(
+
+                document.getElementById(
                     "new-password"
                 ).value = "";
 
-document.getElementById(
+                document.getElementById(
                     "confirm-password"
                 ).value = "";
 
-showToast(
+
+                showToast(
                     "Password update requested"
                 );
 
-}
+            }
         );
 
-/* Active Sessions */
 
-document
+    /* Active Sessions */
+
+    document
         .getElementById("sessions-button")
         .addEventListener(
             "click",
             () => {
 
-showToast(
+                showToast(
                     "Session management coming soon"
                 );
 
-}
+            }
         );
 
-/* =========================================
+
+    /* =========================================
        DELETE ACCOUNT
     ========================================= */
 
-const deleteModal =
+    const deleteModal =
         document.getElementById(
             "delete-modal"
         );
 
-document
+
+    document
         .getElementById("delete-account-button")
         .addEventListener(
             "click",
             () => {
 
-deleteModal.classList.remove(
+                deleteModal.classList.remove(
                     "hidden"
                 );
 
-}
+            }
         );
 
-document
+
+    document
         .getElementById("close-delete")
         .addEventListener(
             "click",
             () => {
 
-deleteModal.classList.add(
+                deleteModal.classList.add(
                     "hidden"
                 );
 
-}
+            }
         );
 
-document
+
+    document
         .getElementById("cancel-delete")
         .addEventListener(
             "click",
             () => {
 
-deleteModal.classList.add(
+                deleteModal.classList.add(
                     "hidden"
                 );
 
-}
+            }
         );
 
-document
+
+    document
         .getElementById("confirm-delete")
         .addEventListener(
             "click",
             () => {
 
-/*
+                /*
                  * IMPORTANT:
                  *
                  * This is currently frontend-only.
@@ -677,158 +737,168 @@ document
                  * DELETE /api/account endpoint.
                  */
 
-localStorage.removeItem(
+                localStorage.removeItem(
                     "aero_user"
                 );
 
-localStorage.removeItem(
+                localStorage.removeItem(
                     "currentUser"
                 );
 
-localStorage.removeItem(
+                localStorage.removeItem(
                     "aero_settings"
                 );
 
-localStorage.removeItem(
+                localStorage.removeItem(
                     "aero_token"
                 );
 
-localStorage.removeItem(
+                localStorage.removeItem(
                     "token"
                 );
 
-sessionStorage.clear();
 
-window.location.href =
+                sessionStorage.clear();
+
+
+                window.location.href =
                     "index.html";
 
-}
+            }
         );
 
-/* =========================================
+
+    /* =========================================
        SIGN OUT CONFIRMATION
     ========================================= */
 
-const signOutModal =
+    const signOutModal =
         document.getElementById(
             "sign-out-modal"
         );
 
-/*
+
+    /*
      * Open confirmation
      */
 
-document
+    document
         .getElementById("sign-out-button")
         .addEventListener(
             "click",
             () => {
 
-signOutModal.classList.remove(
+                signOutModal.classList.remove(
                     "hidden"
                 );
 
-}
+            }
         );
 
-/*
+
+    /*
      * Close confirmation
      */
 
-document
+    document
         .getElementById("close-sign-out")
         .addEventListener(
             "click",
             () => {
 
-signOutModal.classList.add(
+                signOutModal.classList.add(
                     "hidden"
                 );
 
-}
+            }
         );
 
-document
+
+    document
         .getElementById("cancel-sign-out")
         .addEventListener(
             "click",
             () => {
 
-signOutModal.classList.add(
+                signOutModal.classList.add(
                     "hidden"
                 );
 
-}
+            }
         );
 
-/*
+
+    /*
      * Confirm Sign Out
      */
 
-document
+    document
         .getElementById("confirm-sign-out")
         .addEventListener(
             "click",
             () => {
 
-/*
+                /*
                  * Remove authentication/session data.
                  */
 
-localStorage.removeItem(
+                localStorage.removeItem(
                     "aero_token"
                 );
 
-localStorage.removeItem(
+                localStorage.removeItem(
                     "token"
                 );
 
-localStorage.removeItem(
+                localStorage.removeItem(
                     "aero_user"
                 );
 
-localStorage.removeItem(
+                localStorage.removeItem(
                     "currentUser"
                 );
 
-sessionStorage.clear();
 
-/*
+                sessionStorage.clear();
+
+
+                /*
                  * Return to login/home page.
                  */
 
-window.location.href =
+                window.location.href =
                     "index.html";
 
-}
+            }
         );
 
-/* =========================================
+
+    /* =========================================
        BACK BUTTON
     ========================================= */
 
-document
+    document
         .getElementById("back-button")
         .addEventListener(
             "click",
             () => {
 
-/*
+                /*
                  * Go back to the previous page.
                  */
 
-if (document.referrer) {
+                if (document.referrer) {
 
-window.history.back();
+                    window.history.back();
 
-} else {
+                } else {
 
-window.location.href =
+                    window.location.href =
                         "index.html";
 
-}
+                }
 
-}
+            }
         );
 
 });
