@@ -1455,3 +1455,11 @@ document.addEventListener('click', event => {
         });
     }
 });
+
+document
+    .getElementById("settings-btn")
+    .addEventListener("click", () => {
+
+        window.location.href = "settings.html";
+
+    });

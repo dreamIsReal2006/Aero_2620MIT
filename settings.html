@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Aero — Settings</title>
+
+    <link
+        rel="stylesheet"
+        href="css/settings.css"
+    >
+</head>
+
+<body>
+
+    <!-- =========================================
+         APP
+    ========================================== -->
+
+    <div class="settings-app">
+
+        <!-- =====================================
+             TOP BAR
+        ====================================== -->
+
+        <header class="settings-header">
+
+            <a
+                href="index.html"
+                class="back-button"
+            >
+                <span class="back-icon">←</span>
+                <span>Back</span>
+            </a>
+
+
+            <div class="logo">
+                Aero
+            </div>
+
+
+            <button
+                class="logout-button"
+                id="logout-button"
+            >
+                Sign Out
+            </button>
+
+        </header>
+
+
+        <!-- =====================================
+             SETTINGS BODY
+        ====================================== -->
+
+        <main class="settings-container">
+
+            <div class="page-heading">
+
+                <h1>Settings</h1>
+
+                <p>
+                    Manage your account and preferences.
+                </p>
+
+            </div>
+
+
+            <div class="settings-layout">
+
+
+                <!-- =================================
+                     SIDEBAR
+                ================================== -->
+
+                <aside class="settings-sidebar">
+
+                    <button
+                        class="settings-link active"
+                        data-page="account"
+                    >
+
+                        <span class="settings-icon">
+                            👤
+                        </span>
+
+                        <span>
+                            Account
+                        </span>
+
+                    </button>
+
+
+                    <button
+                        class="settings-link"
+                        data-page="appearance"
+                    >
+
+                        <span class="settings-icon">
+                            ◐
+                        </span>
+
+                        <span>
+                            Appearance
+                        </span>
+
+                    </button>
+
+
+                    <button
+                        class="settings-link"
+                        data-page="notifications"
+                    >
+
+                        <span class="settings-icon">
+                            🔔
+                        </span>
+
+                        <span>
+                            Notifications
+                        </span>
+
+                    </button>
+
+
+                    <button
+                        class="settings-link"
+                        data-page="privacy"
+                    >
+
+                        <span class="settings-icon">
+                            🔒
+                        </span>
+
+                        <span>
+                            Privacy
+                        </span>
+
+                    </button>
+
+
+                    <button
+                        class="settings-link"
+                        data-page="security"
+                    >
+
+                        <span class="settings-icon">
+                            🛡
+                        </span>
+
+                        <span>
+                            Security
+                        </span>
+
+                    </button>
+
+                </aside>
+
+
+
+                <!-- =================================
+                     PAGE CONTENT
+                ================================== -->
+
+                <section class="settings-content">
+
+
+                    <!-- =================================
+                         ACCOUNT PAGE
+                    ================================== -->
+
+                    <div
+                        class="settings-page active"
+                        id="page-account"
+                    >
+
+                        <div class="section-heading">
+
+                            <h2>
+                                Account
+                            </h2>
+
+                            <p>
+                                Manage your profile information.
+                            </p>
+
+                        </div>
+
+
+                        <div class="settings-card">
+
+                            <div class="profile-header">
+
+                                <div
+                                    class="profile-avatar"
+                                    id="profile-avatar"
+                                >
+                                    U
+                                </div>
+
+                                <div>
+
+                                    <h3
+                                        id="profile-name"
+                                    >
+                                        User
+                                    </h3>
+
+                                    <p
+                                        id="profile-email-display"
+                                    >
+                                        user@example.com
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="form-group">
+
+                                <label for="username">
+                                    Username
+                                </label>
+
+                                <input
+                                    type="text"
+                                    id="username"
+                                    placeholder="Username"
+                                >
+
+                            </div>
+
+
+                            <div class="form-group">
+
+                                <label for="email">
+                                    Email
+                                </label>
+
+                                <input
+                                    type="email"
+                                    id="email"
+                                    placeholder="Email"
+                                >
+
+                            </div>
+
+
+                            <div class="form-group">
+
+                                <label for="bio">
+                                    Bio
+                                </label>
+
+                                <textarea
+                                    id="bio"
+                                    maxlength="150"
+                                    placeholder="Tell people about yourself..."
+                                ></textarea>
+
+                                <span
+                                    class="character-count"
+                                    id="bio-count"
+                                >
+                                    0 / 150
+                                </span>
+
+                            </div>
+
+
+                            <div class="button-row">
+
+                                <button
+                                    class="button primary"
+                                    id="save-profile"
+                                >
+                                    Save Changes
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- =================================
+                         APPEARANCE PAGE
+                    ================================== -->
+
+                    <div
+                        class="settings-page"
+                        id="page-appearance"
+                    >
+
+                        <div class="section-heading">
+
+                            <h2>
+                                Appearance
+                            </h2>
+
+                            <p>
+                                Customize the way Aero looks.
+                            </p>
+
+                        </div>
+
+
+                        <div class="settings-card">
+
+
+                            <div class="setting-row">
+
+                                <div class="setting-information">
+
+                                    <h3>
+                                        Theme
+                                    </h3>
+
+                                    <p>
+                                        Choose your preferred
+                                        appearance.
+                                    </p>
+
+                                </div>
+
+
+                                <select
+                                    id="theme"
+                                    class="select-control"
+                                >
+
+                                    <option value="light">
+                                        Light
+                                    </option>
+
+                                    <option value="dark">
+                                        Dark
+                                    </option>
+
+                                    <option value="system">
+                                        System
+                                    </option>
+
+                                </select>
+
+                            </div>
+
+
+                            <div class="setting-row">
+
+                                <div class="setting-information">
+
+                                    <h3>
+                                        Compact Mode
+                                    </h3>
+
+                                    <p>
+                                        Reduce spacing throughout
+                                        the interface.
+                                    </p>
+
+                                </div>
+
+
+                                <label class="switch">
+
+                                    <input
+                                        type="checkbox"
+                                        id="compact-mode"
+                                    >
+
+                                    <span class="slider"></span>
+
+                                </label>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- =================================
+                         NOTIFICATIONS PAGE
+                    ================================== -->
+
+                    <div
+                        class="settings-page"
+                        id="page-notifications"
+                    >
+
+                        <div class="section-heading">
+
+                            <h2>
+                                Notifications
+                            </h2>
+
+                            <p>
+                                Choose which notifications you receive.
+                            </p>
+
+                        </div>
+
+
+                        <div class="settings-card">
+
+
+                            <div class="setting-row">
+
+                                <div class="setting-information">
+
+                                    <h3>
+                                        Push Notifications
+                                    </h3>
+
+                                    <p>
+                                        Receive notifications from Aero.
+                                    </p>
+
+                                </div>
+
+
+                                <label class="switch">
+
+                                    <input
+                                        type="checkbox"
+                                        id="push-notifications"
+                                    >
+
+                                    <span class="slider"></span>
+
+                                </label>
+
+                            </div>
+
+
+                            <div class="setting-row">
+
+                                <div class="setting-information">
+
+                                    <h3>
+                                        Likes
+                                    </h3>
+
+                                    <p>
+                                        Notify me when someone likes
+                                        my post.
+                                    </p>
+
+                                </div>
+
+
+                                <label class="switch">
+
+                                    <input
+                                        type="checkbox"
+                                        id="like-notifications"
+                                    >
+
+                                    <span class="slider"></span>
+
+                                </label>
+
+                            </div>
+
+
+                            <div class="setting-row">
+
+                                <div class="setting-information">
+
+                                    <h3>
+                                        Comments
+                                    </h3>
+
+                                    <p>
+                                        Notify me when someone comments
+                                        on my post.
+                                    </p>
+
+                                </div>
+
+
+                                <label class="switch">
+
+                                    <input
+                                        type="checkbox"
+                                        id="comment-notifications"
+                                    >
+
+                                    <span class="slider"></span>
+
+                                </label>
+
+                            </div>
+
+
+                            <div class="setting-row">
+
+                                <div class="setting-information">
+
+                                    <h3>
+                                        Followers
+                                    </h3>
+
+                                    <p>
+                                        Notify me when someone follows you.
+                                    </p>
+
+                                </div>
+
+
+                                <label class="switch">
+
+                                    <input
+                                        type="checkbox"
+                                        id="follow-notifications"
+                                    >
+
+                                    <span class="slider"></span>
+
+                                </label>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- =================================
+                         PRIVACY PAGE
+                    ================================== -->
+
+                    <div
+                        class="settings-page"
+                        id="page-privacy"
+                    >
+
+                        <div class="section-heading">
+
+                            <h2>
+                                Privacy
+                            </h2>
+
+                            <p>
+                                Control your account visibility.
+                            </p>
+
+                        </div>
+
+
+                        <div class="settings-card">
+
+
+                            <div class="setting-row">
+
+                                <div class="setting-information">
+
+                                    <h3>
+                                        Private Account
+                                    </h3>
+
+                                    <p>
+                                        Only approved followers can
+                                        see your posts.
+                                    </p>
+
+                                </div>
+
+
+                                <label class="switch">
+
+                                    <input
+                                        type="checkbox"
+                                        id="private-account"
+                                    >
+
+                                    <span class="slider"></span>
+
+                                </label>
+
+                            </div>
+
+
+                            <div class="setting-row">
+
+                                <div class="setting-information">
+
+                                    <h3>
+                                        Online Status
+                                    </h3>
+
+                                    <p>
+                                        Allow other users to see
+                                        when you are online.
+                                    </p>
+
+                                </div>
+
+
+                                <label class="switch">
+
+                                    <input
+                                        type="checkbox"
+                                        id="online-status"
+                                    >
+
+                                    <span class="slider"></span>
+
+                                </label>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- =================================
+                         SECURITY PAGE
+                    ================================== -->
+
+                    <div
+                        class="settings-page"
+                        id="page-security"
+                    >
+
+                        <div class="section-heading">
+
+                            <h2>
+                                Security
+                            </h2>
+
+                            <p>
+                                Protect and manage your account.
+                            </p>
+
+                        </div>
+
+
+                        <div class="settings-card">
+
+
+                            <div class="security-row">
+
+                                <div>
+
+                                    <h3>
+                                        Password
+                                    </h3>
+
+                                    <p>
+                                        Change your account password.
+                                    </p>
+
+                                </div>
+
+
+                                <button
+                                    class="button secondary"
+                                    id="change-password"
+                                >
+                                    Change Password
+                                </button>
+
+                            </div>
+
+
+                            <div class="security-row">
+
+                                <div>
+
+                                    <h3>
+                                        Active Sessions
+                                    </h3>
+
+                                    <p>
+                                        View devices currently
+                                        signed into your account.
+                                    </p>
+
+                                </div>
+
+
+                                <button
+                                    class="button secondary"
+                                    id="view-sessions"
+                                >
+                                    View Sessions
+                                </button>
+
+                            </div>
+
+
+                            <div class="danger-zone">
+
+                                <div>
+
+                                    <h3>
+                                        Delete Account
+                                    </h3>
+
+                                    <p>
+                                        Permanently delete your
+                                        Aero account.
+                                    </p>
+
+                                </div>
+
+
+                                <button
+                                    class="button danger"
+                                    id="delete-account"
+                                >
+                                    Delete Account
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </section>
+
+            </div>
+
+        </main>
+
+    </div>
+
+
+
+    <!-- =========================================
+         TOAST
+    ========================================== -->
+
+    <div
+        class="toast"
+        id="toast"
+    >
+        <span id="toast-message"></span>
+    </div>
+
+
+
+    <!-- =========================================
+         PASSWORD MODAL
+    ========================================== -->
+
+    <div
+        class="modal-overlay hidden"
+        id="password-modal"
+    >
+
+        <div class="modal">
+
+            <button
+                class="modal-close"
+                id="close-password"
+            >
+                ×
+            </button>
+
+
+            <h2>
+                Change Password
+            </h2>
+
+            <p>
+                Enter your new password below.
+            </p>
+
+
+            <div class="form-group">
+
+                <label>
+                    Current Password
+                </label>
+
+                <input
+                    type="password"
+                    id="current-password"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label>
+                    New Password
+                </label>
+
+                <input
+                    type="password"
+                    id="new-password"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label>
+                    Confirm Password
+                </label>
+
+                <input
+                    type="password"
+                    id="confirm-password"
+                >
+
+            </div>
+
+
+            <button
+                class="button primary full-width"
+                id="update-password"
+            >
+                Update Password
+            </button>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =========================================
+         DELETE ACCOUNT MODAL
+    ========================================== -->
+
+    <div
+        class="modal-overlay hidden"
+        id="delete-modal"
+    >
+
+        <div class="modal">
+
+            <button
+                class="modal-close"
+                id="close-delete"
+            >
+                ×
+            </button>
+
+
+            <h2>
+                Delete Account?
+            </h2>
+
+            <p>
+                This action cannot be undone.
+                Your Aero account will be permanently deleted.
+            </p>
+
+
+            <div class="modal-buttons">
+
+                <button
+                    class="button secondary"
+                    id="cancel-delete"
+                >
+                    Cancel
+                </button>
+
+
+                <button
+                    class="button danger"
+                    id="confirm-delete"
+                >
+                    Delete Account
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <script src="js/settings.js"></script>
+
+</body>
+
+</html>
