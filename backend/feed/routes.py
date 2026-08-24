@@ -10,7 +10,10 @@ from backend.auth.routes import token_required
 from backend.feed import feed_bp
 from backend.models import Comment, Like, Post, User
 
-ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp"}
+ALLOWED_MEDIA_TYPES = {
+    "jpg": "image/", "jpeg": "image/", "png": "image/", "webp": "image/",
+    "mp4": "video/", "webm": "video/", "mov": "video/",
+}
 
 
 def post_payload(post, current_user_id=None):
@@ -63,8 +66,9 @@ def get_posts(current_user):
 def upload_media(current_user):
     file = request.files.get("file")
     extension = Path(secure_filename(file.filename if file else "")).suffix.lower().lstrip(".")
-    if not file or not file.filename or extension not in ALLOWED_IMAGE_EXTENSIONS or not (file.mimetype or "").startswith("image/"):
-        return jsonify({"message": "Only JPG, PNG, GIF, or WEBP images are supported"}), 400
+    expected_mime = ALLOWED_MEDIA_TYPES.get(extension)
+    if not file or not file.filename or not expected_mime or not (file.mimetype or "").startswith(expected_mime):
+        return jsonify({"message": "Only JPG, PNG, JPEG, WEBP, MP4, WEBM, or MOV media are supported"}), 400
     filename = f"{uuid.uuid4().hex}.{extension}"
     file.save(Path(current_app.config["UPLOAD_FOLDER"]) / filename)
     return jsonify({"url": f"/uploads/{filename}"}), 201
@@ -81,7 +85,7 @@ def create_post(current_user):
     data = request.get_json(silent=True) or {}
     content = str(data.get("content", "")).strip()
     images = data.get("images", [])
-    if not content or len(content) > 5000 or not isinstance(images, list) or len(images) > 10:
+    if (not content and not images) or len(content) > 5000 or not isinstance(images, list) or len(images) > 10:
         return jsonify({"message": "Invalid post content or number of media files"}), 400
     post = Post(content=content, images_json=json.dumps(images), user_id=current_user.id)
     db.session.add(post)

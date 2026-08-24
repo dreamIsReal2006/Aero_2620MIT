@@ -53,6 +53,21 @@ function createAvatarElement(username, avatarUrl, className = 'post-avatar') {
     return avatar;
 }
 
+function syncCurrentUserAvatars(user = {}) {
+    const avatarTargets = [
+        ['nav-avatar', 'user-avatar user-avatar-nav'],
+        ['quick-post-avatar', 'compose-trigger-avatar'],
+        ['modal-user-avatar', 'user-avatar']
+    ];
+    avatarTargets.forEach(([id, className]) => {
+        const currentAvatar = document.getElementById(id);
+        if (!currentAvatar) return;
+        const nextAvatar = createAvatarElement(user.username, user.avatar_url, className);
+        nextAvatar.id = id;
+        currentAvatar.replaceWith(nextAvatar);
+    });
+}
+
 function renderSearchResults(payload = { users: [], posts: [] }) {
     const dropdown = document.getElementById('search-dropdown-inner');
     const shell = document.getElementById('search-shell');
@@ -703,7 +718,9 @@ const AeroAPI = {
                 },
                 body: JSON.stringify({ content, images })
             });
-            return await res.json();
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Unable to create post');
+            return data;
         } catch (err) {
             console.error(err);
         }
@@ -718,7 +735,7 @@ const AeroAPI = {
             body: formData
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Image upload failed');
+        if (!res.ok) throw new Error(data.message || 'Media upload failed');
         return `${API_ORIGIN}${data.url}`;
     },
 
@@ -941,12 +958,17 @@ const AeroAPI = {
             if (post.images && post.images.length) {
                 const media = document.createElement('div');
                 media.className = 'post-media-grid';
-                post.images.slice(0, 3).forEach(imageUrl => {
-                    const image = document.createElement('img');
-                    image.src = imageUrl;
-                    image.alt = 'Post media';
-                    image.loading = 'lazy';
-                    media.appendChild(image);
+                post.images.slice(0, 3).forEach(mediaUrl => {
+                    const isVideo = /\.(mp4|webm|mov)(?:$|\?)/i.test(mediaUrl);
+                    const mediaElement = document.createElement(isVideo ? 'video' : 'img');
+                    mediaElement.src = mediaUrl;
+                    mediaElement.alt = isVideo ? '' : 'Post media';
+                    mediaElement.loading = 'lazy';
+                    if (isVideo) {
+                        mediaElement.controls = true;
+                        mediaElement.preload = 'metadata';
+                    }
+                    media.appendChild(mediaElement);
                 });
                 postEl.appendChild(media);
             }
@@ -1116,12 +1138,7 @@ const AeroAPI = {
             if (authOverlay) authOverlay.classList.add('hidden');
             mainApp.classList.remove('hidden');
             document.getElementById('nav-username').innerText = user.username || 'User';
-            const navAvatar = document.getElementById('nav-avatar');
-            if (navAvatar) {
-                const nextAvatar = createAvatarElement(user.username, user.avatar_url, 'user-avatar user-avatar-nav');
-                navAvatar.replaceWith(nextAvatar);
-                nextAvatar.id = 'nav-avatar';
-            }
+            syncCurrentUserAvatars(user);
             this.renderFeed();
             if (sessionStorage.getItem('aero_profile_onboarding') === '1') {
                 document.getElementById('profile-onboarding-overlay')?.classList.remove('hidden');
@@ -1145,12 +1162,7 @@ const AeroAPI = {
         mainApp.classList.add('app-entering');
         authOverlay.classList.add('is-exiting');
         document.getElementById('nav-username').textContent = user.username || 'User';
-        const navAvatar = document.getElementById('nav-avatar');
-        if (navAvatar) {
-            const nextAvatar = createAvatarElement(user.username, user.avatar_url, 'user-avatar user-avatar-nav');
-            navAvatar.replaceWith(nextAvatar);
-            nextAvatar.id = 'nav-avatar';
-        }
+        syncCurrentUserAvatars(user);
         this.renderFeed();
 
         window.setTimeout(() => {
@@ -1163,11 +1175,123 @@ const AeroAPI = {
 
 
 
+const createPostState = { files: [] };
+
+function updateCreatePostState() {
+    const preview = document.getElementById('modal-preview');
+    const button = document.getElementById('modal-publish-btn');
+    const input = document.getElementById('modal-post-input');
+    if (!preview || !button) return;
+    preview.replaceChildren();
+    preview.classList.toggle('has-media', createPostState.files.length > 0);
+    createPostState.files.forEach((file, index) => {
+        const card = document.createElement('div');
+        card.className = 'media-preview-item';
+        const objectUrl = URL.createObjectURL(file);
+        const isVideo = file.type.startsWith('video/');
+        const media = document.createElement(isVideo ? 'video' : 'img');
+        media.src = objectUrl;
+        media.alt = isVideo ? '' : file.name;
+        if (isVideo) {
+            media.autoplay = true;
+            media.muted = true;
+            media.loop = true;
+            media.playsInline = true;
+            const overlay = document.createElement('span');
+            overlay.className = 'media-preview-video-icon';
+            overlay.textContent = '▶';
+            card.appendChild(overlay);
+        }
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'media-remove-btn';
+        remove.textContent = '✕';
+        remove.setAttribute('aria-label', `Remove ${file.name}`);
+        remove.addEventListener('click', () => {
+            URL.revokeObjectURL(objectUrl);
+            createPostState.files.splice(index, 1);
+            updateCreatePostState();
+        });
+        card.append(media, remove);
+        preview.appendChild(card);
+    });
+    button.disabled = !input?.value.trim() && createPostState.files.length === 0;
+}
+
+function openCreatePostModal() {
+    const modal = document.getElementById('create-post-modal');
+    if (!modal) return;
+    const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
+    document.getElementById('create-post-username').textContent = user.username || 'User';
+    syncCurrentUserAvatars(user);
+    modal.classList.remove('hidden');
+    document.getElementById('modal-post-input')?.focus();
+}
+
+async function publishCreatePost() {
+    const input = document.getElementById('modal-post-input');
+    const button = document.getElementById('modal-publish-btn');
+    const content = input?.value.trim() || '';
+    if (!content && !createPostState.files.length) return;
+    button.disabled = true;
+    try {
+        const mediaUrls = await Promise.all(createPostState.files.map(file => AeroAPI.uploadMedia(file)));
+        await AeroAPI.createPost(content, mediaUrls);
+        createPostState.files = [];
+        input.value = '';
+        updateCreatePostState();
+        document.getElementById('create-post-modal').classList.add('hidden');
+        await AeroAPI.renderFeed();
+    } catch (error) {
+        showNotice(error.message, 'error');
+        updateCreatePostState();
+    }
+}
+
+function setupCreatePostExperience() {
+    const modal = document.getElementById('create-post-modal');
+    const fileInput = document.getElementById('modal-post-images');
+    const input = document.getElementById('modal-post-input');
+    document.getElementById('compose-trigger')?.addEventListener('click', openCreatePostModal);
+    document.getElementById('compose-trigger')?.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openCreatePostModal(); }
+    });
+    document.getElementById('compose-trigger-media')?.addEventListener('click', event => { event.stopPropagation(); openCreatePostModal(); });
+    document.getElementById('fab-new-post')?.addEventListener('click', openCreatePostModal);
+    document.getElementById('close-create-post')?.addEventListener('click', () => modal?.classList.add('hidden'));
+    modal?.addEventListener('click', event => { if (event.target === modal) modal.classList.add('hidden'); });
+    fileInput?.addEventListener('change', () => {
+        createPostState.files = [...createPostState.files, ...Array.from(fileInput.files || [])].slice(0, 10);
+        fileInput.value = '';
+        updateCreatePostState();
+    });
+    input?.addEventListener('input', updateCreatePostState);
+    document.getElementById('create-post-form')?.addEventListener('submit', event => { event.preventDefault(); publishCreatePost(); });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) modal.classList.add('hidden');
+    });
+}
+
+function setupPostScrollBehavior() {
+    const fab = document.getElementById('fab-new-post');
+    let lastScroll = window.scrollY;
+    let idleTimer;
+    window.addEventListener('scroll', () => {
+        const current = window.scrollY;
+        fab?.classList.toggle('is-compact', current > lastScroll && current > 32);
+        lastScroll = current;
+        window.clearTimeout(idleTimer);
+        idleTimer = window.setTimeout(() => fab?.classList.remove('is-compact'), 180);
+    }, { passive: true });
+}
+
 // Page event handlers
 document.addEventListener('DOMContentLoaded', () => {
     AeroAPI.initAppState();
     setupSearchInteraction();
     setupSearchPage();
+    setupCreatePostExperience();
+    setupPostScrollBehavior();
 
     // Sign in and sign up toggle
     const toSignUpBtn = document.getElementById('to-signup-btn');
@@ -1312,29 +1436,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', event => {
         if (event.key === 'Escape' && deleteModal && !deleteModal.classList.contains('hidden')) closeDeleteModal();
     });
-
-    // Post submission
-    const publishBtn = document.getElementById('publish-post-btn');
-    if (publishBtn) {
-        publishBtn.addEventListener('click', async () => {
-            const input = document.getElementById('post-input');
-            const imageInput = document.getElementById('post-images');
-            if (input.value.trim() || imageInput.files.length) {
-                publishBtn.disabled = true;
-                try {
-                    const imageUrls = await Promise.all(Array.from(imageInput.files).slice(0, 10).map(file => AeroAPI.uploadMedia(file)));
-                    await AeroAPI.createPost(input.value, imageUrls);
-                } catch (error) {
-                    showNotice(error.message, 'error');
-                } finally {
-                    publishBtn.disabled = false;
-                }
-                input.value = '';
-                imageInput.value = '';
-                AeroAPI.renderFeed();
-            }
-        });
-    }
 
     // Sign out
     const logoutBtn = document.getElementById('logout-btn');
