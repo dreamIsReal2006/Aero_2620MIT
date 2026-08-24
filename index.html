@@ -57,6 +57,20 @@
                     </div>
                     <div class="input-group">
                         <input type="password" id="signup-password" placeholder="Password" required>
+                        <div class="password-strength" aria-live="polite">
+                            <div class="strength-track"><span id="password-strength-bar"></span></div>
+                            <span id="password-strength-label" class="strength-label">Enter a password</span>
+                        </div>
+                        <ul class="password-checklist" aria-label="Password requirements">
+                            <li data-requirement="length"><span class="checkmark">✓</span>At least 8 characters</li>
+                            <li data-requirement="uppercase"><span class="checkmark">✓</span>At least one uppercase letter</li>
+                            <li data-requirement="number"><span class="checkmark">✓</span>At least one number</li>
+                            <li data-requirement="special"><span class="checkmark">✓</span>At least one special character, e.g., @$!%*?&amp;</li>
+                        </ul>
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="signup-confirm-password" placeholder="Confirm Password" required>
+                        <p id="password-match-error" class="field-error" role="alert">Passwords do not match</p>
                     </div>
 
                     <div class="form-actions-link">
@@ -65,6 +79,38 @@
 
                     <button type="submit" class="btn btn-primary g2-btn">Continue</button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="profile-onboarding-overlay" class="profile-onboarding-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+        <form id="profile-onboarding-form" class="profile-onboarding-card glass-card pop-in">
+            <div class="onboarding-kicker">Welcome to Aero</div>
+            <h2 id="onboarding-title">Make your profile yours</h2>
+            <p class="form-subheading">A small introduction helps people find you.</p>
+            <label class="avatar-picker" for="profile-avatar-input">
+                <span id="profile-avatar-preview" class="avatar-preview" aria-hidden="true"><span class="avatar-placeholder">+</span></span>
+                <span class="avatar-edit-badge" aria-hidden="true">&#9998;</span>
+                <span class="sr-only">Choose a profile picture</span>
+            </label>
+            <input id="profile-avatar-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
+            <label class="onboarding-field">Bio
+                <textarea id="profile-bio" maxlength="150" placeholder="Tell the Aero community a little about you..."></textarea>
+                <span id="profile-bio-count" class="character-count">0 / 150</span>
+            </label>
+            <button type="submit" class="btn btn-primary g2-btn">Complete Profile</button>
+            <button type="button" id="skip-profile-btn" class="text-btn">Skip for now</button>
+        </form>
+    </div>
+
+    <div id="delete-modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+        <div class="delete-modal-content glass-card">
+            <div class="delete-modal-icon" aria-hidden="true">!</div>
+            <h2 id="delete-modal-title">Delete Post?</h2>
+            <p>Are you sure you want to delete this post? This action cannot be undone.</p>
+            <div class="delete-modal-actions">
+                <button id="cancel-delete-btn" type="button" class="btn modal-cancel-btn">Cancel</button>
+                <button id="confirm-delete-btn" type="button" class="btn delete-confirm-btn">Delete</button>
             </div>
         </div>
     </div>
@@ -94,6 +140,7 @@
             <div class="nav-right">
                 <a id="admin-dashboard-link" class="admin-nav-link hidden" href="admin.html">Admin Dashboard</a>
                 <div class="user-pill glass-pill">
+                    <span id="nav-avatar" class="user-avatar user-avatar-nav" aria-hidden="true">U</span>
                     <span id="nav-username">User</span>
                     <button id="logout-btn" class="logout-sm-btn" aria-label="Sign out" title="Sign out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10"></path><path d="M14 8l4 4-4 4M8 12h10"></path></svg></button>
                 </div>

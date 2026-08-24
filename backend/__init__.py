@@ -85,6 +85,14 @@ def create_app():
                 db.session.execute(text(
                     "ALTER TABLE users ADD COLUMN is_banned BOOLEAN NOT NULL DEFAULT 0"
                 ))
+            if "bio" not in columns:
+                db.session.execute(text(
+                    "ALTER TABLE users ADD COLUMN bio VARCHAR(150) NOT NULL DEFAULT ''"
+                ))
+            if "avatar_url" not in columns:
+                db.session.execute(text(
+                    "ALTER TABLE users ADD COLUMN avatar_url VARCHAR(500) NOT NULL DEFAULT ''"
+                ))
             db.session.commit()
 
     from backend.admin import admin_bp

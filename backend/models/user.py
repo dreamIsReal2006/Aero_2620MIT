@@ -25,6 +25,9 @@ class User(db.Model):
         index=True
     )
 
+    bio = db.Column(db.String(150), default="", nullable=False)
+    avatar_url = db.Column(db.String(500), default="", nullable=False)
+
     password_hash = db.Column(
         db.String(255),
         nullable=False

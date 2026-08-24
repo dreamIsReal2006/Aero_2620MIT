@@ -30,6 +30,29 @@ function safeRegex(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function createAvatarElement(username, avatarUrl, className = 'post-avatar') {
+    const avatar = document.createElement('span');
+    avatar.className = className;
+    avatar.setAttribute('aria-hidden', 'true');
+    const name = String(username || 'User');
+    if (!avatarUrl) {
+        avatar.textContent = name.charAt(0).toUpperCase();
+        return avatar;
+    }
+
+    const image = document.createElement('img');
+    image.src = avatarUrl.startsWith('http') ? avatarUrl : `${API_ORIGIN}${avatarUrl}`;
+    image.alt = '';
+    image.loading = 'lazy';
+    image.onerror = () => {
+        avatar.textContent = name.charAt(0).toUpperCase();
+        avatar.classList.remove('has-image');
+    };
+    avatar.appendChild(image);
+    avatar.classList.add('has-image');
+    return avatar;
+}
+
 function renderSearchResults(payload = { users: [], posts: [] }) {
     const dropdown = document.getElementById('search-dropdown-inner');
     const shell = document.getElementById('search-shell');
@@ -616,6 +639,7 @@ const AeroAPI = {
             if (res.ok) {
                 localStorage.setItem('aero_token', data.token);
                 localStorage.setItem('aero_user', JSON.stringify(data.user));
+                sessionStorage.setItem('aero_profile_onboarding', '1');
                 window.location.href = 'index.html';
             } else {
                 showNotice(data.message || 'OTP verification failed', 'error');
@@ -624,6 +648,21 @@ const AeroAPI = {
             console.error('API Error:', err);
             showNotice('Unable to connect to Aero right now.', 'error');
         }
+    },
+
+    async updateProfile(profile) {
+        const res = await fetch(`${API_BASE}/users/me/profile`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('aero_token')}`
+            },
+            body: JSON.stringify(profile)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Unable to update profile');
+        localStorage.setItem('aero_user', JSON.stringify(data.user));
+        return data.user;
     },
 
     // Resend OTP
@@ -684,11 +723,19 @@ const AeroAPI = {
     },
 
     async deletePost(postId) {
-        await fetch(`${API_BASE}/posts/${postId}`, {
+        const res = await fetch(`${API_BASE}/posts/${postId}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
         });
-        this.renderFeed();
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.message || 'Unable to delete post');
+        }
+        const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+        if (postElement) {
+            postElement.classList.add('post-removing');
+            window.setTimeout(() => postElement.remove(), 240);
+        }
     },
 
     async submitReport(targetId, reason, targetType = 'post') {
@@ -836,43 +883,57 @@ const AeroAPI = {
         posts.forEach(post => {
             const postEl = document.createElement('div');
             postEl.className = 'post-card glass-card pop-in g2-card';
+            postEl.dataset.postId = String(post.id);
             const header = document.createElement('div');
             header.className = 'post-header';
+            const authorIdentity = document.createElement('div');
+            authorIdentity.className = 'post-author-identity';
+            authorIdentity.appendChild(createAvatarElement(post.username, post.avatar_url));
             const author = document.createElement('span');
             author.className = 'post-author';
-            author.textContent = `User ${post.username}`;
-            header.appendChild(author);
-            if (post.username === currentUser.username) {
-                const deleteButton = document.createElement('button');
-                deleteButton.className = 'icon-btn';
-                deleteButton.type = 'button';
-                deleteButton.setAttribute('aria-label', 'Delete post');
-                deleteButton.title = 'Delete post';
-                deleteButton.appendChild(createIcon('<path d="M5 7h14M10 11v5M14 11v5M9 7V4h6v3m-9 0 1 13h10l1-13"></path>', 'Delete post'));
-                deleteButton.addEventListener('click', () => this.deletePost(post.id));
-                header.appendChild(deleteButton);
-            }
+            author.textContent = post.username || 'User';
+            authorIdentity.appendChild(author);
+            header.appendChild(authorIdentity);
             const moreButton = document.createElement('button');
             moreButton.className = 'icon-btn post-more-btn';
             moreButton.type = 'button';
             moreButton.setAttribute('aria-label', 'Post options');
             moreButton.title = 'Post options';
             moreButton.textContent = '\u22ee';
-            const reportMenu = document.createElement('div');
-            reportMenu.className = 'post-menu hidden';
-            const reportButton = document.createElement('button');
-            reportButton.type = 'button';
-            reportButton.textContent = 'Report';
-            reportMenu.appendChild(reportButton);
+            const optionsMenu = document.createElement('div');
+            optionsMenu.className = 'post-dropdown-menu post-menu hidden';
+            const isOwnPost = post.user_id === currentUser.id;
+            const isAdmin = currentUser.is_admin === true;
+            const openDeleteModal = () => {
+                const overlay = document.getElementById('delete-modal-overlay');
+                if (!overlay) return;
+                overlay.dataset.postId = String(post.id);
+                overlay.classList.remove('hidden');
+                document.getElementById('confirm-delete-btn')?.focus();
+            };
+            const addMenuItem = (label, action, danger = false) => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.textContent = label;
+                item.classList.toggle('danger', danger);
+                item.addEventListener('click', () => {
+                    optionsMenu.classList.add('hidden');
+                    action();
+                });
+                optionsMenu.appendChild(item);
+            };
+            if (isAdmin) {
+                addMenuItem('Delete Post (Admin)', openDeleteModal, true);
+                addMenuItem('Report Post', () => this.showReportModal(post.id));
+            } else if (isOwnPost) addMenuItem('Delete Post', openDeleteModal, true);
+            else addMenuItem('Report Post', () => this.showReportModal(post.id));
             moreButton.addEventListener('click', event => {
                 event.stopPropagation();
-                reportMenu.classList.toggle('hidden');
+                const isClosed = optionsMenu.classList.contains('hidden') || optionsMenu.style.display === 'none';
+                optionsMenu.classList.toggle('hidden', !isClosed);
+                optionsMenu.style.display = isClosed ? '' : 'none';
             });
-            reportButton.addEventListener('click', () => {
-                reportMenu.classList.add('hidden');
-                this.showReportModal(post.id);
-            });
-            header.append(moreButton, reportMenu);
+            header.append(moreButton, optionsMenu);
             const content = document.createElement('div');
             content.className = 'post-content';
             content.textContent = post.content;
@@ -1055,7 +1116,16 @@ const AeroAPI = {
             if (authOverlay) authOverlay.classList.add('hidden');
             mainApp.classList.remove('hidden');
             document.getElementById('nav-username').innerText = user.username || 'User';
+            const navAvatar = document.getElementById('nav-avatar');
+            if (navAvatar) {
+                const nextAvatar = createAvatarElement(user.username, user.avatar_url, 'user-avatar user-avatar-nav');
+                navAvatar.replaceWith(nextAvatar);
+                nextAvatar.id = 'nav-avatar';
+            }
             this.renderFeed();
+            if (sessionStorage.getItem('aero_profile_onboarding') === '1') {
+                document.getElementById('profile-onboarding-overlay')?.classList.remove('hidden');
+            }
         } else if (authOverlay) {
             authOverlay.classList.remove('hidden');
             if (mainApp) mainApp.classList.add('hidden');
@@ -1075,6 +1145,12 @@ const AeroAPI = {
         mainApp.classList.add('app-entering');
         authOverlay.classList.add('is-exiting');
         document.getElementById('nav-username').textContent = user.username || 'User';
+        const navAvatar = document.getElementById('nav-avatar');
+        if (navAvatar) {
+            const nextAvatar = createAvatarElement(user.username, user.avatar_url, 'user-avatar user-avatar-nav');
+            navAvatar.replaceWith(nextAvatar);
+            nextAvatar.id = 'nav-avatar';
+        }
         this.renderFeed();
 
         window.setTimeout(() => {
@@ -1127,8 +1203,46 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (signupForm) {
+        const passwordInput = document.getElementById('signup-password');
+        const confirmInput = document.getElementById('signup-confirm-password');
+        const strengthBar = document.getElementById('password-strength-bar');
+        const strengthLabel = document.getElementById('password-strength-label');
+        const requirements = {
+            length: value => value.length >= 8,
+            uppercase: value => /[A-Z]/.test(value),
+            number: value => /\d/.test(value),
+            special: value => /[@$!%*?&]/.test(value)
+        };
+
+        const updatePasswordFeedback = () => {
+            const value = passwordInput.value;
+            let satisfied = 0;
+            Object.entries(requirements).forEach(([name, test]) => {
+                const item = signupForm.querySelector(`[data-requirement="${name}"]`);
+                const valid = test(value);
+                satisfied += valid ? 1 : 0;
+                item.classList.toggle('is-met', valid);
+            });
+            const level = satisfied >= 4 ? 'strong' : satisfied >= 2 ? 'medium' : satisfied ? 'weak' : '';
+            strengthBar.style.width = `${satisfied * 25}%`;
+            strengthBar.dataset.level = level;
+            strengthLabel.textContent = level ? level[0].toUpperCase() + level.slice(1) : 'Enter a password';
+            strengthLabel.dataset.level = level;
+        };
+
+        const validatePasswordMatch = () => {
+            const mismatch = confirmInput.value.length > 0 && confirmInput.value !== passwordInput.value;
+            confirmInput.classList.toggle('has-error', mismatch);
+            document.getElementById('password-match-error').classList.toggle('is-visible', mismatch);
+            return !mismatch;
+        };
+
+        passwordInput.addEventListener('input', updatePasswordFeedback);
+        confirmInput.addEventListener('blur', validatePasswordMatch);
+        confirmInput.addEventListener('input', validatePasswordMatch);
         signupForm.addEventListener('submit', (e) => {
             e.preventDefault();
+            if (!validatePasswordMatch()) return;
             AeroAPI.signup(
                 document.getElementById('signup-username').value,
                 document.getElementById('signup-email').value,
@@ -1136,6 +1250,68 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         });
     }
+
+    const onboardingForm = document.getElementById('profile-onboarding-form');
+    const avatarInput = document.getElementById('profile-avatar-input');
+    let avatarFile = null;
+    if (avatarInput) avatarInput.addEventListener('change', () => {
+        avatarFile = avatarInput.files[0] || null;
+        if (avatarFile) {
+            const preview = document.getElementById('profile-avatar-preview');
+            preview.style.backgroundImage = `url(${URL.createObjectURL(avatarFile)})`;
+            preview.classList.add('has-image');
+            preview.innerHTML = '';
+        }
+    });
+    document.getElementById('profile-bio')?.addEventListener('input', (event) => {
+        document.getElementById('profile-bio-count').textContent = `${event.target.value.length} / 150`;
+    });
+    const finishOnboarding = () => {
+        sessionStorage.removeItem('aero_profile_onboarding');
+        document.getElementById('profile-onboarding-overlay')?.classList.add('hidden');
+    };
+    document.getElementById('skip-profile-btn')?.addEventListener('click', finishOnboarding);
+    onboardingForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const button = onboardingForm.querySelector('button[type="submit"]');
+        button.disabled = true;
+        try {
+            const avatarUrl = avatarFile ? await AeroAPI.uploadMedia(avatarFile) : '';
+            await AeroAPI.updateProfile({ bio: document.getElementById('profile-bio').value, avatar_url: avatarUrl });
+            finishOnboarding();
+        } catch (error) {
+            showNotice(error.message, 'error');
+        } finally {
+            button.disabled = false;
+        }
+    });
+
+    const deleteModal = document.getElementById('delete-modal-overlay');
+    const closeDeleteModal = () => {
+        deleteModal?.classList.add('hidden');
+        if (deleteModal) deleteModal.dataset.postId = '';
+    };
+    document.getElementById('cancel-delete-btn')?.addEventListener('click', closeDeleteModal);
+    deleteModal?.addEventListener('click', event => {
+        if (event.target === deleteModal) closeDeleteModal();
+    });
+    document.getElementById('confirm-delete-btn')?.addEventListener('click', async event => {
+        const button = event.currentTarget;
+        const postId = deleteModal?.dataset.postId;
+        if (!postId || button.disabled) return;
+        button.disabled = true;
+        try {
+            await AeroAPI.deletePost(postId);
+            closeDeleteModal();
+        } catch (error) {
+            showNotice(error.message, 'error');
+        } finally {
+            button.disabled = false;
+        }
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && deleteModal && !deleteModal.classList.contains('hidden')) closeDeleteModal();
+    });
 
     // Post submission
     const publishBtn = document.getElementById('publish-post-btn');
@@ -1166,6 +1342,15 @@ document.addEventListener('DOMContentLoaded', () => {
         logoutBtn.addEventListener('click', () => {
             localStorage.clear();
             location.reload();
+        });
+    }
+});
+
+document.addEventListener('click', event => {
+    if (!event.target.closest('.post-more-btn') && !event.target.closest('.post-dropdown-menu')) {
+        document.querySelectorAll('.post-dropdown-menu').forEach(menu => {
+            menu.classList.add('hidden');
+            menu.style.display = 'none';
         });
     }
 });

@@ -141,6 +141,7 @@ def verify_otp():
     session["user_id"] = user.id
     return jsonify({"token": make_token(user), "user": {
         "id": user.id, "username": user.username, "email": user.email,
+        "bio": user.bio or "", "avatar_url": user.avatar_url or "",
         "is_admin": user.is_admin, "is_banned": user.is_banned,
     }}), 200
 
@@ -156,5 +157,6 @@ def signin():
     session["user_id"] = user.id
     return jsonify({"token": make_token(user), "user": {
         "id": user.id, "username": user.username, "email": user.email,
+        "bio": user.bio or "", "avatar_url": user.avatar_url or "",
         "is_admin": user.is_admin, "is_banned": user.is_banned,
     }}), 200

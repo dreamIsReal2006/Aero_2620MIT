@@ -21,7 +21,9 @@ def post_payload(post, current_user_id=None):
     ).first() is not None
     return {
         "id": post.id,
+        "user_id": post.user_id,
         "username": post.author.username,
+        "avatar_url": post.author.avatar_url or "",
         "content": post.content,
         "images": json.loads(post.images_json or "[]"),
         "likes_count": likes_count,

@@ -69,11 +69,41 @@ def get_profile(user_id):
             "id": user.id,
             "username": user.username,
             "email": user.email,
+            "bio": user.bio or "",
+            "avatar_url": user.avatar_url or "",
             "created_at": user.created_at.isoformat(),
         },
         "followers_count": followers_count,
         "following_count": following_count,
         "posts": [serialize_post(post) for post in posts],
+    }), 200
+
+
+@social_bp.put("/users/me/profile")
+@token_required
+def update_my_profile(current_user):
+    data = request.get_json(silent=True) or {}
+    bio = str(data.get("bio", "")).strip()
+    avatar_url = str(data.get("avatar_url", "")).strip()
+    if len(bio) > 150:
+        return jsonify({"message": "Bio must be 150 characters or fewer"}), 400
+    if len(avatar_url) > 500:
+        return jsonify({"message": "Avatar URL is too long"}), 400
+
+    current_user.bio = bio
+    current_user.avatar_url = avatar_url
+    db.session.commit()
+    return jsonify({
+        "message": "Profile updated successfully",
+        "user": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "email": current_user.email,
+            "bio": current_user.bio,
+            "avatar_url": current_user.avatar_url,
+            "is_admin": current_user.is_admin,
+            "is_banned": current_user.is_banned,
+        },
     }), 200
 
 

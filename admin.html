@@ -4,27 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aero Admin Dashboard</title>
+    <link rel="icon" type="image/png" sizes="16x16" href="./assets/img/logo.png">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="light-mode admin-page">
     <main class="admin-shell">
-        <header class="admin-header">
+        <header class="admin-header glass-card">
             <div>
                 <a class="admin-back-link" href="index.html">&larr; Back to Aero</a>
                 <h1>Admin Dashboard</h1>
             </div>
-            <button id="admin-logout" class="btn" type="button">Sign out</button>
+            <button id="admin-logout" class="btn admin-toolbar-btn" type="button">Sign out</button>
         </header>
 
         <div id="admin-error" class="admin-state hidden"></div>
         <section class="admin-stats" aria-label="Platform statistics">
-            <article class="admin-stat-card"><span>Total Users</span><strong id="admin-users-count">-</strong></article>
-            <article class="admin-stat-card"><span>Total Posts</span><strong id="admin-posts-count">-</strong></article>
-            <article class="admin-stat-card"><span>Pending Reports</span><strong id="admin-reports-count">-</strong></article>
+            <article class="admin-stat-card glass-card"><span>Total Users</span><strong id="admin-users-count">-</strong></article>
+            <article class="admin-stat-card glass-card"><span>Total Posts</span><strong id="admin-posts-count">-</strong></article>
+            <article class="admin-stat-card glass-card"><span>Pending Reports</span><strong id="admin-reports-count">-</strong></article>
         </section>
 
-        <section class="admin-reports-section">
-            <div class="admin-section-heading"><div><span class="admin-eyebrow">Moderation queue</span><h2>Pending Reports</h2></div><button id="admin-refresh" class="btn" type="button">Refresh</button></div>
+        <section class="admin-reports-section glass-card">
+            <div class="admin-section-heading"><div><span class="admin-eyebrow">Moderation queue</span><h2>Pending Reports</h2></div><button id="admin-refresh" class="btn admin-toolbar-btn" type="button">Refresh</button></div>
             <div class="admin-table-wrap">
                 <table class="admin-reports-table">
                     <thead><tr><th>Reporter</th><th>Target</th><th>Reason</th><th>Actions</th></tr></thead>
@@ -78,7 +79,7 @@
                         actions.className = 'admin-actions-cell';
                         if (report.target_type === 'post') {
                             const deleteButton = document.createElement('button');
-                            deleteButton.className = 'btn btn-danger';
+                            deleteButton.className = 'btn btn-danger admin-action-btn';
                             deleteButton.type = 'button';
                             deleteButton.textContent = 'Delete Post';
                             deleteButton.addEventListener('click', async () => {
@@ -88,7 +89,7 @@
                             actions.appendChild(deleteButton);
                         }
                         const banButton = document.createElement('button');
-                        banButton.className = 'btn';
+                        banButton.className = 'btn admin-action-btn';
                         banButton.type = 'button';
                         banButton.textContent = 'Ban/Unban User';
                         const targetUserId = report.target_type === 'user' ? report.target_id : report.target?.user_id;
