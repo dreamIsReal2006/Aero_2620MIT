@@ -16,8 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ========================================= */
 
     const defaultSettings = {
-        theme: "light",
-        compactMode: false
+    theme: "light"
     };
 
 
@@ -421,11 +420,6 @@ document.addEventListener("DOMContentLoaded", () => {
             "theme-select"
         );
 
-    const compactMode =
-        document.getElementById(
-            "compact-mode"
-        );
-
 
     function applyTheme(theme) {
 
@@ -476,42 +470,12 @@ document.addEventListener("DOMContentLoaded", () => {
     );
 
 
-    compactMode.addEventListener(
-        "change",
-        () => {
-
-            const settings =
-                getSettings();
-
-            settings.compactMode =
-                compactMode.checked;
-
-            saveSettings(settings);
-
-            document.body.classList.toggle(
-                "compact-mode",
-                compactMode.checked
-            );
-
-            showToast(
-                compactMode.checked
-                    ? "Compact mode enabled"
-                    : "Compact mode disabled"
-            );
-
-        }
-    );
-
-
     const savedSettings =
         getSettings();
 
 
     themeSelect.value =
         savedSettings.theme;
-
-    compactMode.checked =
-        savedSettings.compactMode;
 
     document.body.classList.toggle(
         "compact-mode",
