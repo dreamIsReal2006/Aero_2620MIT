@@ -30,6 +30,20 @@ function safeRegex(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function formatRelativeTime(timestamp) {
+    const elapsedSeconds = Math.max(0, (Date.now() - new Date(timestamp).getTime()) / 1000);
+    if (elapsedSeconds < 60) return '刚刚';
+    const minutes = Math.floor(elapsedSeconds / 60);
+    if (minutes < 60) return `${minutes}分钟`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}小时`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}天`;
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months}个月`;
+    return `${Math.floor(months / 12)}年`;
+}
+
 function createAvatarElement(username, avatarUrl, className = 'post-avatar') {
     const avatar = document.createElement('span');
     avatar.className = className;
@@ -862,8 +876,74 @@ const AeroAPI = {
         return data;
     },
 
+    async toggleFollow(userId) {
+        const res = await fetch(`${API_BASE}/social/follow/${userId}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Unable to update follow status');
+        return data;
+    },
+
+    async repostPost(postId, type = 'repost', content = '') {
+        const res = await fetch(`${API_BASE}/posts/${postId}/repost`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` },
+            body: JSON.stringify({ type, content })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Unable to repost');
+        return data;
+    },
+
+    async toggleBookmark(postId) {
+        const res = await fetch(`${API_BASE}/posts/${postId}/bookmark`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Unable to update bookmark');
+        return data;
+    },
+
+    async markNotInterested(postId) {
+        const res = await fetch(`${API_BASE}/recommendations/feedback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` },
+            body: JSON.stringify({ postId, feedback: 'not_interested' })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Unable to update recommendations');
+        return data;
+    },
+
+    async recordShareStats(postId, action = 'share') {
+        const res = await fetch(`${API_BASE}/posts/${postId}/share-stats`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` },
+            body: JSON.stringify({ action })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Unable to record share');
+        return data;
+    },
+
+    async sendPostToUser(postId, username) {
+        const res = await fetch(`${API_BASE}/posts/${postId}/share`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` },
+            body: JSON.stringify({ username })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Unable to share with user');
+        return data;
+    },
+
     async getComments(postId) {
-        const res = await fetch(`${API_ORIGIN}/interact/posts/${postId}/comments`);
+        const res = await fetch(`${API_ORIGIN}/interact/posts/${postId}/comments`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || data.message || 'Unable to load comments');
         return data.comments || [];
@@ -880,6 +960,16 @@ const AeroAPI = {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || data.message || 'Unable to send comment');
+        return data;
+    },
+
+    async toggleCommentLike(commentId, liked) {
+        const res = await fetch(`${API_BASE}/comments/${commentId}/like`, {
+            method: liked ? 'DELETE' : 'POST',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Unable to update comment like');
         return data;
     },
 
@@ -910,6 +1000,11 @@ const AeroAPI = {
             author.className = 'post-author';
             author.textContent = post.username || 'User';
             authorIdentity.appendChild(author);
+            const postTime = document.createElement('time');
+            postTime.className = 'post-relative-time';
+            postTime.dateTime = post.created_at || '';
+            postTime.textContent = formatRelativeTime(post.created_at);
+            authorIdentity.appendChild(postTime);
             header.appendChild(authorIdentity);
             const moreButton = document.createElement('button');
             moreButton.className = 'icon-btn post-more-btn';
@@ -928,10 +1023,11 @@ const AeroAPI = {
                 overlay.classList.remove('hidden');
                 document.getElementById('confirm-delete-btn')?.focus();
             };
-            const addMenuItem = (label, action, danger = false) => {
+            const addMenuItem = (label, iconPath, action, danger = false) => {
                 const item = document.createElement('button');
                 item.type = 'button';
-                item.textContent = label;
+                item.appendChild(createIcon(iconPath, label));
+                item.append(` ${label}`);
                 item.classList.toggle('danger', danger);
                 item.addEventListener('click', () => {
                     closeAllPostMenus();
@@ -939,11 +1035,37 @@ const AeroAPI = {
                 });
                 optionsMenu.appendChild(item);
             };
-            if (isAdmin) {
-                addMenuItem('Delete Post (Admin)', openDeleteModal, true);
-                addMenuItem('Report Post', () => this.showReportModal(post.id));
-            } else if (isOwnPost) addMenuItem('Delete Post', openDeleteModal, true);
-            else addMenuItem('Report Post', () => this.showReportModal(post.id));
+            addMenuItem(post.is_bookmarked ? 'Remove Bookmark' : 'Bookmark Post', '<path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-3-6 3V4.5Z"></path>', async () => {
+                try {
+                    const result = await this.toggleBookmark(post.id);
+                    post.is_bookmarked = result.bookmarked;
+                    showNotice(result.bookmarked ? 'Post bookmarked.' : 'Bookmark removed.', 'success');
+                } catch (error) { showNotice(error.message, 'error'); }
+            });
+            addMenuItem('Copy Link', '<path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"></path><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1"></path>', () => copyPostLink(post.id));
+            addMenuItem('Not Interested', '<path d="M4 4l16 16M20 4 4 20"></path>', async () => {
+                postEl.classList.add('post-removing');
+                try {
+                    await this.markNotInterested(post.id);
+                    window.setTimeout(() => postEl.remove(), 240);
+                } catch (error) {
+                    postEl.classList.remove('post-removing');
+                    showNotice(error.message, 'error');
+                }
+            });
+            const separator = document.createElement('div');
+            separator.className = 'post-menu-separator';
+            optionsMenu.appendChild(separator);
+            if (!isOwnPost) {
+                addMenuItem(`${post.is_following ? 'Unfollow' : 'Follow'} @${post.username || 'user'}`, '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M19 8v6M22 11h-6"></path>', async () => {
+                    try {
+                        const result = await this.toggleFollow(post.user_id);
+                        showNotice(result.is_following ? `Following @${post.username}.` : `Unfollowed @${post.username}.`, 'success');
+                    } catch (error) { showNotice(error.message, 'error'); }
+                });
+            }
+            if (isAdmin || isOwnPost) addMenuItem(isAdmin && !isOwnPost ? 'Delete Post (Admin)' : 'Delete Post', '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3"></path>', openDeleteModal, true);
+            addMenuItem('Report Post', '<path d="M5 21V4m0 0c4-3 7 3 14 0v10c-7 3-10-3-14 0"></path>', () => this.showReportModal(post.id), true);
             moreButton.addEventListener('click', event => {
                 event.stopPropagation();
                 const shouldOpen = !optionsMenu.classList.contains('show');
@@ -974,6 +1096,8 @@ const AeroAPI = {
             }
             const actions = document.createElement('div');
             actions.className = 'post-actions';
+            const actionCapsule = document.createElement('div');
+            actionCapsule.className = 'action-bar-capsule';
             const likeButton = document.createElement('button');
             likeButton.className = 'post-action-btn';
             likeButton.type = 'button';
@@ -1019,7 +1143,46 @@ const AeroAPI = {
             const commentCount = document.createElement('span');
             commentCount.textContent = post.comments_count ?? post.comments ?? 0;
             commentButton.append(' ', commentCount);
-            actions.append(likeButton, commentButton);
+            const repostWrap = document.createElement('div');
+            repostWrap.className = 'repost-action-wrap';
+            const repostButton = document.createElement('button');
+            repostButton.className = 'post-action-btn';
+            repostButton.type = 'button';
+            repostButton.setAttribute('aria-label', 'Repost');
+            repostButton.title = 'Repost';
+            repostButton.appendChild(createIcon('<path d="m17 2 4 4-4 4"></path><path d="M3 11V9a3 3 0 0 1 3-3h15"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v2a3 3 0 0 1-3 3H3"></path>', 'Repost'));
+            const repostMenu = document.createElement('div');
+            repostMenu.className = 'repost-menu glass-card';
+            [['Repost', 'Repost this post'], ['Quote Post', 'Add your thoughts']].forEach(([label, description]) => {
+                const option = document.createElement('button');
+                option.type = 'button';
+                option.innerHTML = `<strong>${label}</strong><span>${description}</span>`;
+                option.addEventListener('click', async () => {
+                    repostMenu.classList.remove('show');
+                    try {
+                        const quote = label === 'Quote Post' ? window.prompt('Add your thoughts', '') : '';
+                        if (label === 'Quote Post' && quote === null) return;
+                        await this.repostPost(post.id, label === 'Repost' ? 'repost' : 'quote', quote || '');
+                        showNotice(label === 'Repost' ? 'Post reposted.' : 'Quote Post published.', 'success');
+                    } catch (error) { showNotice(error.message, 'error'); }
+                });
+                repostMenu.appendChild(option);
+            });
+            repostButton.addEventListener('click', event => {
+                event.stopPropagation();
+                document.querySelectorAll('.repost-menu.show').forEach(menu => menu.classList.remove('show'));
+                repostMenu.classList.toggle('show');
+            });
+            repostWrap.append(repostButton, repostMenu);
+            const shareButton = document.createElement('button');
+            shareButton.className = 'post-action-btn';
+            shareButton.type = 'button';
+            shareButton.setAttribute('aria-label', 'Share post');
+            shareButton.title = 'Share post';
+            shareButton.appendChild(createIcon('<path d="m22 2-7 20-4-9-9-4Z"></path><path d="M22 2 11 13"></path>', 'Share post'));
+            shareButton.addEventListener('click', () => openShareModal(post));
+            actionCapsule.append(likeButton, commentButton, repostWrap, shareButton);
+            actions.appendChild(actionCapsule);
             postEl.appendChild(actions);
 
             const commentsPanel = document.createElement('section');
@@ -1037,7 +1200,9 @@ const AeroAPI = {
             replyStatus.append(replyStatusText, cancelReplyButton);
             const composer = document.createElement('form');
             composer.className = 'comment-composer';
-            composer.innerHTML = '<input type="text" maxlength="1000" placeholder="Write a comment..." aria-label="Comment text"><button type="submit" class="btn btn-primary">Send</button>';
+            const composerUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
+            composer.innerHTML = '<span class="comment-composer-avatar"></span><div class="comment-input-shell"><input type="text" maxlength="1000" placeholder="Write a comment..." aria-label="Comment text"><button type="button" class="comment-media-btn" aria-label="Add image or GIF" title="Add image or GIF">GIF</button></div><button type="submit" class="comment-send-btn" aria-label="Send comment" title="Send comment"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"></path><path d="M22 2 11 13"></path></svg></button>';
+            composer.querySelector('.comment-composer-avatar').replaceWith(createAvatarElement(composerUser.username, composerUser.avatar_url, 'comment-composer-avatar'));
             commentsPanel.append(commentsList, replyStatus, composer);
             const composerInput = composer.querySelector('input');
             let replyTarget = null;
@@ -1068,17 +1233,80 @@ const AeroAPI = {
 
             const renderComment = (comment, depth = 0) => {
                 const item = document.createElement('article');
-                item.className = depth ? 'reply-item' : 'comment-item';
+                item.className = depth ? 'comment-item reply-item' : 'comment-item';
+                const commentHeader = document.createElement('div');
+                commentHeader.className = 'comment-header';
+                const avatarWrap = document.createElement('span');
+                avatarWrap.className = 'comment-avatar-wrap';
+                avatarWrap.appendChild(createAvatarElement(comment.username, comment.avatar_url, 'comment-avatar'));
+                const avatarBadge = document.createElement('span');
+                avatarBadge.className = 'comment-follow-badge';
+                avatarBadge.textContent = '+';
+                avatarWrap.appendChild(avatarBadge);
                 const meta = document.createElement('strong');
-                meta.textContent = comment.username || `User ${comment.user_id}`;
+                meta.textContent = `@${comment.username || `user${comment.user_id}`}`;
+                const time = document.createElement('time');
+                time.className = 'comment-relative-time';
+                time.dateTime = comment.created_at || '';
+                time.textContent = formatRelativeTime(comment.created_at);
+                const authorTag = document.createElement('span');
+                authorTag.className = 'comment-author-tag';
+                authorTag.textContent = comment.user_id === post.user_id ? '· 作者' : '';
+                const metaLine = document.createElement('div');
+                metaLine.className = 'comment-meta-line';
+                metaLine.append(meta, time, authorTag);
+                commentHeader.append(avatarWrap, metaLine);
                 const body = document.createElement('p');
                 body.textContent = comment.content;
+                const commentActions = document.createElement('div');
+                commentActions.className = 'comment-actions';
+                const likeButton = document.createElement('button');
+                likeButton.type = 'button';
+                likeButton.className = 'comment-action-btn';
+                let commentLiked = Boolean(comment.is_liked);
+                let commentLikeCount = Number(comment.likes_count) || 0;
+                const updateLike = () => {
+                    likeButton.classList.toggle('is-liked', commentLiked);
+                    likeButton.innerHTML = `${commentLiked ? '♥' : '♡'} <span>${commentLikeCount}</span>`;
+                    likeButton.setAttribute('aria-label', `${commentLiked ? 'Unlike' : 'Like'} comment`);
+                };
+                updateLike();
+                likeButton.addEventListener('click', async () => {
+                    likeButton.disabled = true;
+                    const previousLiked = commentLiked;
+                    commentLiked = !previousLiked;
+                    commentLikeCount = Math.max(0, commentLikeCount + (commentLiked ? 1 : -1));
+                    updateLike();
+                    try {
+                        const result = await this.toggleCommentLike(comment.id, previousLiked);
+                        commentLiked = result.liked;
+                        commentLikeCount = result.like_count;
+                        updateLike();
+                    } catch (error) {
+                        commentLiked = previousLiked;
+                        commentLikeCount = Math.max(0, commentLikeCount + (commentLiked ? 1 : -1));
+                        updateLike();
+                        showNotice(error.message, 'error');
+                    } finally { likeButton.disabled = false; }
+                });
                 const replyButton = document.createElement('button');
                 replyButton.type = 'button';
-                replyButton.className = 'comment-reply-btn';
-                replyButton.textContent = 'Reply';
-                item.append(meta, body, replyButton);
+                replyButton.className = 'comment-action-btn comment-reply-btn';
+                const replyCount = Array.isArray(comment.replies) ? comment.replies.length : 0;
+                replyButton.innerHTML = `↩ <span>Reply${replyCount ? ` ${replyCount}` : ''}</span>`;
                 replyButton.addEventListener('click', () => setReplyTarget(comment));
+                const repostButton = document.createElement('button');
+                repostButton.type = 'button';
+                repostButton.className = 'comment-action-btn';
+                repostButton.textContent = '↻';
+                repostButton.setAttribute('aria-label', 'Repost comment');
+                const shareButton = document.createElement('button');
+                shareButton.type = 'button';
+                shareButton.className = 'comment-action-btn';
+                shareButton.textContent = '↗';
+                shareButton.setAttribute('aria-label', 'Share comment');
+                commentActions.append(likeButton, replyButton, repostButton, shareButton);
+                item.append(commentHeader, body, commentActions);
                 if (comment.replies && comment.replies.length) {
                     const replies = document.createElement('div');
                     replies.className = 'comment-replies';
@@ -1205,6 +1433,70 @@ function closeAllPostMenus(exceptMenu = null) {
             menu.classList.remove('show');
         }
     });
+}
+
+async function copyPostLink(postId) {
+    const link = `${window.location.origin}${window.location.pathname}#post-${postId}`;
+    try {
+        await navigator.clipboard.writeText(link);
+        await AeroAPI.recordShareStats(postId, 'copy');
+        showNotice('Post link copied.', 'success');
+    } catch (error) { showNotice('Unable to copy the post link.', 'error'); }
+}
+
+function openShareModal(post) {
+    let overlay = document.getElementById('share-modal-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'share-modal-overlay';
+        overlay.className = 'share-modal-overlay';
+        overlay.innerHTML = `<div class="share-modal glass-card" role="dialog" aria-modal="true" aria-labelledby="share-modal-title"><header class="share-modal-header"><div><span class="share-modal-kicker">Aero share</span><h2 id="share-modal-title">Share this post</h2></div><button type="button" class="modal-close-btn share-modal-close" aria-label="Close share dialog">&times;</button></header><p class="share-modal-preview"></p><div class="share-shortcuts"><button type="button" data-share-action="copy"><span class="share-shortcut-icon">⌁</span><strong>Copy Link</strong><small>Copy the post URL</small></button><button type="button" data-share-action="export"><span class="share-shortcut-icon">▧</span><strong>Export as Card</strong><small>Download an image</small></button><button type="button" data-share-action="send"><span class="share-shortcut-icon">➤</span><strong>Send to User</strong><small>Share privately</small></button></div><div class="share-send-form hidden"><input type="text" placeholder="Username" aria-label="Recipient username"><button type="button" class="btn btn-primary g2-btn">Send</button></div></div>`;
+        document.body.appendChild(overlay);
+        const close = () => overlay.classList.remove('is-open');
+        overlay.querySelector('.share-modal-close').addEventListener('click', close);
+        overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
+        overlay.querySelector('[data-share-action="copy"]').addEventListener('click', () => copyPostLink(overlay.dataset.postId));
+        overlay.querySelector('[data-share-action="export"]').addEventListener('click', () => {
+            exportPostCard(overlay.dataset.postId, overlay.dataset.content, overlay.dataset.username);
+            AeroAPI.recordShareStats(overlay.dataset.postId, 'share').catch(() => {});
+        });
+        overlay.querySelector('[data-share-action="send"]').addEventListener('click', () => overlay.querySelector('.share-send-form').classList.toggle('hidden'));
+        overlay.querySelector('.share-send-form button').addEventListener('click', () => {
+            const recipient = overlay.querySelector('.share-send-form input').value.trim();
+            if (recipient) {
+                AeroAPI.sendPostToUser(overlay.dataset.postId, recipient)
+                    .then(() => { close(); showNotice(`Post shared with @${recipient}.`, 'success'); })
+                    .catch(error => showNotice(error.message, 'error'));
+            }
+        });
+    }
+    overlay.dataset.postId = String(post.id);
+    overlay.dataset.content = post.content || '';
+    overlay.dataset.username = post.username || 'User';
+    overlay.querySelector('.share-modal-preview').textContent = `${post.username || 'User'}: ${post.content || 'Aero post'}`;
+    overlay.classList.add('is-open');
+}
+
+function exportPostCard(postId, content, username) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200;
+    canvas.height = 630;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#f4f7f8';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#17252b';
+    context.font = '700 42px sans-serif';
+    context.fillText('Aero', 72, 100);
+    context.font = '600 28px sans-serif';
+    context.fillText(`@${username}`, 72, 170);
+    context.font = '32px sans-serif';
+    context.fillStyle = '#33454d';
+    String(content || '').match(/.{1,55}/g)?.slice(0, 8).forEach((line, index) => context.fillText(line, 72, 250 + index * 48));
+    const link = document.createElement('a');
+    link.download = `aero-post-${postId}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showNotice('Card image downloaded.', 'success');
 }
 
 

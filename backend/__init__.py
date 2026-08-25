@@ -47,7 +47,10 @@ def create_app():
         Comment,
         Follow,
         Like,
-        Report
+        Report,
+        UserInteraction,
+        Notification,
+        CommentLike
     )
 
     from backend.auth import auth_bp
@@ -59,6 +62,12 @@ def create_app():
     from backend.interact import routes as interact_routes
 
     app.register_blueprint(interact_bp)
+    app.add_url_rule(
+        "/api/comments/<int:comment_id>/like",
+        endpoint="api_comment_like",
+        view_func=interact_routes.toggle_comment_like,
+        methods=["POST", "DELETE"],
+    )
 
     from backend.feed import feed_bp
     from backend.feed import routes as feed_routes
@@ -73,6 +82,14 @@ def create_app():
     with app.app_context():
         db.create_all()
         if db.engine.dialect.name == "sqlite":
+            post_columns = {
+                column[1]
+                for column in db.session.execute(text("PRAGMA table_info(posts)"))
+            }
+            if "parent_id" not in post_columns:
+                db.session.execute(text("ALTER TABLE posts ADD COLUMN parent_id INTEGER"))
+            if "type" not in post_columns:
+                db.session.execute(text("ALTER TABLE posts ADD COLUMN type VARCHAR(12) NOT NULL DEFAULT 'original'"))
             columns = {
                 column[1]
                 for column in db.session.execute(text("PRAGMA table_info(users)"))

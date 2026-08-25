@@ -3,7 +3,7 @@ from flask import jsonify, request
 from backend import db
 from backend.auth.routes import token_required
 from backend.interact import interact_bp
-from backend.models import Post, Like, Comment
+from backend.models import Post, Like, Comment, CommentLike
 
 
 @interact_bp.route("/test", methods=["GET"])
@@ -159,7 +159,10 @@ def create_comment(current_user, post_id):
             "post_id": comment.post_id,
             "content": comment.content,
             "parent_id": comment.parent_id,
-            "created_at": comment.created_at.isoformat()
+            "created_at": comment.created_at.isoformat(),
+            "avatar_url": current_user.avatar_url or "",
+            "likes_count": 0,
+            "is_liked": False
         }
     }), 201
 
@@ -218,7 +221,10 @@ def create_reply(current_user, comment_id):
             "post_id": reply.post_id,
             "content": reply.content,
             "parent_id": reply.parent_id,
-            "created_at": reply.created_at.isoformat()
+            "created_at": reply.created_at.isoformat(),
+            "avatar_url": current_user.avatar_url or "",
+            "likes_count": 0,
+            "is_liked": False
         }
     }), 201
 
@@ -227,7 +233,8 @@ def create_reply(current_user, comment_id):
     "/posts/<int:post_id>/comments",
     methods=["GET"]
 )
-def get_comments(post_id):
+@token_required
+def get_comments(current_user, post_id):
     # Check that the post exists
     post = db.session.get(Post, post_id)
 
@@ -251,10 +258,15 @@ def get_comments(post_id):
             "id": comment.id,
             "user_id": comment.user_id,
             "username": comment.author.username,
+            "avatar_url": comment.author.avatar_url or "",
             "post_id": comment.post_id,
             "content": comment.content,
             "parent_id": comment.parent_id,
             "created_at": comment.created_at.isoformat(),
+            "likes_count": CommentLike.query.filter_by(comment_id=comment.id).count(),
+            "is_liked": CommentLike.query.filter_by(
+                comment_id=comment.id, user_id=current_user.id
+            ).first() is not None,
             "replies": []
         }
 
@@ -275,4 +287,28 @@ def get_comments(post_id):
     return jsonify({
         "post_id": post_id,
         "comments": root_comments
+    }), 200
+
+
+@interact_bp.route("/comments/<int:comment_id>/like", methods=["POST", "DELETE"])
+@token_required
+def toggle_comment_like(current_user, comment_id):
+    comment = db.session.get(Comment, comment_id)
+    if not comment:
+        return jsonify({"error": "Comment not found"}), 404
+    existing = CommentLike.query.filter_by(user_id=current_user.id, comment_id=comment_id).first()
+    if request.method == "POST":
+        if not existing:
+            db.session.add(CommentLike(user_id=current_user.id, comment_id=comment_id))
+            db.session.commit()
+        liked = True
+    elif existing:
+        db.session.delete(existing)
+        db.session.commit()
+        liked = False
+    else:
+        liked = False
+    return jsonify({
+        "liked": liked,
+        "like_count": CommentLike.query.filter_by(comment_id=comment_id).count(),
     }), 200
