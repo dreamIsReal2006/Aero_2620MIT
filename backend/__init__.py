@@ -93,6 +93,14 @@ def create_app():
                 db.session.execute(text(
                     "ALTER TABLE users ADD COLUMN avatar_url VARCHAR(500) NOT NULL DEFAULT ''"
                 ))
+            if "is_private" not in columns:
+                db.session.execute(text(
+                    "ALTER TABLE users ADD COLUMN is_private BOOLEAN NOT NULL DEFAULT 0"
+                ))
+            if "show_online_status" not in columns:
+                db.session.execute(text(
+                    "ALTER TABLE users ADD COLUMN show_online_status BOOLEAN NOT NULL DEFAULT 1"
+                ))
             db.session.commit()
 
     from backend.admin import admin_bp

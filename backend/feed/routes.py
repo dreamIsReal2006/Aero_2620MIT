@@ -1,4 +1,6 @@
 import json
+import datetime as dt
+import math
 import uuid
 from pathlib import Path
 
@@ -22,6 +24,8 @@ def post_payload(post, current_user_id=None):
     is_liked = current_user_id is not None and Like.query.filter_by(
         post_id=post.id, user_id=current_user_id
     ).first() is not None
+    hours_ago = max(0, (dt.datetime.utcnow() - post.created_at).total_seconds() / 3600)
+    score = (likes_count + comments_count * 3) / math.pow(hours_ago + 2, 1.5)
     return {
         "id": post.id,
         "user_id": post.user_id,
@@ -34,6 +38,7 @@ def post_payload(post, current_user_id=None):
         "is_liked": is_liked,
         "likes": likes_count,
         "comments": comments_count,
+        "ranking_score": score,
         "created_at": post.created_at.isoformat(),
     }
 
@@ -55,10 +60,12 @@ def search():
 @feed_bp.get("/posts")
 @token_required
 def get_posts(current_user):
-    return jsonify([
+    posts = [
         post_payload(post, current_user.id)
-        for post in Post.query.order_by(Post.created_at.desc()).all()
-    ])
+        for post in Post.query.all()
+    ]
+    posts.sort(key=lambda post: post["ranking_score"], reverse=True)
+    return jsonify(posts)
 
 
 @feed_bp.post("/uploads")

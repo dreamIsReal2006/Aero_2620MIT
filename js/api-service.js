@@ -788,8 +788,8 @@ const AeroAPI = {
     },
 
     async adminDeletePost(postId) {
-        const res = await fetch(`${API_BASE}/admin/posts/${postId}/delete`, {
-            method: 'POST',
+        const res = await fetch(`${API_BASE}/admin/posts/${postId}`, {
+            method: 'DELETE',
             headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
         });
         const data = await res.json();
@@ -815,12 +815,12 @@ const AeroAPI = {
             overlay.className = 'report-modal-overlay';
             overlay.innerHTML = `<div class="report-modal" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
                 <div class="report-modal-header"><h2 id="report-modal-title">Report post</h2><button type="button" class="report-close" aria-label="Close report dialog">&times;</button></div>
-                <form class="report-form"><label for="report-reason">Why are you reporting this?</label><textarea id="report-reason" maxlength="1000" required placeholder="Tell us what is wrong..."></textarea><div class="report-form-actions"><button type="button" class="btn report-cancel">Cancel</button><button type="submit" class="btn btn-primary">Submit report</button></div></form>
+                <form class="report-form"><label for="report-reason">Why are you reporting this?</label><textarea id="report-reason" maxlength="1000" required placeholder="Tell us what is wrong..."></textarea><div class="report-form-actions"><button type="button" class="report-cancel-btn">Cancel</button><button type="submit" class="report-submit-btn">Submit report</button></div></form>
             </div>`;
             document.body.appendChild(overlay);
             const close = () => overlay.classList.remove('is-open');
             overlay.querySelector('.report-close').addEventListener('click', close);
-            overlay.querySelector('.report-cancel').addEventListener('click', close);
+            overlay.querySelector('.report-cancel-btn').addEventListener('click', close);
             overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
         }
         const form = overlay.querySelector('.report-form');
@@ -918,7 +918,7 @@ const AeroAPI = {
             moreButton.title = 'Post options';
             moreButton.textContent = '\u22ee';
             const optionsMenu = document.createElement('div');
-            optionsMenu.className = 'post-dropdown-menu post-menu hidden';
+            optionsMenu.className = 'post-dropdown-menu post-menu';
             const isOwnPost = post.user_id === currentUser.id;
             const isAdmin = currentUser.is_admin === true;
             const openDeleteModal = () => {
@@ -934,7 +934,7 @@ const AeroAPI = {
                 item.textContent = label;
                 item.classList.toggle('danger', danger);
                 item.addEventListener('click', () => {
-                    optionsMenu.classList.add('hidden');
+                    closeAllPostMenus();
                     action();
                 });
                 optionsMenu.appendChild(item);
@@ -946,9 +946,9 @@ const AeroAPI = {
             else addMenuItem('Report Post', () => this.showReportModal(post.id));
             moreButton.addEventListener('click', event => {
                 event.stopPropagation();
-                const isClosed = optionsMenu.classList.contains('hidden') || optionsMenu.style.display === 'none';
-                optionsMenu.classList.toggle('hidden', !isClosed);
-                optionsMenu.style.display = isClosed ? '' : 'none';
+                const shouldOpen = !optionsMenu.classList.contains('show');
+                closeAllPostMenus(optionsMenu);
+                optionsMenu.classList.toggle('show', shouldOpen);
             });
             header.append(moreButton, optionsMenu);
             const content = document.createElement('div');
@@ -1126,6 +1126,32 @@ const AeroAPI = {
     },
 
     initAppState() {
+        const homeButton = document.getElementById('home-nav-btn');
+        const logoButton = document.getElementById('aero-logo');
+        const goHome = async () => {
+            if (!window.location.pathname.endsWith('/index.html') && window.location.pathname !== '/') {
+                window.location.href = 'index.html';
+                return;
+            }
+            homeButton?.classList.add('active');
+            await this.renderFeed();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+        homeButton?.addEventListener('click', goHome);
+        logoButton?.addEventListener('click', goHome);
+        let savedSettings = {};
+        try {
+            savedSettings = JSON.parse(localStorage.getItem('aero_settings') || '{}');
+        } catch (error) {
+            savedSettings = {};
+        }
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const useDarkMode = savedSettings.theme === 'dark' || (savedSettings.theme === 'system' && prefersDark);
+        document.body.classList.toggle('dark-mode', useDarkMode);
+        document.body.classList.toggle('light-mode', !useDarkMode);
+        document.getElementById('settings-nav-btn')?.addEventListener('click', () => {
+            window.location.href = 'settings.html';
+        });
         const token = localStorage.getItem('aero_token');
         const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
         const adminLink = document.getElementById('admin-dashboard-link');
@@ -1172,6 +1198,14 @@ const AeroAPI = {
         }, 460);
     }
 };
+
+function closeAllPostMenus(exceptMenu = null) {
+    document.querySelectorAll('.post-dropdown-menu, .post-menu').forEach(menu => {
+        if (menu !== exceptMenu) {
+            menu.classList.remove('show');
+        }
+    });
+}
 
 
 
@@ -1448,10 +1482,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.addEventListener('click', event => {
-    if (!event.target.closest('.post-more-btn') && !event.target.closest('.post-dropdown-menu')) {
-        document.querySelectorAll('.post-dropdown-menu').forEach(menu => {
-            menu.classList.add('hidden');
-            menu.style.display = 'none';
-        });
+    if (!event.target.closest('.post-more-btn') && !event.target.closest('.post-dropdown-menu, .post-menu')) {
+        closeAllPostMenus();
     }
 });

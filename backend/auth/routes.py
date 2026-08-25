@@ -12,7 +12,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from backend import db
 from backend.auth import auth_bp
-from backend.models import OTPCode, User
+from backend.models import Comment, Follow, Like, OTPCode, Post, Report, User
 
 
 def make_token(user):
@@ -143,6 +143,7 @@ def verify_otp():
         "id": user.id, "username": user.username, "email": user.email,
         "bio": user.bio or "", "avatar_url": user.avatar_url or "",
         "is_admin": user.is_admin, "is_banned": user.is_banned,
+        "is_private": user.is_private, "show_online_status": user.show_online_status,
     }}), 200
 
 
@@ -159,4 +160,42 @@ def signin():
         "id": user.id, "username": user.username, "email": user.email,
         "bio": user.bio or "", "avatar_url": user.avatar_url or "",
         "is_admin": user.is_admin, "is_banned": user.is_banned,
+        "is_private": user.is_private, "show_online_status": user.show_online_status,
     }}), 200
+
+
+@auth_bp.put("/password")
+@token_required
+def change_password(current_user):
+    data = request.get_json(silent=True) or {}
+    old_password = str(data.get("old_password", ""))
+    new_password = str(data.get("new_password", ""))
+    if not current_user.check_password(old_password):
+        return jsonify({"message": "Current password is incorrect"}), 400
+    if len(new_password) < 8 or len(new_password) > 128:
+        return jsonify({"message": "Password must be 8-128 characters"}), 400
+    if (not any(char.isupper() for char in new_password) or
+            not any(char.isdigit() for char in new_password) or
+            not any(not char.isalnum() for char in new_password)):
+        return jsonify({"message": "Password must include uppercase, number, and special character"}), 400
+    current_user.set_password(new_password)
+    db.session.commit()
+    return jsonify({"message": "Password updated successfully"}), 200
+
+
+@auth_bp.delete("/account")
+@token_required
+def delete_account(current_user):
+    post_ids = [post.id for post in Post.query.filter_by(user_id=current_user.id).all()]
+    if post_ids:
+        Comment.query.filter(Comment.post_id.in_(post_ids)).delete(synchronize_session=False)
+        Like.query.filter(Like.post_id.in_(post_ids)).delete(synchronize_session=False)
+        Post.query.filter(Post.id.in_(post_ids)).delete(synchronize_session=False)
+    Comment.query.filter_by(user_id=current_user.id).delete(synchronize_session=False)
+    Like.query.filter_by(user_id=current_user.id).delete(synchronize_session=False)
+    Follow.query.filter((Follow.follower_id == current_user.id) | (Follow.following_id == current_user.id)).delete(synchronize_session=False)
+    Report.query.filter_by(reporter_id=current_user.id).delete(synchronize_session=False)
+    db.session.delete(current_user)
+    db.session.commit()
+    session.clear()
+    return jsonify({"message": "Account deleted successfully"}), 200

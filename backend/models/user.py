@@ -28,6 +28,9 @@ class User(db.Model):
     bio = db.Column(db.String(150), default="", nullable=False)
     avatar_url = db.Column(db.String(500), default="", nullable=False)
 
+    is_private = db.Column(db.Boolean, default=False, nullable=False)
+    show_online_status = db.Column(db.Boolean, default=True, nullable=False)
+
     password_hash = db.Column(
         db.String(255),
         nullable=False
