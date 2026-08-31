@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from backend import db
 
 
@@ -15,6 +16,12 @@ class Post(db.Model):
         nullable=False
     )
 
+    images_json = db.Column(
+        db.Text,
+        default="[]",
+        nullable=False
+    )
+
     created_at = db.Column(
         db.DateTime,
         default=datetime.utcnow,
@@ -27,6 +34,26 @@ class Post(db.Model):
         db.ForeignKey("users.id"),
         nullable=False,
         index=True
+    )
+
+    parent_id = db.Column(
+        db.Integer,
+        db.ForeignKey("posts.id"),
+        nullable=True,
+        index=True
+    )
+
+    type = db.Column(
+        db.String(12),
+        nullable=False,
+        default="original",
+        index=True
+    )
+
+    parent = db.relationship(
+        "Post",
+        remote_side=[id],
+        backref=db.backref("reposts", lazy=True)
     )
 
     author = db.relationship(

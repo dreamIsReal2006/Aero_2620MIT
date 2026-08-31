@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aero - Verify OTP</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="light-mode auth-body">
+
+    <div class="otp-wrapper">
+        <div class="otp-card glass-card pop-in g2-card">
+            <div class="brand-header">
+                <h1 class="brand-title">Aero</h1>
+            </div>
+            
+            <h2 class="form-heading">Verify your email</h2>
+            <p class="form-subheading">We sent a 6-digit verification code to <br><strong id="target-email">your email</strong></p>
+
+            <form id="otp-form">
+                <div class="otp-inputs">
+                    <input type="text" maxlength="1" class="otp-digit" pattern="[0-9]" required autofocus>
+                    <input type="text" maxlength="1" class="otp-digit" pattern="[0-9]" required>
+                    <input type="text" maxlength="1" class="otp-digit" pattern="[0-9]" required>
+                    <input type="text" maxlength="1" class="otp-digit" pattern="[0-9]" required>
+                    <input type="text" maxlength="1" class="otp-digit" pattern="[0-9]" required>
+                    <input type="text" maxlength="1" class="otp-digit" pattern="[0-9]" required>
+                </div>
+
+                <div class="otp-actions">
+                    <button type="submit" class="btn btn-primary g2-btn full-width">Continue</button>
+                </div>
+            </form>
+
+            <div class="resend-container" style="margin-top: 16px; font-size: 0.85rem;">
+                <p>Didn't receive code? <a href="#" id="resend-otp-btn" style="color: var(--accent-primary); font-weight: 600;">Resend</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api-service.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const pendingEmail = sessionStorage.getItem('aero_pending_email');
+            if (!pendingEmail) {
+                window.location.href = 'index.html';
+                return;
+            }
+            document.getElementById('target-email').innerText = pendingEmail;
+
+            const digits = document.querySelectorAll('.otp-digit');
+            digits.forEach((digit, index) => {
+                digit.addEventListener('input', (e) => {
+                    if (e.target.value.length === 1 && index < digits.length - 1) {
+                        digits[index + 1].focus();
+                    }
+                });
+                digit.addEventListener('keydown', (e) => {
+                    if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                        digits[index - 1].focus();
+                    }
+                });
+            });
+
+            // Submit OTP
+            document.getElementById('otp-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const code = Array.from(digits).map(d => d.value).join('');
+                if (code.length === 6) {
+                    await AeroAPI.verifyOTP(pendingEmail, code);
+                }
+            });
+
+            // Resend OTP
+            document.getElementById('resend-otp-btn').addEventListener('click', async (e) => {
+                e.preventDefault();
+                await AeroAPI.resendOTP(pendingEmail);
+            });
+        });
+    </script>
+</body>
+</html>

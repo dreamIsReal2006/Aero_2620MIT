@@ -1,8 +1,9 @@
-from flask import jsonify, session, request
+from flask import jsonify, request
 
 from backend import db
+from backend.auth.routes import token_required
 from backend.interact import interact_bp
-from backend.models import User, Post, Like, Comment
+from backend.models import Post, Like, Comment, CommentLike
 
 
 @interact_bp.route("/test", methods=["GET"])
@@ -13,14 +14,9 @@ def interact_test():
 
 
 @interact_bp.route("/posts/<int:post_id>/like", methods=["POST"])
-def like_post(post_id):
-    # Check whether a user is logged in
-    user_id = session.get("user_id")
-
-    if not user_id:
-        return jsonify({
-            "error": "Authentication required"
-        }), 401
+@token_required
+def like_post(current_user, post_id):
+    user_id = current_user.id
 
     # Check that the post exists
     post = db.session.get(Post, post_id)
@@ -63,14 +59,9 @@ def like_post(post_id):
 
 
 @interact_bp.route("/posts/<int:post_id>/like", methods=["DELETE"])
-def unlike_post(post_id):
-    # Check whether a user is logged in
-    user_id = session.get("user_id")
-
-    if not user_id:
-        return jsonify({
-            "error": "Authentication required"
-        }), 401
+@token_required
+def unlike_post(current_user, post_id):
+    user_id = current_user.id
 
     # Check that the post exists
     post = db.session.get(Post, post_id)
@@ -108,14 +99,9 @@ def unlike_post(post_id):
 
 
 @interact_bp.route("/posts/<int:post_id>/comments", methods=["POST"])
-def create_comment(post_id):
-    # Check whether a user is logged in
-    user_id = session.get("user_id")
-
-    if not user_id:
-        return jsonify({
-            "error": "Authentication required"
-        }), 401
+@token_required
+def create_comment(current_user, post_id):
+    user_id = current_user.id
 
     # Check that the post exists
     post = db.session.get(Post, post_id)
@@ -143,12 +129,30 @@ def create_comment(post_id):
 
     content = content.strip()
 
+    # Support nested comments/replies
+    parent_id = data.get("parentId", data.get("parent_id"))
+
+    if parent_id is not None:
+        try:
+            parent_id = int(parent_id)
+        except (TypeError, ValueError):
+            return jsonify({
+                "error": "Invalid parent comment"
+            }), 400
+
+        parent_comment = db.session.get(Comment, parent_id)
+
+        if not parent_comment or parent_comment.post_id != post_id:
+            return jsonify({
+                "error": "Parent comment not found"
+            }), 404
+
     # Create the comment
     comment = Comment(
         user_id=user_id,
         post_id=post_id,
         content=content,
-        parent_id=None
+        parent_id=parent_id
     )
 
     db.session.add(comment)
@@ -159,10 +163,14 @@ def create_comment(post_id):
         "comment": {
             "id": comment.id,
             "user_id": comment.user_id,
+            "username": current_user.username,
             "post_id": comment.post_id,
             "content": comment.content,
             "parent_id": comment.parent_id,
-            "created_at": comment.created_at.isoformat()
+            "created_at": comment.created_at.isoformat(),
+            "avatar_url": current_user.avatar_url or "",
+            "likes_count": 0,
+            "is_liked": False
         }
     }), 201
 
@@ -171,14 +179,9 @@ def create_comment(post_id):
     "/comments/<int:comment_id>/replies",
     methods=["POST"]
 )
-def create_reply(comment_id):
-    # Check whether a user is logged in
-    user_id = session.get("user_id")
-
-    if not user_id:
-        return jsonify({
-            "error": "Authentication required"
-        }), 401
+@token_required
+def create_reply(current_user, comment_id):
+    user_id = current_user.id
 
     # Check that the parent comment exists
     parent_comment = db.session.get(Comment, comment_id)
@@ -222,10 +225,14 @@ def create_reply(comment_id):
         "comment": {
             "id": reply.id,
             "user_id": reply.user_id,
+            "username": current_user.username,
             "post_id": reply.post_id,
             "content": reply.content,
             "parent_id": reply.parent_id,
-            "created_at": reply.created_at.isoformat()
+            "created_at": reply.created_at.isoformat(),
+            "avatar_url": current_user.avatar_url or "",
+            "likes_count": 0,
+            "is_liked": False
         }
     }), 201
 
@@ -234,7 +241,8 @@ def create_reply(comment_id):
     "/posts/<int:post_id>/comments",
     methods=["GET"]
 )
-def get_comments(post_id):
+@token_required
+def get_comments(current_user, post_id):
     # Check that the post exists
     post = db.session.get(Post, post_id)
 
@@ -257,10 +265,19 @@ def get_comments(post_id):
         comment_map[comment.id] = {
             "id": comment.id,
             "user_id": comment.user_id,
+            "username": comment.author.username,
+            "avatar_url": comment.author.avatar_url or "",
             "post_id": comment.post_id,
             "content": comment.content,
             "parent_id": comment.parent_id,
             "created_at": comment.created_at.isoformat(),
+            "likes_count": CommentLike.query.filter_by(
+                comment_id=comment.id
+            ).count(),
+            "is_liked": CommentLike.query.filter_by(
+                comment_id=comment.id,
+                user_id=current_user.id
+            ).first() is not None,
             "replies": []
         }
 
@@ -281,4 +298,50 @@ def get_comments(post_id):
     return jsonify({
         "post_id": post_id,
         "comments": root_comments
+    }), 200
+
+
+@interact_bp.route(
+    "/comments/<int:comment_id>/like",
+    methods=["POST", "DELETE"]
+)
+@token_required
+def toggle_comment_like(current_user, comment_id):
+    comment = db.session.get(Comment, comment_id)
+
+    if not comment:
+        return jsonify({
+            "error": "Comment not found"
+        }), 404
+
+    existing = CommentLike.query.filter_by(
+        user_id=current_user.id,
+        comment_id=comment_id
+    ).first()
+
+    if request.method == "POST":
+        if not existing:
+            db.session.add(
+                CommentLike(
+                    user_id=current_user.id,
+                    comment_id=comment_id
+                )
+            )
+            db.session.commit()
+
+        liked = True
+
+    elif existing:
+        db.session.delete(existing)
+        db.session.commit()
+        liked = False
+
+    else:
+        liked = False
+
+    return jsonify({
+        "liked": liked,
+        "like_count": CommentLike.query.filter_by(
+            comment_id=comment_id
+        ).count(),
     }), 200

@@ -3,3 +3,8 @@ from backend.models.post import Post
 from backend.models.comment import Comment
 from backend.models.follow import Follow
 from backend.models.like import Like
+from backend.models.otp import OTPCode
+from backend.models.report import Report
+from backend.models.user_interaction import UserInteraction
+from backend.models.notification import Notification
+from backend.models.comment_like import CommentLike
