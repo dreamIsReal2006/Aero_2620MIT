@@ -34,8 +34,10 @@ def post_payload(post, current_user_id=None):
         UserInteraction.post_id == post.id,
         UserInteraction.type.in_(["share", "copy"]),
     ).count()
-    hours_ago = max(0, (dt.datetime.utcnow() - post.created_at).total_seconds() / 3600)
-    score = (likes_count + comments_count * 3 + share_count * 2) / math.pow(hours_ago + 2, 1.5)
+    hours_ago = max(0, (dt.datetime.utcnow() -
+                    post.created_at).total_seconds() / 3600)
+    score = (likes_count + comments_count * 3 + share_count * 2) / \
+        math.pow(hours_ago + 2, 1.5)
     return {
         "id": post.id,
         "user_id": post.user_id,
@@ -63,8 +65,10 @@ def search():
     if not query:
         return jsonify({"users": [], "posts": []})
     pattern = f"%{query}%"
-    users = User.query.filter(User.username.ilike(pattern)).order_by(User.username).limit(5).all()
-    posts = Post.query.join(User).filter(Post.content.ilike(pattern)).order_by(Post.created_at.desc()).limit(5).all()
+    users = User.query.filter(User.username.ilike(
+        pattern)).order_by(User.username).limit(5).all()
+    posts = Post.query.join(User).filter(Post.content.ilike(
+        pattern)).order_by(Post.created_at.desc()).limit(5).all()
     return jsonify({
         "users": [{"id": user.id, "username": user.username, "email": user.email} for user in users],
         "posts": [{"id": post.id, "content": post.content, "username": post.author.username} for post in posts],
@@ -93,7 +97,8 @@ def get_posts(current_user):
 @token_required
 def upload_media(current_user):
     file = request.files.get("file")
-    extension = Path(secure_filename(file.filename if file else "")).suffix.lower().lstrip(".")
+    extension = Path(secure_filename(
+        file.filename if file else "")).suffix.lower().lstrip(".")
     expected_mime = ALLOWED_MEDIA_TYPES.get(extension)
     if not file or not file.filename or not expected_mime or not (file.mimetype or "").startswith(expected_mime):
         return jsonify({"message": "Only JPG, PNG, JPEG, WEBP, MP4, WEBM, or MOV media are supported"}), 400
@@ -164,7 +169,8 @@ def repost_post(current_user, post_id):
         type=post_type,
     )
     db.session.add(repost)
-    db.session.add(UserInteraction(user_id=current_user.id, post_id=original.id, type="repost"))
+    db.session.add(UserInteraction(user_id=current_user.id,
+                   post_id=original.id, type="repost"))
     if original.user_id != current_user.id:
         db.session.add(Notification(
             recipient_id=original.user_id,
@@ -180,19 +186,28 @@ def repost_post(current_user, post_id):
 @feed_bp.post("/posts/<int:post_id>/bookmark")
 @token_required
 def bookmark_post(current_user, post_id):
-    if not db.session.get(Post, post_id):
-        return jsonify({"message": "Post not found"}), 404
-    interaction = UserInteraction.query.filter_by(
-        user_id=current_user.id, post_id=post_id, type="bookmark"
-    ).first()
-    if interaction:
-        db.session.delete(interaction)
-        bookmarked = False
-    else:
-        db.session.add(UserInteraction(user_id=current_user.id, post_id=post_id, type="bookmark"))
-        bookmarked = True
+    ...
     db.session.commit()
     return jsonify({"bookmarked": bookmarked}), 200
+
+
+@feed_bp.get("/bookmarks")
+@token_required
+def get_bookmarks(current_user):
+    interactions = UserInteraction.query.filter_by(
+        user_id=current_user.id,
+        type="bookmark"
+    ).all()
+
+    posts = []
+
+    for interaction in interactions:
+        post = db.session.get(Post, interaction.post_id)
+
+        if post:
+            posts.append(post_payload(post, current_user.id))
+
+    return jsonify(posts), 200
 
 
 @feed_bp.post("/recommendations/feedback")
@@ -209,7 +224,8 @@ def recommendation_feedback(current_user):
         user_id=current_user.id, post_id=post_id, type="not_interested"
     ).first()
     if not existing:
-        db.session.add(UserInteraction(user_id=current_user.id, post_id=post_id, type="not_interested"))
+        db.session.add(UserInteraction(user_id=current_user.id,
+                       post_id=post_id, type="not_interested"))
         db.session.commit()
     return jsonify({"feedback": "not_interested"}), 200
 
@@ -219,10 +235,12 @@ def recommendation_feedback(current_user):
 def share_stats(current_user, post_id):
     if not db.session.get(Post, post_id):
         return jsonify({"message": "Post not found"}), 404
-    action = str((request.get_json(silent=True) or {}).get("action", "share")).lower()
+    action = str((request.get_json(silent=True) or {}
+                  ).get("action", "share")).lower()
     if action not in {"share", "copy"}:
         return jsonify({"message": "Action must be share or copy"}), 400
-    db.session.add(UserInteraction(user_id=current_user.id, post_id=post_id, type=action))
+    db.session.add(UserInteraction(
+        user_id=current_user.id, post_id=post_id, type=action))
     db.session.commit()
     return jsonify({"recorded": action}), 201
 
@@ -231,7 +249,8 @@ def share_stats(current_user, post_id):
 @token_required
 def send_post_to_user(current_user, post_id):
     post = db.session.get(Post, post_id)
-    recipient_name = str((request.get_json(silent=True) or {}).get("username", "")).strip()
+    recipient_name = str((request.get_json(silent=True)
+                         or {}).get("username", "")).strip()
     recipient = User.query.filter(User.username.ilike(recipient_name)).first()
     if not post or not recipient:
         return jsonify({"message": "Post or recipient not found"}), 404
@@ -242,6 +261,7 @@ def send_post_to_user(current_user, post_id):
         type="share",
         message=f"@{current_user.username} shared a post with you",
     ))
-    db.session.add(UserInteraction(user_id=current_user.id, post_id=post.id, type="share"))
+    db.session.add(UserInteraction(
+        user_id=current_user.id, post_id=post.id, type="share"))
     db.session.commit()
     return jsonify({"message": "Post shared successfully", "recipient": recipient.username}), 201
