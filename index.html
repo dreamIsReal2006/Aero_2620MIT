@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <script src="js/theme.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aero - Liquid Social Platform</title>
     <link rel="icon" type="image/png" sizes="16x16" href="./assets/img/logo.png">
@@ -57,6 +58,20 @@
                     </div>
                     <div class="input-group">
                         <input type="password" id="signup-password" placeholder="Password" required>
+                        <div class="password-strength" aria-live="polite">
+                            <div class="strength-track"><span id="password-strength-bar"></span></div>
+                            <span id="password-strength-label" class="strength-label">Enter a password</span>
+                        </div>
+                        <ul class="password-checklist" aria-label="Password requirements">
+                            <li data-requirement="length"><span class="checkmark">✓</span>At least 8 characters</li>
+                            <li data-requirement="uppercase"><span class="checkmark">✓</span>At least one uppercase letter</li>
+                            <li data-requirement="number"><span class="checkmark">✓</span>At least one number</li>
+                            <li data-requirement="special"><span class="checkmark">✓</span>At least one special character, e.g., @$!%*?&amp;</li>
+                        </ul>
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="signup-confirm-password" placeholder="Confirm Password" required>
+                        <p id="password-match-error" class="field-error" role="alert">Passwords do not match</p>
                     </div>
 
                     <div class="form-actions-link">
@@ -65,6 +80,38 @@
 
                     <button type="submit" class="btn btn-primary g2-btn">Continue</button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="profile-onboarding-overlay" class="profile-onboarding-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+        <form id="profile-onboarding-form" class="profile-onboarding-card glass-card pop-in">
+            <div class="onboarding-kicker">Welcome to Aero</div>
+            <h2 id="onboarding-title">Make your profile yours</h2>
+            <p class="form-subheading">A small introduction helps people find you.</p>
+            <label class="avatar-picker" for="profile-avatar-input">
+                <span id="profile-avatar-preview" class="avatar-preview" aria-hidden="true"><span class="avatar-placeholder">+</span></span>
+                <span class="avatar-edit-badge" aria-hidden="true">&#9998;</span>
+                <span class="sr-only">Choose a profile picture</span>
+            </label>
+            <input id="profile-avatar-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
+            <label class="onboarding-field">Bio
+                <textarea id="profile-bio" maxlength="150" placeholder="Tell the Aero community a little about you..."></textarea>
+                <span id="profile-bio-count" class="character-count">0 / 150</span>
+            </label>
+            <button type="submit" class="btn btn-primary g2-btn">Complete Profile</button>
+            <button type="button" id="skip-profile-btn" class="text-btn">Skip for now</button>
+        </form>
+    </div>
+
+    <div id="delete-modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+        <div class="delete-modal-content glass-card">
+            <div class="delete-modal-icon" aria-hidden="true">!</div>
+            <h2 id="delete-modal-title">Delete Post?</h2>
+            <p>Are you sure you want to delete this post? This action cannot be undone.</p>
+            <div class="delete-modal-actions">
+                <button id="cancel-delete-btn" type="button" class="btn modal-cancel-btn">Cancel</button>
+                <button id="confirm-delete-btn" type="button" class="btn delete-confirm-btn">Delete</button>
             </div>
         </div>
     </div>
@@ -78,7 +125,6 @@
                         <span class="search-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.5 4.5"></path></svg></span>
                         <input type="text" id="global-search" placeholder="Search" autocomplete="off" aria-label="Search Aero">
                         <button type="button" class="search-clear-btn" id="search-clear-btn" aria-label="Clear search">✕</button>
-                        <span class="search-shortcut">⌘K</span>
                     </div>
 
                     <div class="search-dropdown glass-card" id="search-dropdown" role="dialog" aria-label="Search suggestions" aria-expanded="false">
@@ -88,12 +134,13 @@
             </div>
             
             <div class="nav-center">
-                <div class="nav-brand">Aero <span class="brand-sparkle" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 2 1.7 6.3L20 10l-6.3 1.7L12 18l-1.7-6.3L4 10l6.3-1.7L12 2Z"></path></svg></span></div>
+                <button class="nav-brand" id="aero-logo" type="button" aria-label="Go to Aero home">Aero <span class="brand-sparkle" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 2 1.7 6.3L20 10l-6.3 1.7L12 18l-1.7-6.3L4 10l6.3-1.7L12 2Z"></path></svg></span></button>
             </div>
 
             <div class="nav-right">
                 <a id="admin-dashboard-link" class="admin-nav-link hidden" href="admin.html">Admin Dashboard</a>
                 <div class="user-pill glass-pill">
+                    <span id="nav-avatar" class="user-avatar user-avatar-nav" aria-hidden="true">U</span>
                     <span id="nav-username">User</span>
                     <button id="logout-btn" class="logout-sm-btn" aria-label="Sign out" title="Sign out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10"></path><path d="M14 8l4 4-4 4M8 12h10"></path></svg></button>
                 </div>
@@ -102,21 +149,15 @@
 
         <div class="app-viewport">
             <aside class="floating-dock dock-left glass-dock">
-                <button class="dock-btn active" aria-label="Home" title="Home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"></path><path d="M9 21v-7h6v7"></path></svg></button>
+                <button class="dock-btn active" id="home-nav-btn" type="button" aria-label="Home" title="Home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"></path><path d="M9 21v-7h6v7"></path></svg></button>
                 <button class="dock-btn" aria-label="Media" title="Media"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m4 17 4.5-4 3.5 3 2.5-2 5.5 5"></path></svg></button>
                 <button class="dock-btn" aria-label="Messages" title="Messages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.5-.7L4 20l1.7-3.6A7.2 7.2 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z"></path></svg></button>
             </aside>
 
             <main class="feed-container" id="feed-container">
-                <div class="compose-card glass-card g2-card">
-                    <div class="compose-header">
-                        <input type="text" id="post-input" placeholder="Share what's on your mind..." autocomplete="off">
-                    </div>
-                    <div class="compose-footer" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
-                        <label class="btn btn-sm" for="post-images"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m4 17 4.5-4 3.5 3 2.5-2 5.5 5"></path></svg> Add images</label>
-                        <input type="file" id="post-images" accept="image/jpeg,image/png,image/gif,image/webp" multiple hidden>
-                        <button id="publish-post-btn" class="btn btn-primary g2-btn btn-sm" style="width: 100px;">Post</button>
-                    </div>
+                <div class="compose-card glass-card g2-card compose-trigger" id="compose-trigger" role="button" tabindex="0" aria-label="Create a new post">
+                    <div class="compose-trigger-copy"><span id="quick-post-avatar" class="compose-trigger-avatar" aria-hidden="true">U</span><span>Share what's on your mind...</span></div>
+                    <button type="button" class="compose-trigger-media" aria-label="Add media"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m4 17 4.5-4 3.5 3 2.5-2 5.5 5"></path></svg><span>Add media</span></button>
                 </div>
 
                 <div id="posts-feed" class="posts-feed"></div>
@@ -138,9 +179,27 @@
             <aside class="floating-dock dock-right glass-dock">
                 <button class="dock-btn" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4"></path></svg></button>
                 <button class="dock-btn" aria-label="Saved posts" title="Saved posts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-3-6 3V4.5Z"></path></svg></button>
-                <button class="dock-btn" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path><path d="m19.4 15 .1.1a2 2 0 1 1-2.8 2.8l-.1-.1a2 2 0 0 0-3.4 1.4v.3a2 2 0 1 1-4 0v-.3a2 2 0 0 0-3.4-1.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A2 2 0 0 0 3.7 12a2 2 0 0 0-.7-1.5l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A2 2 0 0 0 9.2 6.3H9a2 2 0 1 1 4 0v.3a2 2 0 0 0 3.4 1.4l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a2 2 0 0 0 0 4.2Z"></path></svg></button>
+                    <button class="dock-btn" id="settings-nav-btn" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2.75 14.1 4.2l2.5-.35.95 2.35 2.25 1.15-.35 2.5L20.9 12l-1.45 2.1.35 2.5-2.25 1.15-.95 2.35-2.5-.35L12 21.25l-2.1-1.5-2.5.35-.95-2.35-2.25-1.15.35-2.5L3.1 12l1.45-2.15-.35-2.5 2.25-1.15.95-2.35 2.5.35L12 2.75Z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
             </aside>
         </div>
+
+        <button type="button" id="fab-new-post" class="fab-new-post" aria-label="Create a new post"><span class="fab-plus">+</span><span class="fab-label">New Post</span></button>
+    </div>
+
+    <div id="create-post-modal" class="create-post-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="create-post-title">
+        <form id="create-post-form" class="create-post-modal glass-card">
+            <header class="create-post-header">
+                <div class="create-post-user"><span id="modal-user-avatar" class="user-avatar">U</span><div><h2 id="create-post-title">Create post</h2><span id="create-post-username">User</span></div></div>
+                <button type="button" id="close-create-post" class="modal-close-btn" aria-label="Close create post">&times;</button>
+            </header>
+            <textarea id="modal-post-input" maxlength="5000" placeholder="Share what's on your mind..."></textarea>
+            <div id="modal-preview" class="media-preview-grid" aria-live="polite"></div>
+            <footer class="create-post-footer">
+                <label class="media-picker-btn" for="modal-post-images"><span aria-hidden="true">⌁</span> Add media</label>
+                <input type="file" id="modal-post-images" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime" multiple hidden>
+                <button type="submit" id="modal-publish-btn" class="btn btn-primary g2-btn" disabled>Post</button>
+            </footer>
+        </form>
     </div>
 
     <script src="js/api-service.js"></script>

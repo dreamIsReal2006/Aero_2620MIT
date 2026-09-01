@@ -4,27 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aero Admin Dashboard</title>
+    <link rel="icon" type="image/png" sizes="16x16" href="./assets/img/logo.png">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="light-mode admin-page">
     <main class="admin-shell">
-        <header class="admin-header">
+        <header class="admin-header glass-card">
             <div>
                 <a class="admin-back-link" href="index.html">&larr; Back to Aero</a>
                 <h1>Admin Dashboard</h1>
             </div>
-            <button id="admin-logout" class="btn" type="button">Sign out</button>
+            <button id="admin-logout" class="btn admin-toolbar-btn" type="button">Sign out</button>
         </header>
 
         <div id="admin-error" class="admin-state hidden"></div>
         <section class="admin-stats" aria-label="Platform statistics">
-            <article class="admin-stat-card"><span>Total Users</span><strong id="admin-users-count">-</strong></article>
-            <article class="admin-stat-card"><span>Total Posts</span><strong id="admin-posts-count">-</strong></article>
-            <article class="admin-stat-card"><span>Pending Reports</span><strong id="admin-reports-count">-</strong></article>
+            <article class="admin-stat-card glass-card"><span>Total Users</span><strong id="admin-users-count">-</strong></article>
+            <article class="admin-stat-card glass-card"><span>Total Posts</span><strong id="admin-posts-count">-</strong></article>
+            <article class="admin-stat-card glass-card"><span>Pending Reports</span><strong id="admin-reports-count">-</strong></article>
         </section>
 
-        <section class="admin-reports-section">
-            <div class="admin-section-heading"><div><span class="admin-eyebrow">Moderation queue</span><h2>Pending Reports</h2></div><button id="admin-refresh" class="btn" type="button">Refresh</button></div>
+        <section class="admin-reports-section glass-card">
+            <div class="admin-section-heading"><div><span class="admin-eyebrow">Moderation queue</span><h2>Pending Reports</h2></div><button id="admin-refresh" class="btn admin-toolbar-btn" type="button">Refresh</button></div>
             <div class="admin-table-wrap">
                 <table class="admin-reports-table">
                     <thead><tr><th>Reporter</th><th>Target</th><th>Reason</th><th>Actions</th></tr></thead>
@@ -33,86 +34,13 @@
             </div>
         </section>
     </main>
+    <div id="admin-post-preview-modal" class="admin-post-preview-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="admin-post-preview-title">
+        <article class="admin-post-preview glass-card">
+            <button id="close-admin-post-preview" class="admin-preview-close" type="button" aria-label="Close post preview">&times;</button>
+            <div id="admin-post-preview-content"></div>
+        </article>
+    </div>
     <script src="js/api-service.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            const token = localStorage.getItem('aero_token');
-            const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
-            if (!token || user.is_admin !== true) {
-                window.location.href = 'index.html';
-                return;
-            }
-
-            const errorBox = document.getElementById('admin-error');
-            const reportsBody = document.getElementById('admin-reports-body');
-            const showError = error => {
-                errorBox.textContent = error.message;
-                errorBox.classList.remove('hidden');
-            };
-
-            const loadDashboard = async () => {
-                errorBox.classList.add('hidden');
-                reportsBody.innerHTML = '<tr><td colspan="4" class="admin-empty">Loading reports...</td></tr>';
-                try {
-                    const [stats, reports] = await Promise.all([AeroAPI.getAdminStats(), AeroAPI.getAdminReports()]);
-                    document.getElementById('admin-users-count').textContent = stats.users_count;
-                    document.getElementById('admin-posts-count').textContent = stats.posts_count;
-                    document.getElementById('admin-reports-count').textContent = stats.pending_reports_count;
-                    reportsBody.innerHTML = '';
-                    if (!reports.length) {
-                        reportsBody.innerHTML = '<tr><td colspan="4" class="admin-empty">No pending reports.</td></tr>';
-                        return;
-                    }
-                    reports.forEach(report => {
-                        const row = document.createElement('tr');
-                        const reporter = document.createElement('td');
-                        reporter.textContent = `@${report.reporter.username}`;
-                        const target = document.createElement('td');
-                        target.textContent = report.target_type === 'post'
-                            ? (report.target ? report.target.content : `Post #${report.target_id}`)
-                            : (report.target ? `@${report.target.username}` : `User #${report.target_id}`);
-                        target.className = 'admin-target-cell';
-                        const reason = document.createElement('td');
-                        reason.textContent = report.reason;
-                        const actions = document.createElement('td');
-                        actions.className = 'admin-actions-cell';
-                        if (report.target_type === 'post') {
-                            const deleteButton = document.createElement('button');
-                            deleteButton.className = 'btn btn-danger';
-                            deleteButton.type = 'button';
-                            deleteButton.textContent = 'Delete Post';
-                            deleteButton.addEventListener('click', async () => {
-                                try { await AeroAPI.adminDeletePost(report.target_id); await loadDashboard(); }
-                                catch (error) { showError(error); }
-                            });
-                            actions.appendChild(deleteButton);
-                        }
-                        const banButton = document.createElement('button');
-                        banButton.className = 'btn';
-                        banButton.type = 'button';
-                        banButton.textContent = 'Ban/Unban User';
-                        const targetUserId = report.target_type === 'user' ? report.target_id : report.target?.user_id;
-                        if (targetUserId) {
-                            banButton.addEventListener('click', async () => {
-                                try { await AeroAPI.adminToggleBan(targetUserId); await loadDashboard(); }
-                                catch (error) { showError(error); }
-                            });
-                            actions.appendChild(banButton);
-                        }
-                        row.append(reporter, target, reason, actions);
-                        reportsBody.appendChild(row);
-                    });
-                } catch (error) { showError(error); }
-            };
-
-            document.getElementById('admin-refresh').addEventListener('click', loadDashboard);
-            document.getElementById('admin-logout').addEventListener('click', () => {
-                localStorage.removeItem('aero_token');
-                localStorage.removeItem('aero_user');
-                window.location.href = 'index.html';
-            });
-            await loadDashboard();
-        });
-    </script>
+    <script src="js/admin.js"></script>
 </body>
 </html>

@@ -28,6 +28,7 @@ def serialize_post(post):
         "created_at": post.created_at.isoformat(),
         "user_id": post.user_id,
         "username": post.author.username,
+        "avatar_url": post.author.avatar_url or "",
     }
 
 
@@ -79,18 +80,42 @@ def get_pending_reports(current_user):
     return jsonify([serialize_report(report) for report in reports]), 200
 
 
-@admin_bp.post("/posts/<int:post_id>/delete")
+@admin_bp.patch("/reports/<int:report_id>/dismiss")
 @admin_required
-def force_delete_post(current_user, post_id):
+def dismiss_report(current_user, report_id):
+    report = db.session.get(Report, report_id)
+    if not report:
+        return jsonify({"message": "Report not found"}), 404
+    if report.status != "pending":
+        return jsonify({"message": "Report has already been processed"}), 409
+    report.status = "dismissed"
+    db.session.commit()
+    return jsonify({"message": "Report dismissed successfully", "report_id": report.id}), 200
+
+
+def _delete_post(current_user, post_id):
     post = db.session.get(Post, post_id)
     if not post:
         return jsonify({"message": "Post not found"}), 404
 
     Comment.query.filter_by(post_id=post_id).delete(synchronize_session=False)
     Like.query.filter_by(post_id=post_id).delete(synchronize_session=False)
+    Report.query.filter_by(target_type="post", target_id=post_id).delete(synchronize_session=False)
     db.session.delete(post)
     db.session.commit()
     return jsonify({"message": "Post deleted successfully", "post_id": post_id}), 200
+
+
+@admin_bp.delete("/posts/<int:post_id>")
+@admin_required
+def force_delete_post(current_user, post_id):
+    return _delete_post(current_user, post_id)
+
+
+@admin_bp.post("/posts/<int:post_id>/delete")
+@admin_required
+def legacy_force_delete_post(current_user, post_id):
+    return _delete_post(current_user, post_id)
 
 
 @admin_bp.post("/users/<int:user_id>/ban")
