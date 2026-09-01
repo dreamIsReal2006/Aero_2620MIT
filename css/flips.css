@@ -1,0 +1,770 @@
+/* =========================================
+   FLIPS
+   YouTube Shorts style vertical video page
+========================================= */
+
+.flips-page {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100dvh;
+
+    z-index: 100;
+
+    background: #000;
+
+    display: flex;
+    justify-content: center;
+
+    overflow: hidden;
+}
+
+.flips-page.hidden {
+    display: none;
+}
+
+
+/* =========================================
+   VIDEO FEED
+========================================= */
+
+.flips-feed {
+    width: 100%;
+    max-width: 520px;
+
+    height: 100%;
+
+    overflow-y: auto;
+
+    scroll-snap-type: y mandatory;
+
+    overscroll-behavior-y: contain;
+
+    scrollbar-width: none;
+
+    background: #000;
+}
+
+.flips-feed::-webkit-scrollbar {
+    display: none;
+}
+
+
+/* =========================================
+   INDIVIDUAL FLIP
+========================================= */
+
+.flip-card {
+    position: relative;
+
+    width: 100%;
+    height: 100dvh;
+
+    min-height: 500px;
+
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+
+    overflow: hidden;
+
+    background: #000;
+
+    color: white;
+}
+
+
+/* =========================================
+   VIDEO
+========================================= */
+
+.flip-video {
+    width: 100%;
+    height: 100%;
+
+    object-fit: contain;
+
+    display: block;
+
+    background: #000;
+
+    cursor: pointer;
+}
+
+
+/* =========================================
+   GRADIENT
+========================================= */
+
+.flip-overlay {
+    position: absolute;
+
+    inset: 0;
+
+    pointer-events: none;
+
+    background:
+        linear-gradient(
+            to top,
+            rgba(0, 0, 0, 0.8),
+            rgba(0, 0, 0, 0.2) 45%,
+            rgba(0, 0, 0, 0.15)
+        );
+}
+
+
+/* =========================================
+   SOUND BUTTON
+========================================= */
+
+.flip-sound-button {
+    position: absolute;
+
+    top: 20px;
+    right: 20px;
+
+    width: 44px;
+    height: 44px;
+
+    border: none;
+    border-radius: 50%;
+
+    background:
+        rgba(0, 0, 0, 0.45);
+
+    color: white;
+
+    font-size: 18px;
+
+    cursor: pointer;
+
+    z-index: 5;
+
+    backdrop-filter:
+        blur(8px);
+}
+
+
+/* =========================================
+   USER AND CAPTION
+========================================= */
+
+.flip-bottom {
+    position: absolute;
+
+    left: 20px;
+    right: 90px;
+    bottom: 30px;
+
+    z-index: 4;
+}
+
+.flip-user {
+    display: flex;
+    align-items: center;
+
+    gap: 10px;
+
+    margin-bottom: 12px;
+}
+
+.flip-avatar {
+    width: 42px;
+    height: 42px;
+
+    border-radius: 50%;
+
+    overflow: hidden;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background:
+        rgba(255, 255, 255, 0.2);
+
+    border:
+        2px solid
+        rgba(255, 255, 255, 0.7);
+
+    font-weight: 700;
+}
+
+.flip-avatar img {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+}
+
+.flip-caption {
+    margin: 0;
+
+    font-size: 15px;
+
+    line-height: 1.5;
+
+    text-shadow:
+        0 2px 6px
+        rgba(0, 0, 0, 0.7);
+}
+
+
+/* =========================================
+   RIGHT ACTIONS
+========================================= */
+
+.flip-actions {
+    position: absolute;
+
+    right: 14px;
+    bottom: 30px;
+
+    z-index: 5;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+
+    gap: 18px;
+}
+
+.flip-action {
+    width: 58px;
+
+    border: none;
+
+    padding: 0;
+
+    background: transparent;
+
+    color: white;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+
+    gap: 5px;
+
+    cursor: pointer;
+}
+
+.flip-icon {
+    width: 48px;
+    height: 48px;
+
+    border-radius: 50%;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background:
+        rgba(0, 0, 0, 0.4);
+
+    backdrop-filter:
+        blur(8px);
+
+    font-size: 24px;
+
+    transition:
+        transform 0.2s ease,
+        background 0.2s ease;
+}
+
+.flip-action:hover .flip-icon {
+    transform: scale(1.1);
+
+    background:
+        rgba(0, 0, 0, 0.65);
+}
+
+.flip-action small {
+    font-size: 11px;
+
+    font-weight: 700;
+
+    color: white;
+}
+
+.flip-like.liked .flip-icon,
+.flip-like.liked small {
+    color: #ff3b5c;
+}
+
+
+/* =========================================
+   COMMENTS PANEL
+========================================= */
+
+.flip-comments-panel {
+    position: absolute;
+
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    height: 55%;
+
+    z-index: 20;
+
+    background:
+        var(--bg-card, #ffffff);
+
+    color:
+        var(--text-primary, #111111);
+
+    border-radius:
+        24px 24px 0 0;
+
+    padding: 20px;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 15px;
+
+    box-shadow:
+        0 -10px 40px
+        rgba(0, 0, 0, 0.35);
+
+    animation:
+        slideCommentsUp
+        0.25s ease;
+}
+
+@keyframes slideCommentsUp {
+
+    from {
+        transform:
+            translateY(100%);
+    }
+
+    to {
+        transform:
+            translateY(0);
+    }
+}
+
+.flip-comments-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    font-size: 17px;
+}
+
+.close-comments {
+    width: 35px;
+    height: 35px;
+
+    border: none;
+
+    background: transparent;
+
+    font-size: 28px;
+
+    cursor: pointer;
+
+    color:
+        var(--text-primary, #111111);
+}
+
+.flip-comments-list {
+    flex: 1;
+
+    overflow-y: auto;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 14px;
+}
+
+.flip-comment-item {
+    display: flex;
+    flex-direction: column;
+
+    gap: 5px;
+
+    padding-bottom: 10px;
+
+    border-bottom:
+        1px solid
+        rgba(128, 128, 128, 0.15);
+}
+
+.flip-comment-item strong {
+    font-size: 13px;
+}
+
+.flip-comment-item span {
+    font-size: 14px;
+
+    line-height: 1.4;
+}
+
+.no-comments {
+    text-align: center;
+
+    color:
+        var(--text-secondary, #777);
+
+    padding: 30px 10px;
+}
+
+
+/* =========================================
+   COMMENT FORM
+========================================= */
+
+.flip-comment-form {
+    display: flex;
+
+    gap: 8px;
+
+    padding-top: 10px;
+}
+
+.flip-comment-form input {
+    flex: 1;
+
+    min-width: 0;
+
+    padding: 12px 15px;
+
+    border-radius: 22px;
+
+    border:
+        1px solid
+        rgba(128, 128, 128, 0.25);
+
+    background:
+        var(--bg-primary, #f5f5f5);
+
+    color:
+        var(--text-primary, #111111);
+
+    outline: none;
+}
+
+.flip-comment-form button {
+    border: none;
+
+    padding:
+        0 16px;
+
+    border-radius: 20px;
+
+    background:
+        var(--accent-primary, #2563eb);
+
+    color: white;
+
+    cursor: pointer;
+
+    font-weight: 600;
+}
+
+
+/* =========================================
+   EMPTY / LOADING STATES
+========================================= */
+
+.flips-state {
+    height: 100%;
+
+    min-height: 500px;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 12px;
+
+    text-align: center;
+
+    color: white;
+
+    padding: 30px;
+}
+
+.flips-state strong {
+    font-size: 20px;
+}
+
+.flips-state span {
+    opacity: 0.75;
+}
+
+.flips-state button {
+    margin-top: 10px;
+
+    padding:
+        10px 20px;
+
+    border: none;
+
+    border-radius: 20px;
+
+    background:
+        var(--accent-primary, #2563eb);
+
+    color: white;
+
+    cursor: pointer;
+}
+
+.flips-loader {
+    width: 34px;
+    height: 34px;
+
+    border-radius: 50%;
+
+    border:
+        3px solid
+        rgba(255, 255, 255, 0.2);
+
+    border-top-color:
+        white;
+
+    animation:
+        flipsSpin
+        0.8s linear infinite;
+}
+
+@keyframes flipsSpin {
+
+    to {
+        transform:
+            rotate(360deg);
+    }
+}
+
+
+/* =========================================
+   HIDE MAIN POST BUTTON
+========================================= */
+
+body.flips-open .fab-new-post,
+body.flips-open .new-post-button {
+    display: none;
+}
+
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 600px) {
+
+    .flip-bottom {
+        left: 16px;
+        bottom: 24px;
+    }
+
+    .flip-actions {
+        right: 8px;
+        bottom: 24px;
+    }
+
+    .flip-sound-button {
+        top: 16px;
+        right: 16px;
+    }
+
+    .flip-comments-panel {
+        height: 60%;
+    }
+}
+
+/* =========================================
+   IMPROVED FLIPS COMMENTS
+========================================= */
+
+.flip-comment-item {
+    display: flex;
+    align-items: flex-start;
+
+    gap: 10px;
+
+    padding: 10px 0;
+}
+
+.comment-avatar {
+    width: 34px;
+    height: 34px;
+
+    min-width: 34px;
+
+    border-radius: 50%;
+
+    overflow: hidden;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background:
+        var(--accent-primary, #2563eb);
+
+    color: white;
+
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.comment-avatar img {
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+}
+
+.comment-content {
+    flex: 1;
+
+    min-width: 0;
+}
+
+.comment-content strong {
+    display: block;
+
+    font-size: 13px;
+
+    margin-bottom: 3px;
+}
+
+.comment-content p {
+    margin: 0;
+
+    font-size: 14px;
+
+    line-height: 1.4;
+
+    word-break: break-word;
+}
+
+.comment-content small {
+    display: block;
+
+    margin-top: 5px;
+
+    font-size: 11px;
+
+    color:
+        var(--text-secondary, #888);
+}
+
+.comments-loading {
+    text-align: center;
+
+    padding: 30px 10px;
+
+    color:
+        var(--text-secondary, #888);
+}
+
+.no-comments {
+    min-height: 180px;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 6px;
+
+    text-align: center;
+
+    color:
+        var(--text-secondary, #888);
+}
+
+.no-comments .material-symbols-rounded {
+    font-size: 36px;
+
+    opacity: 0.5;
+}
+
+.no-comments p {
+    margin: 5px 0 0;
+}
+
+.no-comments small {
+    opacity: 0.7;
+}
+
+.retry-comments {
+    margin-top: 10px;
+
+    border: none;
+
+    border-radius: 18px;
+
+    padding: 8px 16px;
+
+    background:
+        var(--accent-primary, #2563eb);
+
+    color: white;
+
+    cursor: pointer;
+}
+
+.send-comment-button:disabled,
+.flip-comment-input:disabled {
+    opacity: 0.6;
+
+    cursor: not-allowed;
+}
+
+.flips-back-btn {
+    position: absolute;
+
+    top: 20px;
+    left: 20px;
+
+    z-index: 100;
+
+    display: flex;
+    align-items: center;
+
+    gap: 6px;
+
+    padding: 9px 14px;
+
+    border: none;
+    border-radius: 20px;
+
+    background: var(--card-bg, rgba(0, 0, 0, 0.65));
+    color: var(--text-primary, #fff);
+
+    cursor: pointer;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    backdrop-filter: blur(10px);
+
+    transition:
+        transform 0.2s ease,
+        opacity 0.2s ease;
+}
+
+.flips-back-btn:hover {
+    transform: scale(1.04);
+}
+
+.flips-back-btn:active {
+    transform: scale(0.96);
+}
+
+.flips-back-btn .material-symbols-rounded {
+    font-size: 20px;
+}

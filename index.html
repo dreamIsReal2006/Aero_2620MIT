@@ -7,6 +7,7 @@
     <title>Aero - Liquid Social Platform</title>
     <link rel="icon" type="image/png" sizes="16x16" href="./assets/img/logo.png">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/flips.css">
 </head>
 <body class="light-mode">
 
@@ -150,7 +151,7 @@
         <div class="app-viewport">
             <aside class="floating-dock dock-left glass-dock">
                 <button class="dock-btn active" id="home-nav-btn" type="button" aria-label="Home" title="Home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"></path><path d="M9 21v-7h6v7"></path></svg></button>
-                <button class="dock-btn" aria-label="Media" title="Media"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m4 17 4.5-4 3.5 3 2.5-2 5.5 5"></path></svg></button>
+                <button class="dock-btn active" id="flips-nav-btn" type="button" aria-label="Flips" title="Flips"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m4 17 4.5-4 3.5 3 2.5-2 5.5 5"></path></svg></button>
                 <button class="dock-btn" aria-label="Messages" title="Messages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.5-.7L4 20l1.7-3.6A7.2 7.2 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z"></path></svg></button>
             </aside>
 
@@ -202,6 +203,25 @@
         </form>
     </div>
 
+    <section id="flips-page" class="flips-page hidden">
+        <button type="button" id="flips-back-btn" class="flips-back-btn" aria-label="Back to Home">
+            <span class="material-symbols-rounded">
+                arrow_back
+            </span>
+            <span>Home</span>
+        </button>
+        
+        <div id="flips-feed" class="flips-feed">
+            <div class="flips-state">
+                <div class="flips-loader"></div>
+                <span>
+                    Loading Flips...
+                </span>
+            </div>
+        </div>
+    </section>
+
+    <script src="js/flips.js"></script>
     <script src="js/api-service.js"></script>
 </body>
 </html>
