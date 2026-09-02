@@ -230,6 +230,12 @@ const FlipsPage = {
                 post.author?.username ||
                 "User";
 
+            const userId =
+                post.user_id ||
+                post.user?.id ||
+                post.author?.id ||
+                "";
+
             const content =
                 post.content ||
                 post.caption ||
@@ -290,23 +296,15 @@ const FlipsPage = {
                     <div class="flip-bottom">
                         <div class="flip-user">
 
-                            <div class="flip-avatar">
-                                ${
-                                    avatar
-                                        ? `
-                                            <img
-                                                src="${this.escapeHtml(this.getMediaUrl(avatar))}"
-                                                alt="${this.escapeHtml(username)}"
-                                            >
-                                        `
-                                        : `
-                                            <span>
-                                                ${this.escapeHtml(
-                                                    username.charAt(0).toUpperCase()
-                                                )}
-                                            </span>
-                                        `
-                                }
+                            <div
+                                class="flip-avatar flip-profile-link"
+                                data-user-id="${this.escapeHtml(userId)}"
+                                data-username="${this.escapeHtml(username)}"
+                                role="button"
+                                tabindex="0"
+                                title="Open profile"
+                                aria-label="Open profile"
+                            >
                             </div>
 
                             <strong>
@@ -368,6 +366,35 @@ const FlipsPage = {
     },
 
     bindEvents() {
+        document.querySelectorAll(".flip-profile-link").forEach(avatar => {
+            const userId = avatar.dataset.userId;
+            const username = avatar.dataset.username;
+
+            const openProfile = event => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (userId) {
+                    window.location.href =
+                        `profile.html?id=${encodeURIComponent(userId)}`;
+                    return;
+                }
+
+                if (username) {
+                    window.location.href =
+                        `profile.html?username=${encodeURIComponent(username)}`;
+                }
+            };
+
+            avatar.addEventListener("click", openProfile);
+
+            avatar.addEventListener("keydown", event => {
+                if (event.key === "Enter" || event.key === " ") {
+                    openProfile(event);
+                }
+            });
+        });
+        
         document.querySelectorAll(".flip-card").forEach(card => {
             const postId = card.dataset.postId;
             const video = card.querySelector(".flip-video");
@@ -385,10 +412,13 @@ const FlipsPage = {
                 card.querySelector(".flip-share");
 
             card.addEventListener("click", event => {
-                if (event.target.closest("button")) {
+                if (
+                    event.target.closest("button") ||
+                    event.target.closest(".flip-profile-link")
+                ) {
                     return;
                 }
-
+                
                 if (video.paused) {
                     video.play().catch(() => {});
                 } else {
