@@ -30,6 +30,9 @@ class User(db.Model):
 
     is_private = db.Column(db.Boolean, default=False, nullable=False)
     show_online_status = db.Column(db.Boolean, default=True, nullable=False)
+    push_notifications = db.Column(db.Boolean, default=True, nullable=False)
+    notify_likes = db.Column(db.Boolean, default=True, nullable=False)
+    notify_comments = db.Column(db.Boolean, default=True, nullable=False)
 
     password_hash = db.Column(
         db.String(255),

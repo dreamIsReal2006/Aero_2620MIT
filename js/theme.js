@@ -15,6 +15,7 @@
 
     function applyTheme(value = getTheme()) {
         const isDark = value === "dark" || (value === "system" && mediaQuery.matches);
+        document.documentElement.dataset.theme = isDark ? "dark" : "light";
         document.documentElement.classList.toggle("dark-mode", isDark);
         document.documentElement.classList.toggle("light-mode", !isDark);
         document.body?.classList.toggle("dark-mode", isDark);

@@ -4,7 +4,7 @@ from flask import jsonify, request
 
 from backend import db
 from backend.auth.routes import token_required
-from backend.models import Follow, Post, Report, User
+from backend.models import Comment, Follow, Notification, Post, Report, User, Video, VideoLike
 from backend.social import social_bp
 
 
@@ -18,6 +18,7 @@ def serialize_post(post):
 
 
 @social_bp.post("/social/follow/<int:user_id>")
+@social_bp.post("/users/<int:user_id>/follow")
 @token_required
 def toggle_follow(current_user, user_id):
     if current_user.id == user_id:
@@ -41,9 +42,18 @@ def toggle_follow(current_user, user_id):
             follower_id=current_user.id,
             following_id=user_id,
         ))
+        if target_user.push_notifications:
+            db.session.add(Notification(
+                recipient_id=user_id,
+                actor_id=current_user.id,
+                type="follow",
+                message=f"@{current_user.username} followed you",
+            ))
         is_following = True
     db.session.commit()
 
+    # The chat contact list is derived from the follow relationship; once the follow
+    # row is saved, the user is automatically available in the contact list.
     followers_count = Follow.query.filter_by(following_id=user_id).count()
     following_count = Follow.query.filter_by(follower_id=user_id).count()
     return jsonify({
@@ -77,6 +87,73 @@ def get_profile(user_id):
         "following_count": following_count,
         "posts": [serialize_post(post) for post in posts],
     }), 200
+
+
+@social_bp.get("/users/<int:user_id>")
+@token_required
+def get_user_profile(current_user, user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    followers_count = Follow.query.filter_by(following_id=user_id).count()
+    following_count = Follow.query.filter_by(follower_id=user_id).count()
+    posts = Post.query.filter_by(user_id=user_id).order_by(Post.created_at.desc()).all()
+    is_following = Follow.query.filter_by(
+        follower_id=current_user.id,
+        following_id=user_id,
+    ).first() is not None
+    return jsonify({
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "bio": user.bio or "",
+            "avatar_url": user.avatar_url or "",
+            "created_at": user.created_at.isoformat(),
+        },
+        "is_following": is_following,
+        "followers_count": followers_count,
+        "following_count": following_count,
+        "posts": [serialize_post(post) for post in posts],
+    }), 200
+
+
+@social_bp.get("/users/<int:user_id>/content")
+@token_required
+def get_user_content(current_user, user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    content_type = str(request.args.get("type", "posts")).strip().lower()
+    if content_type == "posts":
+        items = [serialize_post(post) for post in Post.query.filter_by(user_id=user_id, type="original").order_by(Post.created_at.desc()).all()]
+    elif content_type == "reposts":
+        items = [serialize_post(post) for post in Post.query.filter_by(user_id=user_id).filter(Post.type.in_(["repost", "quote"])).order_by(Post.created_at.desc()).all()]
+    elif content_type == "replies":
+        items = []
+        for comment in Comment.query.filter_by(user_id=user_id).order_by(Comment.created_at.desc()).all():
+            post = db.session.get(Post, comment.post_id)
+            if post:
+                items.append({
+                    "id": comment.id,
+                    "content": comment.content,
+                    "created_at": comment.created_at.isoformat(),
+                    "post": {"id": post.id, "content": post.content, "username": post.author.username},
+                })
+    elif content_type == "shorts":
+        items = [{
+            "id": video.id,
+            "video_url": video.video_url,
+            "caption": video.caption,
+            "created_at": video.created_at.isoformat(),
+            "views_count": 0,
+            "likes_count": VideoLike.query.filter_by(video_id=video.id).count(),
+        } for video in Video.query.filter_by(user_id=user_id).order_by(Video.created_at.desc()).all()]
+    else:
+        return jsonify({"message": "Unknown profile content type"}), 400
+    return jsonify({"type": content_type, "items": items}), 200
 
 
 @social_bp.put("/users/me/profile")
@@ -123,9 +200,13 @@ def update_my_profile(current_user):
     }), 200
 
 
+@social_bp.get("/users/me")
 @social_bp.get("/users/me/profile")
 @token_required
 def get_my_profile(current_user):
+    followers_count = Follow.query.filter_by(following_id=current_user.id).count()
+    following_count = Follow.query.filter_by(follower_id=current_user.id).count()
+    posts = Post.query.filter_by(user_id=current_user.id).order_by(Post.created_at.desc()).all()
     return jsonify({
         "user": {
             "id": current_user.id,
@@ -137,7 +218,10 @@ def get_my_profile(current_user):
             "is_banned": current_user.is_banned,
             "is_private": current_user.is_private,
             "show_online_status": current_user.show_online_status,
-        }
+        },
+        "followers_count": followers_count,
+        "following_count": following_count,
+        "posts": [serialize_post(post) for post in posts],
     }), 200
 
 

@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
@@ -25,7 +25,7 @@ def create_app():
         database_setting if "://" in database_setting else f"sqlite:///{database_setting}"
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
+    app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
     app.config["MAIL_SERVER"] = os.environ.get("AERO_MAIL_SERVER", "smtp.gmail.com")
     app.config["MAIL_PORT"] = int(os.environ.get("AERO_MAIL_PORT", "587"))
     app.config["MAIL_USERNAME"] = os.environ.get("AERO_MAIL_USERNAME")
@@ -50,7 +50,12 @@ def create_app():
         Report,
         UserInteraction,
         Notification,
-        CommentLike
+        CommentLike,
+        Video,
+        Message,
+        VideoComment,
+        Note,
+        VideoLike
     )
 
     from backend.auth import auth_bp
@@ -78,6 +83,23 @@ def create_app():
     from backend.social import routes as social_routes
 
     app.register_blueprint(social_bp)
+
+    from backend.video import video_bp
+    from backend.video import routes as video_routes
+    app.register_blueprint(video_bp)
+
+    from backend.chat import chat_bp
+    from backend.chat import routes as chat_routes
+    app.register_blueprint(chat_bp)
+
+    @app.errorhandler(413)
+    def request_entity_too_large(error):
+        return jsonify({"success": False, "message": "Uploaded file exceeds the 500MB limit"}), 413
+
+    from backend.notification import notification_bp
+    from backend.notification import routes as notification_routes
+
+    app.register_blueprint(notification_bp)
 
     with app.app_context():
         db.create_all()
@@ -118,6 +140,29 @@ def create_app():
                 db.session.execute(text(
                     "ALTER TABLE users ADD COLUMN show_online_status BOOLEAN NOT NULL DEFAULT 1"
                 ))
+            for column_name in ("push_notifications", "notify_likes", "notify_comments"):
+                if column_name not in columns:
+                    db.session.execute(text(
+                        f"ALTER TABLE users ADD COLUMN {column_name} BOOLEAN NOT NULL DEFAULT 1"
+                    ))
+            comment_columns = {
+                column[1]
+                for column in db.session.execute(text("PRAGMA table_info(comments)"))
+            }
+            if "image_url" not in comment_columns:
+                db.session.execute(text(
+                    "ALTER TABLE comments ADD COLUMN image_url VARCHAR(500) NOT NULL DEFAULT ''"
+                ))
+            message_columns = {column[1] for column in db.session.execute(text("PRAGMA table_info(messages)"))}
+            if "media_url" not in message_columns:
+                db.session.execute(text("ALTER TABLE messages ADD COLUMN media_url VARCHAR(500) NOT NULL DEFAULT ''"))
+            if "type" not in message_columns:
+                db.session.execute(text("ALTER TABLE messages ADD COLUMN type VARCHAR(20) NOT NULL DEFAULT 'text'"))
+            video_comment_columns = {column[1] for column in db.session.execute(text("PRAGMA table_info(video_comments)"))}
+            if "media_url" not in video_comment_columns:
+                db.session.execute(text("ALTER TABLE video_comments ADD COLUMN media_url VARCHAR(500) NOT NULL DEFAULT ''"))
+            if "type" not in video_comment_columns:
+                db.session.execute(text("ALTER TABLE video_comments ADD COLUMN type VARCHAR(20) NOT NULL DEFAULT 'text'"))
             db.session.commit()
 
     from backend.admin import admin_bp

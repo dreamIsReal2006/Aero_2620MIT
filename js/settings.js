@@ -88,6 +88,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const onlineToggle = byId("toggle-online-status");
         if (privateToggle) privateToggle.checked = user.is_private === true;
         if (onlineToggle) onlineToggle.checked = user.show_online_status !== false;
+        [
+            ["toggle-push-notifications", user.push_notifications !== false],
+            ["toggle-notify-likes", user.notify_likes !== false],
+            ["toggle-notify-comments", user.notify_comments !== false]
+        ].forEach(([id, checked]) => {
+            const toggle = byId(id);
+            if (toggle) toggle.checked = checked;
+        });
     }
 
     async function loadUser() {
@@ -98,6 +106,12 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const data = await request("/users/me/profile");
             writeUser(data.user || {});
+            const notificationData = await request("/settings/notifications");
+            const settings = notificationData.settings || {};
+            [["toggle-push-notifications", settings.push_notifications], ["toggle-notify-likes", settings.likes], ["toggle-notify-comments", settings.comments]].forEach(([id, checked]) => {
+                const toggle = byId(id);
+                if (toggle && typeof checked === "boolean") toggle.checked = checked;
+            });
         } catch (error) {
             showToast(error.message);
         }
@@ -165,10 +179,35 @@ document.addEventListener("DOMContentLoaded", () => {
                 body: { [field]: toggle.checked, [otherField]: otherToggle?.checked === true }
             });
             const user = JSON.parse(localStorage.getItem("aero_user") || "{}");
-            user[field] = toggle.checked;
+            const userField = field === "likes" ? "notify_likes" : field === "comments" ? "notify_comments" : field;
+            user[userField] = toggle.checked;
             if (otherToggle) user[otherField] = otherToggle.checked;
             localStorage.setItem("aero_user", JSON.stringify(user));
             showToast("Privacy settings updated");
+        } catch (error) {
+            toggle.checked = !toggle.checked;
+            showToast(error.message);
+        } finally {
+            toggle.disabled = false;
+        }
+    }));
+
+    [
+        ["toggle-push-notifications", "push_notifications"],
+        ["toggle-notify-likes", "likes"],
+        ["toggle-notify-comments", "comments"]
+    ].forEach(([id, field]) => byId(id)?.addEventListener("change", async (event) => {
+        const toggle = event.currentTarget;
+        toggle.disabled = true;
+        try {
+            await request("/settings/notifications", {
+                method: "PUT",
+                body: { [field]: toggle.checked }
+            });
+            const user = JSON.parse(localStorage.getItem("aero_user") || "{}");
+            user[field] = toggle.checked;
+            localStorage.setItem("aero_user", JSON.stringify(user));
+            showToast("Notification settings updated");
         } catch (error) {
             toggle.checked = !toggle.checked;
             showToast(error.message);
@@ -250,10 +289,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    const signOutModal = byId("sign-out-modal");
-    byId("sign-out-button")?.addEventListener("click", () => openModal(signOutModal));
-    ["close-sign-out", "cancel-sign-out"].forEach((id) => byId(id)?.addEventListener("click", () => closeModal(signOutModal)));
-    byId("confirm-sign-out")?.addEventListener("click", () => { clearAuthState(); window.location.href = "index.html"; });
     byId("back-button")?.addEventListener("click", () => { window.location.href = "index.html"; });
     document.querySelectorAll(".modal-overlay").forEach((modal) => modal.addEventListener("click", (event) => {
         if (event.target === modal) closeModal(modal);

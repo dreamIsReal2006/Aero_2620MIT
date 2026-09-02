@@ -31,7 +31,10 @@ function safeRegex(value) {
 }
 
 function formatRelativeTime(timestamp) {
-    const elapsedSeconds = Math.max(0, (Date.now() - new Date(timestamp).getTime()) / 1000);
+    const normalizedTimestamp = typeof timestamp === 'string' && timestamp && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(timestamp)
+        ? `${timestamp}Z`
+        : timestamp;
+    const elapsedSeconds = Math.max(0, (Date.now() - new Date(normalizedTimestamp).getTime()) / 1000);
     if (elapsedSeconds < 60) return '刚刚';
     const minutes = Math.floor(elapsedSeconds / 60);
     if (minutes < 60) return `${minutes}分钟`;
@@ -103,7 +106,7 @@ function renderSearchResults(payload = { users: [], posts: [] }) {
         const name = user.username || user.name || 'Unknown user';
         const tag = user.email || 'Member';
         return `
-            <div class="search-result-item search-item ${index === searchState.highlightedIndex ? 'active' : ''}" data-type="user" data-index="${index}" data-username="${escapeHtml(name)}">
+            <div class="search-result-item search-item ${index === searchState.highlightedIndex ? 'active' : ''}" data-type="user" data-index="${index}" data-user-id="${user.id || ''}" data-username="${escapeHtml(name)}">
                 <div class="user-result">
                     <div class="user-avatar">${escapeHtml(name).slice(0, 1).toUpperCase()}</div>
                     <div class="user-details">
@@ -111,7 +114,7 @@ function renderSearchResults(payload = { users: [], posts: [] }) {
                         <span class="user-subline">${highlightMatch(tag, query)}</span>
                     </div>
                 </div>
-                <button type="button" class="user-action-btn">Visit</button>
+                <button type="button" class="user-action-btn" data-action="visit">Visit</button>
             </div>
         `;
     }).join('');
@@ -163,7 +166,7 @@ function getQueryFromUrl() {
 
 function setSearchPageVisibility(showPage) {
     const page = document.getElementById('search-results-page');
-    const feed = document.getElementById('feed-container');
+    const feed = document.getElementById('view-main');
     if (!page || !feed) return;
 
     page.classList.toggle('hidden', !showPage);
@@ -426,10 +429,12 @@ function triggerSearchItemNavigation(item) {
     if (!item) return;
     const type = item.dataset.type;
     const username = item.dataset.username;
+    const userId = item.dataset.userId;
     const postId = item.dataset.postId;
 
-    if (type === 'user' && username) {
-        window.location.href = `/profile/${encodeURIComponent(username)}`;
+    if (type === 'user' && userId) {
+        closeSearchPanel();
+        window.navigateToUserProfile?.(Number(userId));
         return;
     }
 
@@ -476,11 +481,20 @@ function setupSearchInteraction() {
     });
 
     dropdown.addEventListener('mousedown', (event) => {
+        if (event.target.closest('[data-action="visit"]')) return;
         const item = event.target.closest('.search-result-item');
         if (!item) return;
         searchState.ignoreBlur = true;
         event.preventDefault();
         triggerSearchItemNavigation(item);
+    });
+
+    dropdown.addEventListener('click', (event) => {
+        const visitButton = event.target.closest('[data-action="visit"]');
+        if (!visitButton) return;
+        event.preventDefault();
+        event.stopPropagation();
+        triggerSearchItemNavigation(visitButton.closest('.search-result-item'));
     });
 
     input.addEventListener('input', handleSearchInput);
@@ -570,7 +584,7 @@ function createIcon(pathData, label) {
     return icon;
 }
 
-function showNotice(message, type = 'info') {
+function showNotice(message, type = 'info', options = {}) {
     let overlay = document.getElementById('notice-overlay');
     if (!overlay) {
         overlay = document.createElement('div');
@@ -584,6 +598,7 @@ function showNotice(message, type = 'info') {
                     <strong id="notice-title">Aero</strong>
                     <p id="notice-message"></p>
                 </div>
+                <div class="notice-actions"></div>
                 <button class="notice-close" type="button" aria-label="Close notification" title="Close notification">&times;</button>
             </div>`;
         document.body.appendChild(overlay);
@@ -594,6 +609,7 @@ function showNotice(message, type = 'info') {
     const icon = overlay.querySelector('.notice-icon');
     const title = overlay.querySelector('#notice-title');
     const messageElement = overlay.querySelector('#notice-message');
+    const actionArea = overlay.querySelector('.notice-actions');
     const icons = {
         success: '<svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>',
         error: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="m9 9 6 6m0-6-6 6"></path></svg>',
@@ -602,10 +618,315 @@ function showNotice(message, type = 'info') {
     icon.innerHTML = icons[type] || icons.info;
     title.textContent = type === 'success' ? 'All set' : type === 'error' ? 'Something went wrong' : 'Aero';
     messageElement.textContent = message;
+    actionArea.innerHTML = '';
+    if (options.actionLabel && typeof options.onAction === 'function') {
+        const actionButton = document.createElement('button');
+        actionButton.type = 'button';
+        actionButton.className = 'notice-action-btn';
+        actionButton.textContent = options.actionLabel;
+        actionButton.addEventListener('click', () => {
+            options.onAction();
+            closeNotice(overlay);
+        });
+        actionArea.appendChild(actionButton);
+    }
     dialog.dataset.type = type;
     overlay.classList.remove('hidden', 'is-closing');
     window.clearTimeout(overlay.noticeTimer);
     overlay.noticeTimer = window.setTimeout(() => closeNotice(overlay), 4200);
+}
+
+function setBookmarkDrawerVisibility(isOpen) {
+    const drawer = document.getElementById('bookmarks-drawer');
+    const dockButton = document.getElementById('bookmark-dock-btn');
+    if (!drawer || !dockButton) return;
+    drawer.classList.toggle('hidden', !isOpen);
+    dockButton.classList.toggle('active', isOpen);
+}
+
+let notificationItems = [];
+let notificationTab = 'all';
+
+function setNotificationDrawerVisibility(isOpen) {
+    const drawer = document.getElementById('notifications-drawer');
+    const button = document.getElementById('notification-dock-btn');
+    if (!drawer || !button) return;
+    drawer.classList.toggle('hidden', !isOpen);
+    button.classList.toggle('active', isOpen);
+}
+
+function renderNotifications() {
+    const list = document.getElementById('notifications-list');
+    if (!list) return;
+    const items = notificationItems.filter((item) => notificationTab === 'all' || item.type === notificationTab || (notificationTab === 'mentions' && item.type === 'mention'));
+    list.innerHTML = items.length ? items.map((item) => {
+        const actor = item.actor || {};
+        const icon = item.type === 'like' ? '♥' : item.type === 'comment' ? '●' : item.type === 'follow' ? '●' : '↗';
+        const avatarUrl = actor.avatar_url ? (actor.avatar_url.startsWith('http') ? actor.avatar_url : `${API_ORIGIN}${actor.avatar_url}`) : '';
+        const avatar = avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="" onerror="this.remove()">` : escapeHtml((actor.username || 'S').charAt(0).toUpperCase());
+        return `<article class="notification-item" data-post-id="${item.post_id || ''}" tabindex="0"><span class="notification-avatar">${avatar}</span><div class="notification-copy"><strong>@${escapeHtml(actor.username || 'Someone')}</strong><span>${escapeHtml(item.message || `${item.type} your post`)}</span><time>${formatRelativeTime(item.created_at)}</time><p>${escapeHtml(item.post_content || '')}</p></div><span class="notification-type-icon">${icon}</span></article>`;
+    }).join('') : '<div class="bookmarks-empty">No notifications yet.</div>';
+    list.querySelectorAll('.notification-item').forEach((item) => item.addEventListener('click', () => {
+        const post = document.querySelector(`[data-post-id="${item.dataset.postId}"]`);
+        setNotificationDrawerVisibility(false);
+        post?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }));
+}
+
+async function loadNotifications(markRead = true) {
+    try {
+        const response = await fetch(`${API_BASE}/notifications`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Unable to load notifications');
+        notificationItems = data.notifications || [];
+        const badge = document.querySelector('#notification-dock-btn .dock-badge');
+        badge?.classList.toggle('hidden', !(data.unread_count > 0));
+        renderNotifications();
+        if (markRead) {
+            await fetch(`${API_BASE}/notifications/read-all`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+        }
+    } catch (error) {
+        const list = document.getElementById('notifications-list');
+        if (list) list.innerHTML = `<div class="bookmarks-empty">${escapeHtml(error.message)}</div>`;
+    }
+}
+
+function setupNotificationDrawer() {
+    const button = document.getElementById('notification-dock-btn');
+    button?.addEventListener('click', () => {
+        const drawer = document.getElementById('notifications-drawer');
+        const opening = drawer?.classList.contains('hidden');
+        setNotificationDrawerVisibility(Boolean(opening));
+        if (opening) loadNotifications();
+    });
+    document.getElementById('close-notifications-drawer')?.addEventListener('click', () => setNotificationDrawerVisibility(false));
+    document.querySelectorAll('.notification-tab').forEach((tab) => tab.addEventListener('click', () => {
+        notificationTab = tab.dataset.notificationTab || 'all';
+        document.querySelectorAll('.notification-tab').forEach((item) => item.classList.toggle('active', item === tab));
+        renderNotifications();
+    }));
+    if (localStorage.getItem('aero_token')) loadNotifications(false);
+}
+
+let activeChatUser = null;
+let chatPollTimer = null;
+
+async function loadShortVideos() {
+    const feed = document.getElementById('video-feed');
+    if (!feed) return;
+    try {
+        const response = await fetch(`${API_BASE}/videos`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+        const videos = await response.json();
+        if (!response.ok) throw new Error(videos.message || 'Unable to load videos');
+        feed.innerHTML = videos.length ? videos.map((video) => `<article class="short-video-card"><video src="${escapeHtml(video.video_url)}" playsinline loop preload="metadata"></video><div class="short-video-overlay"><button type="button" class="video-action" aria-label="Like video">♥</button><button type="button" class="video-action" aria-label="Comment on video">●</button><button type="button" class="video-action" aria-label="Share video">↗</button></div><div class="short-video-meta"><span class="video-author-avatar">${escapeHtml((video.author?.username || 'U').charAt(0).toUpperCase())}</span><div><strong>@${escapeHtml(video.author?.username || 'User')}</strong><p>${escapeHtml(video.caption || '')}</p><small>♫ ${escapeHtml(video.track_name || 'Original audio')}</small></div><button type="button" class="video-mute-btn" aria-label="Mute video">🔊</button></div></article>`).join('') : '<div class="bookmarks-empty">No short videos yet.</div>';
+        feed.querySelectorAll('video').forEach((video) => {
+            video.muted = true;
+            video.play().catch(() => {});
+            const muteButton = video.closest('.short-video-card').querySelector('.video-mute-btn');
+            muteButton.addEventListener('click', () => { video.muted = !video.muted; muteButton.textContent = video.muted ? '🔇' : '🔊'; });
+        });
+    } catch (error) {
+        feed.innerHTML = `<div class="bookmarks-empty">${escapeHtml(error.message)}</div>`;
+    }
+}
+
+async function loadChatContacts() {
+    const list = document.getElementById('chat-contacts-list');
+    if (!list) return;
+    const response = await fetch(`${API_BASE}/chat/contacts`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+    const contacts = await response.json();
+    list.innerHTML = (contacts || []).map((contact) => `<button type="button" class="chat-contact ${contact.unread_count ? 'unread' : ''}" data-user-id="${contact.id}"><span class="chat-contact-avatar">${escapeHtml((contact.username || 'U').charAt(0).toUpperCase())}</span><span><strong>@${escapeHtml(contact.username)}</strong><small>${escapeHtml(contact.latest_message || 'Start a conversation')}</small></span></button>`).join('') || '<div class="bookmarks-empty">No contacts yet.</div>';
+    list.querySelectorAll('.chat-contact').forEach((item) => item.addEventListener('click', () => selectChatContact(contacts.find((contact) => String(contact.id) === item.dataset.userId))));
+}
+
+async function selectChatContact(contact) {
+    if (!contact) return;
+    activeChatUser = contact;
+    window.activeChatUser = contact;
+    document.getElementById('chat-active-header').textContent = `@${contact.username}`;
+    await loadChatMessages();
+    window.clearInterval(chatPollTimer);
+    chatPollTimer = window.setInterval(loadChatMessages, 5000);
+}
+
+async function loadChatMessages() {
+    const contact = activeChatUser || window.activeChatUser;
+    if (!contact) return;
+    const response = await fetch(`${API_BASE}/chat/messages?contact_id=${contact.id}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+    const messages = await response.json();
+    const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
+    const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
+    box.innerHTML = (messages || []).map((message) => `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}">${escapeHtml(message.content)}</div>`).join('');
+    box.scrollTop = box.scrollHeight;
+}
+
+function setupMediaAndChat() {
+    document.getElementById('chat-dock-btn')?.addEventListener('click', () => { window.AeroRouter?.navigate('chat'); loadChatContacts(); });
+    document.getElementById('close-chat-drawer')?.addEventListener('click', () => { document.getElementById('view-chat').classList.add('hidden'); window.clearInterval(chatPollTimer); });
+    document.getElementById('chat-contact-search')?.addEventListener('input', (event) => document.querySelectorAll('.chat-contact').forEach((item) => item.classList.toggle('hidden', !item.textContent.toLowerCase().includes(event.target.value.toLowerCase()))));
+    const getChatInput = () => document.getElementById('chat-input') || document.getElementById('chat-message-input');
+    document.getElementById('chat-emoji-btn')?.addEventListener('click', () => { const input = getChatInput(); if (!input) return; input.value += ' 😊'; input.focus(); });
+    const chatGifUrls = ['https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif', 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif', 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif'];
+    document.getElementById('chat-gif-btn')?.addEventListener('click', () => {
+        const input = getChatInput();
+        if (!input) return;
+        const picker = document.createElement('div');
+        picker.className = 'chat-gif-picker';
+        picker.innerHTML = chatGifUrls.map((url) => `<button type="button" data-gif-url="${url}"><img src="${url}" alt="GIF"></button>`).join('');
+        document.getElementById('chat-form')?.appendChild(picker);
+        picker.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-gif-url]');
+            if (!button) return;
+            input.dataset.mediaUrl = button.dataset.gifUrl;
+            input.dataset.messageType = 'gif';
+            input.value = '';
+            picker.remove();
+            input.focus();
+        });
+    });
+    document.getElementById('chat-form')?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const input = getChatInput();
+        const contact = activeChatUser || window.activeChatUser;
+        const content = input?.value.trim();
+        const mediaUrl = input?.dataset.mediaUrl || '';
+        if (!contact || (!content && !mediaUrl)) return;
+        const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
+        if (box) {
+            const message = document.createElement('div');
+            message.className = 'chat-message mine';
+            const gif = window.parseGifContent?.(content, mediaUrl, input.dataset.messageType) || { url: mediaUrl, text: content };
+            message.innerHTML = `<div class="chat-bubble-content">${gif.url ? `<img src="${escapeHtml(gif.url)}" class="chat-gif-media" alt="GIF" loading="lazy">` : ''}${gif.text ? escapeHtml(gif.text) : ''}</div>`;
+            box.appendChild(message);
+            box.scrollTop = box.scrollHeight;
+        }
+        const response = await fetch(`${API_BASE}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: JSON.stringify({ user_id: contact.id, recipient_id: contact.id, content, media_url: mediaUrl, type: input.dataset.messageType || 'text' }) });
+        if (response.ok) { input.value = ''; delete input.dataset.mediaUrl; delete input.dataset.messageType; await loadChatMessages(); }
+    });
+}
+
+function createBookmarkItemMarkup(post) {
+    const authorName = post.username || 'User';
+    const avatarUrl = post.author_avatar || post.avatar_url || post.user?.avatar_url || '/static/default-avatar.png';
+    const excerpt = (post.content || '').trim() || 'Saved post';
+    const createdAt = formatRelativeTime(post.created_at);
+    return `
+        <article class="bookmark-item" data-bookmark-id="${post.id}">
+            <span class="bookmark-item-avatar" aria-hidden="true"><img src="${escapeHtml(avatarUrl.startsWith('http') ? avatarUrl : `${API_ORIGIN}${avatarUrl}`)}" alt="" onerror="this.remove()">${escapeHtml(authorName).slice(0, 1).toUpperCase()}</span>
+            <div class="bookmark-item-content">
+                <div class="bookmark-item-header">
+                    <span class="bookmark-item-author">@${escapeHtml(authorName)}</span>
+                    <div class="bookmark-item-meta"><span class="bookmark-item-time">${createdAt}</span><button type="button" class="bookmark-item-remove" data-bookmark-id="${post.id}" aria-label="Remove bookmark">×</button></div>
+                </div>
+                <p class="bookmark-item-text">${escapeHtml(excerpt)}</p>
+            </div>
+        </article>
+    `;
+}
+
+const trendingGifs = [
+    { name: 'Celebrate', url: 'https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif' },
+    { name: 'Happy', url: 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif' },
+    { name: 'Applause', url: 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif' },
+    { name: 'Laugh', url: 'https://media.giphy.com/media/10t57cXgo7x5kI/giphy.gif' },
+    { name: 'Wow', url: 'https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif' },
+    { name: 'Love', url: 'https://media.giphy.com/media/MDJ9IbxxvDUQM/giphy.gif' }
+];
+
+function renderGifPicker(popover, query, onSelect) {
+    const results = trendingGifs.filter((gif) => gif.name.toLowerCase().includes(query.toLowerCase()));
+    popover.querySelector('.gif-picker-grid').innerHTML = results.length
+        ? results.map((gif) => `<button type="button" class="gif-picker-item" data-gif-url="${gif.url}"><img src="${gif.url}" alt="${escapeHtml(gif.name)}" loading="lazy"></button>`).join('')
+        : '<p class="gif-picker-empty">No GIFs found.</p>';
+    popover.querySelectorAll('.gif-picker-item').forEach((item) => item.addEventListener('click', () => onSelect(item.dataset.gifUrl)));
+}
+
+function setupGifPicker(composer, onSelect) {
+    const button = composer.querySelector('.comment-media-btn');
+    const shell = composer.querySelector('.comment-input-shell');
+    if (!button || !shell) return;
+    const popover = document.createElement('div');
+    popover.className = 'gif-picker-popover hidden';
+    popover.innerHTML = '<input class="gif-picker-search" type="search" placeholder="Search GIFs" aria-label="Search GIFs"><div class="gif-picker-grid"></div>';
+    shell.appendChild(popover);
+    const close = () => popover.classList.add('hidden');
+    button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        popover.classList.toggle('hidden');
+        if (!popover.classList.contains('hidden')) {
+            renderGifPicker(popover, '', onSelect);
+            popover.querySelector('.gif-picker-search').focus();
+        }
+    });
+    popover.querySelector('.gif-picker-search').addEventListener('input', (event) => renderGifPicker(popover, event.target.value, onSelect));
+    document.addEventListener('click', (event) => { if (!popover.contains(event.target) && event.target !== button) close(); });
+}
+
+async function loadBookmarksDrawer() {
+    const list = document.getElementById('bookmarks-list');
+    if (!list) return;
+
+    list.innerHTML = '<div class="bookmarks-empty"><div class="bookmarks-empty-icon">★</div><div>Loading bookmarks...</div></div>';
+    try {
+        const posts = await AeroAPI.getBookmarkedPosts();
+        if (!posts || posts.length === 0) {
+            list.innerHTML = `
+                <div class="bookmarks-empty">
+                    <div class="bookmarks-empty-icon">☆</div>
+                    <div>No bookmarks saved yet.</div>
+                </div>
+            `;
+            return;
+        }
+
+        list.innerHTML = posts.map(createBookmarkItemMarkup).join('');
+        list.querySelectorAll('.bookmark-item-remove').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const postId = Number(button.dataset.bookmarkId);
+                const item = button.closest('.bookmark-item');
+                if (!item || Number.isNaN(postId)) return;
+                item.classList.add('fade-out');
+                try {
+                    const result = await AeroAPI.toggleBookmark(postId);
+                    if (result.bookmarked) {
+                        item.classList.remove('fade-out');
+                        return;
+                    }
+                    window.setTimeout(() => {
+                        item.remove();
+                        if (!list.querySelector('.bookmark-item')) {
+                            list.innerHTML = `
+                                <div class="bookmarks-empty">
+                                    <div class="bookmarks-empty-icon">☆</div>
+                                    <div>No bookmarks saved yet.</div>
+                                </div>
+                            `;
+                        }
+                    }, 220);
+
+                    showNotice('Bookmark removed.', 'success', {
+                        actionLabel: 'Undo',
+                        onAction: async () => {
+                            await AeroAPI.toggleBookmark(postId);
+                            await loadBookmarksDrawer();
+                            await AeroAPI.renderFeed();
+                        }
+                    });
+                    await AeroAPI.renderFeed();
+                } catch (error) {
+                    item.classList.remove('fade-out');
+                    showNotice(error.message, 'error');
+                }
+            });
+        });
+    } catch (error) {
+        list.innerHTML = `
+            <div class="bookmarks-empty">
+                <div class="bookmarks-empty-icon">!</div>
+                <div>${escapeHtml(error.message || 'Unable to load bookmarks.')}</div>
+            </div>
+        `;
+    }
 }
 
 function closeNotice(overlay) {
@@ -623,6 +944,7 @@ const AeroAPI = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
+
             const data = await res.json();
             if (res.ok) {
                 localStorage.setItem('aero_token', data.token);
@@ -637,14 +959,14 @@ const AeroAPI = {
         }
     },
 
-    async signup(username, email, password) {
+    async signup(username, email, password, confirmPassword = password) {
         try {
             const res = await fetch(`${API_BASE}/auth/signup`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, email, password })
+                body: JSON.stringify({ username, email, password, confirm_password: confirmPassword })
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (res.ok) {
                 sessionStorage.setItem('aero_pending_email', email);
                 window.location.href = 'otp.html';
@@ -711,9 +1033,10 @@ const AeroAPI = {
     },
 
     // Post CRUD API
-    async fetchPosts() {
+    async fetchPosts(feedType = 'for_you') {
         try {
-            const res = await fetch(`${API_BASE}/posts`, {
+            const type = feedType === 'following' ? 'following' : 'for_you';
+            const res = await fetch(`${API_BASE}/posts?feed_type=${encodeURIComponent(type)}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
             });
             return await res.json();
@@ -876,13 +1199,21 @@ const AeroAPI = {
         return data;
     },
 
-    async toggleFollow(userId) {
+    async toggleFollow(userId, userMeta = {}) {
         const res = await fetch(`${API_BASE}/social/follow/${userId}`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Unable to update follow status');
+        if (data.is_following) {
+            window.addContactToChatList?.({
+                id: userId,
+                name: userMeta.name || userMeta.username || 'User',
+                username: userMeta.username || userMeta.name || 'User',
+                avatar: userMeta.avatar || userMeta.avatar_url || ''
+            });
+        }
         return data;
     },
 
@@ -905,6 +1236,15 @@ const AeroAPI = {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Unable to update bookmark');
         return data;
+    },
+
+    async getBookmarkedPosts() {
+        const res = await fetch(`${API_BASE}/posts/bookmarked`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Unable to load bookmarks');
+        return Array.isArray(data) ? data : [];
     },
 
     async markNotInterested(postId) {
@@ -949,14 +1289,14 @@ const AeroAPI = {
         return data.comments || [];
     },
 
-    async sendComment(postId, content, parentId = null) {
+    async sendComment(postId, content, parentId = null, imageUrl = '') {
         const res = await fetch(`${API_ORIGIN}/interact/posts/${postId}/comments`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('aero_token')}`
             },
-            body: JSON.stringify({ content, parentId })
+            body: JSON.stringify({ content, parentId, image_url: imageUrl })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || data.message || 'Unable to send comment');
@@ -974,12 +1314,12 @@ const AeroAPI = {
     },
 
     // Feed rendering and DOM updates
-    async renderFeed() {
+    async renderFeed(feedType = 'for_you') {
         const feedContainer = document.getElementById('posts-feed');
         if (!feedContainer) return;
 
         feedContainer.innerHTML = '';
-        const posts = await this.fetchPosts();
+        const posts = await this.fetchPosts(feedType);
 
         if (!posts || posts.length === 0) {
             feedContainer.innerHTML = `<div class="post-card glass-card text-center"><p>No posts available yet.</p></div>`;
@@ -1029,6 +1369,10 @@ const AeroAPI = {
                 item.appendChild(createIcon(iconPath, label));
                 item.append(` ${label}`);
                 item.classList.toggle('danger', danger);
+                if (label === 'Bookmark Post' || label === 'Remove Bookmark') {
+                    item.classList.add('bookmark-toggle-btn');
+                    item.classList.toggle('is-bookmarked', Boolean(post.is_bookmarked));
+                }
                 item.addEventListener('click', () => {
                     closeAllPostMenus();
                     action();
@@ -1037,9 +1381,28 @@ const AeroAPI = {
             };
             addMenuItem(post.is_bookmarked ? 'Remove Bookmark' : 'Bookmark Post', '<path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-3-6 3V4.5Z"></path>', async () => {
                 try {
+                    const menuButton = Array.from(optionsMenu.querySelectorAll('button')).find((button) => button.textContent.includes('Bookmark'));
+                    menuButton?.classList.add('animate-pop');
+                    setTimeout(() => menuButton?.classList.remove('animate-pop'), 220);
                     const result = await this.toggleBookmark(post.id);
                     post.is_bookmarked = result.bookmarked;
-                    showNotice(result.bookmarked ? 'Post bookmarked.' : 'Bookmark removed.', 'success');
+                    if (result.bookmarked) {
+                        showNotice('Post bookmarked.', 'success');
+                    } else {
+                        showNotice('Bookmark removed.', 'success', {
+                            actionLabel: 'Undo',
+                            onAction: async () => {
+                                const undoResult = await this.toggleBookmark(post.id);
+                                post.is_bookmarked = undoResult.bookmarked;
+                                await this.renderFeed();
+                                await loadBookmarksDrawer();
+                            }
+                        });
+                    }
+                    await this.renderFeed();
+                    if (!result.bookmarked) {
+                        await loadBookmarksDrawer();
+                    }
                 } catch (error) { showNotice(error.message, 'error'); }
             });
             addMenuItem('Copy Link', '<path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"></path><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1"></path>', () => copyPostLink(post.id));
@@ -1059,7 +1422,7 @@ const AeroAPI = {
             if (!isOwnPost) {
                 addMenuItem(`${post.is_following ? 'Unfollow' : 'Follow'} @${post.username || 'user'}`, '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M19 8v6M22 11h-6"></path>', async () => {
                     try {
-                        const result = await this.toggleFollow(post.user_id);
+                        const result = await this.toggleFollow(post.user_id, { username: post.username, name: post.username, avatar: post.avatar_url });
                         showNotice(result.is_following ? `Following @${post.username}.` : `Unfollowed @${post.username}.`, 'success');
                     } catch (error) { showNotice(error.message, 'error'); }
                 });
@@ -1205,7 +1568,22 @@ const AeroAPI = {
             composer.querySelector('.comment-composer-avatar').replaceWith(createAvatarElement(composerUser.username, composerUser.avatar_url, 'comment-composer-avatar'));
             commentsPanel.append(commentsList, replyStatus, composer);
             const composerInput = composer.querySelector('input');
+            let selectedGifUrl = '';
             let replyTarget = null;
+
+            const gifPreview = document.createElement('div');
+            gifPreview.className = 'comment-gif-preview hidden';
+            composer.insertBefore(gifPreview, composer.firstChild);
+            setupGifPicker(composer, (gifUrl) => {
+                selectedGifUrl = gifUrl;
+                gifPreview.innerHTML = `<img src="${gifUrl}" alt="Selected GIF"><button type="button" aria-label="Remove selected GIF">×</button>`;
+                gifPreview.classList.remove('hidden');
+                gifPreview.querySelector('button').addEventListener('click', () => {
+                    selectedGifUrl = '';
+                    gifPreview.classList.add('hidden');
+                    gifPreview.replaceChildren();
+                });
+            });
 
             const clearReplyTarget = () => {
                 replyTarget = null;
@@ -1258,6 +1636,14 @@ const AeroAPI = {
                 commentHeader.append(avatarWrap, metaLine);
                 const body = document.createElement('p');
                 body.textContent = comment.content;
+                if (comment.image_url) {
+                    const gif = document.createElement('img');
+                    gif.className = 'comment-gif';
+                    gif.src = comment.image_url;
+                    gif.alt = 'GIF attached to comment';
+                    gif.loading = 'lazy';
+                    body.after(gif);
+                }
                 const commentActions = document.createElement('div');
                 commentActions.className = 'comment-actions';
                 const likeButton = document.createElement('button');
@@ -1334,10 +1720,13 @@ const AeroAPI = {
             composer.addEventListener('submit', async event => {
                 event.preventDefault();
                 const content = composerInput.value.trim();
-                if (!content) return;
+                if (!content && !selectedGifUrl) return;
                 try {
-                    await this.sendComment(post.id, content, replyTarget ? replyTarget.id : null);
+                    await this.sendComment(post.id, content, replyTarget ? replyTarget.id : null, selectedGifUrl);
                     composerInput.value = '';
+                    selectedGifUrl = '';
+                    gifPreview.classList.add('hidden');
+                    gifPreview.replaceChildren();
                     clearReplyTarget();
                     commentCount.textContent = (Number(commentCount.textContent) || 0) + 1;
                     await loadComments();
@@ -1356,12 +1745,25 @@ const AeroAPI = {
     initAppState() {
         const homeButton = document.getElementById('home-nav-btn');
         const logoButton = document.getElementById('aero-logo');
+        const bookmarkDockButton = document.getElementById('bookmark-dock-btn');
+        const bookmarkCloseButton = document.getElementById('close-bookmarks-drawer');
+
+        bookmarkDockButton?.addEventListener('click', () => {
+            const drawer = document.getElementById('bookmarks-drawer');
+            const isHidden = drawer?.classList.contains('hidden');
+            setBookmarkDrawerVisibility(Boolean(isHidden));
+            if (isHidden) {
+                loadBookmarksDrawer();
+            }
+        });
+        bookmarkCloseButton?.addEventListener('click', () => setBookmarkDrawerVisibility(false));
+
         const goHome = async () => {
             if (!window.location.pathname.endsWith('/index.html') && window.location.pathname !== '/') {
                 window.location.href = 'index.html';
                 return;
             }
-            homeButton?.classList.add('active');
+            window.AeroRouter?.navigate('main');
             await this.renderFeed();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         };
@@ -1389,6 +1791,7 @@ const AeroAPI = {
         const mainApp = document.getElementById('main-app');
 
         if (token && mainApp) {
+            window.setFabAuthState?.(true);
             if (authOverlay) authOverlay.classList.add('hidden');
             mainApp.classList.remove('hidden');
             document.getElementById('nav-username').innerText = user.username || 'User';
@@ -1398,6 +1801,7 @@ const AeroAPI = {
                 document.getElementById('profile-onboarding-overlay')?.classList.remove('hidden');
             }
         } else if (authOverlay) {
+            window.setFabAuthState?.(false);
             authOverlay.classList.remove('hidden');
             if (mainApp) mainApp.classList.add('hidden');
         }
@@ -1409,6 +1813,7 @@ const AeroAPI = {
         if (!authOverlay || !mainApp) return;
 
         const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
+        window.setFabAuthState?.(true);
         const adminLink = document.getElementById('admin-dashboard-link');
         if (adminLink) adminLink.classList.toggle('hidden', user.is_admin !== true);
         authOverlay.classList.remove('hidden');
@@ -1425,6 +1830,21 @@ const AeroAPI = {
             mainApp.classList.remove('app-entering');
         }, 460);
     }
+};
+
+window.AeroAPI = AeroAPI;
+window.apiService = AeroAPI;
+window.toggleFollowUser = async (userId, userMeta = {}) => {
+    const api = window.apiService || window.api;
+    if (api && typeof api.toggleFollow === 'function') return api.toggleFollow(userId, userMeta);
+    const apiOrigin = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000' : window.location.origin;
+    const response = await fetch(`${apiOrigin}/api/users/${userId}/follow`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || 'Unable to update follow status');
+    return data;
 };
 
 function closeAllPostMenus(exceptMenu = null) {
@@ -1583,7 +2003,7 @@ function setupCreatePostExperience() {
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openCreatePostModal(); }
     });
     document.getElementById('compose-trigger-media')?.addEventListener('click', event => { event.stopPropagation(); openCreatePostModal(); });
-    document.getElementById('fab-new-post')?.addEventListener('click', openCreatePostModal);
+    document.getElementById('global-fab-btn')?.addEventListener('click', openCreatePostModal);
     document.getElementById('close-create-post')?.addEventListener('click', () => modal?.classList.add('hidden'));
     modal?.addEventListener('click', event => { if (event.target === modal) modal.classList.add('hidden'); });
     fileInput?.addEventListener('change', () => {
@@ -1599,7 +2019,7 @@ function setupCreatePostExperience() {
 }
 
 function setupPostScrollBehavior() {
-    const fab = document.getElementById('fab-new-post');
+    const fab = document.getElementById('global-fab-btn');
     let lastScroll = window.scrollY;
     let idleTimer;
     window.addEventListener('scroll', () => {
@@ -1614,6 +2034,8 @@ function setupPostScrollBehavior() {
 // Page event handlers
 document.addEventListener('DOMContentLoaded', () => {
     AeroAPI.initAppState();
+    setupNotificationDrawer();
+    setupMediaAndChat();
     setupSearchInteraction();
     setupSearchPage();
     setupCreatePostExperience();
@@ -1696,7 +2118,8 @@ document.addEventListener('DOMContentLoaded', () => {
             AeroAPI.signup(
                 document.getElementById('signup-username').value,
                 document.getElementById('signup-email').value,
-                document.getElementById('signup-password').value
+                document.getElementById('signup-password').value,
+                document.getElementById('signup-confirm-password').value
             );
         });
     }
@@ -1767,6 +2190,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
+            window.setFabAuthState?.(false);
             localStorage.clear();
             location.reload();
         });

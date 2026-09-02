@@ -53,7 +53,7 @@ def post_payload(post, current_user_id=None):
         "likes": likes_count,
         "comments": comments_count,
         "ranking_score": score,
-        "created_at": post.created_at.isoformat(),
+        "created_at": f"{post.created_at.isoformat()}Z",
     }
 
 
@@ -74,17 +74,33 @@ def search():
 @feed_bp.get("/posts")
 @token_required
 def get_posts(current_user):
+    feed_type = str(request.args.get("feed_type", "for_you")).strip().lower()
     excluded_ids = {
         interaction.post_id
         for interaction in UserInteraction.query.filter_by(
             user_id=current_user.id, type="not_interested"
         ).all()
     }
+    author_id = request.args.get("author_id", type=int)
     posts = [
         post_payload(post, current_user.id)
         for post in Post.query.all()
-        if post.id not in excluded_ids
+        if post.id not in excluded_ids and (author_id is None or post.user_id == author_id)
     ]
+    if author_id is not None:
+        return jsonify(sorted(posts, key=lambda post: post["created_at"], reverse=True))
+    followed_ids = [
+        follow.following_id
+        for follow in Follow.query.filter_by(follower_id=current_user.id).all()
+    ]
+    if feed_type == "following":
+        posts = [post for post in posts if post["user_id"] in followed_ids]
+    else:
+        followed_posts = [post for post in posts if post["user_id"] in followed_ids]
+        recommended_posts = [post for post in posts if post["user_id"] not in followed_ids]
+        followed_posts.sort(key=lambda post: post["ranking_score"], reverse=True)
+        recommended_posts.sort(key=lambda post: post["ranking_score"], reverse=True)
+        posts = followed_posts + recommended_posts
     posts.sort(key=lambda post: post["ranking_score"], reverse=True)
     return jsonify(posts)
 
@@ -177,7 +193,22 @@ def repost_post(current_user, post_id):
     return jsonify(post_payload(repost, current_user.id)), 201
 
 
-@feed_bp.post("/posts/<int:post_id>/bookmark")
+@feed_bp.get("/posts/bookmarked")
+@token_required
+def get_bookmarked_posts(current_user):
+    bookmarked_ids = [
+        interaction.post_id
+        for interaction in UserInteraction.query.filter_by(
+            user_id=current_user.id, type="bookmark"
+        ).order_by(UserInteraction.id.desc()).all()
+    ]
+    if not bookmarked_ids:
+        return jsonify([]), 200
+    posts = Post.query.filter(Post.id.in_(bookmarked_ids)).order_by(Post.created_at.desc()).all()
+    return jsonify([post_payload(post, current_user.id) for post in posts]), 200
+
+
+@feed_bp.route("/posts/<int:post_id>/bookmark", methods=["POST", "DELETE"])
 @token_required
 def bookmark_post(current_user, post_id):
     if not db.session.get(Post, post_id):
@@ -185,6 +216,14 @@ def bookmark_post(current_user, post_id):
     interaction = UserInteraction.query.filter_by(
         user_id=current_user.id, post_id=post_id, type="bookmark"
     ).first()
+
+    if request.method == "DELETE":
+        if interaction:
+            db.session.delete(interaction)
+            db.session.commit()
+            return jsonify({"bookmarked": False, "post_id": post_id}), 200
+        return jsonify({"bookmarked": False, "post_id": post_id, "message": "Bookmark not found"}), 200
+
     if interaction:
         db.session.delete(interaction)
         bookmarked = False
@@ -192,7 +231,7 @@ def bookmark_post(current_user, post_id):
         db.session.add(UserInteraction(user_id=current_user.id, post_id=post_id, type="bookmark"))
         bookmarked = True
     db.session.commit()
-    return jsonify({"bookmarked": bookmarked}), 200
+    return jsonify({"bookmarked": bookmarked, "post_id": post_id}), 200
 
 
 @feed_bp.post("/recommendations/feedback")
