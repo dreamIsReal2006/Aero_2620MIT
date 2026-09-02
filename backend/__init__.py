@@ -90,27 +90,30 @@ def create_app():
         UserInteraction,
         Notification,
         CommentLike,
+        Message,
     )
 
     from backend.auth import auth_bp
-    from backend.auth import routes
-
-    app.register_blueprint(auth_bp)
-
-    from backend.interact import interact_bp
-    from backend.interact import routes as interact_routes
-
-    app.register_blueprint(interact_bp)
+    from backend.auth import routes as auth_routes
 
     from backend.feed import feed_bp
     from backend.feed import routes as feed_routes
 
-    app.register_blueprint(feed_bp)
+    from backend.interact import interact_bp
+    from backend.interact import routes as interact_routes
 
     from backend.social import social_bp
     from backend.social import routes as social_routes
 
+    from backend.messages import messages_bp
+    import backend.messages.routes
+
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(feed_bp)
+    app.register_blueprint(interact_bp)
     app.register_blueprint(social_bp)
+    app.register_blueprint(messages_bp)
+
     with app.app_context():
         db.create_all()
 
