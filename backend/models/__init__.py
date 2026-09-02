@@ -8,3 +8,4 @@ from backend.models.report import Report
 from backend.models.user_interaction import UserInteraction
 from backend.models.notification import Notification
 from backend.models.comment_like import CommentLike
+from backend.models.message import Message
