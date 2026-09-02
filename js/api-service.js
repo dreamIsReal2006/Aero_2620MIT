@@ -44,26 +44,160 @@ function formatRelativeTime(timestamp) {
     return `${Math.floor(months / 12)}年`;
 }
 
-function createAvatarElement(username, avatarUrl, className = 'post-avatar') {
+function resolveMediaUrl(url) {
+
+    if (!url) {
+        return '';
+    }
+
+    const value =
+        String(url).trim();
+
+    if (!value) {
+        return '';
+    }
+
+    if (
+        /^(https?:\/\/|blob:|data:)/i.test(value)
+    ) {
+        return value;
+    }
+
+    if (value.startsWith('/')) {
+        return `${API_ORIGIN}${value}`;
+    }
+
+    return `${API_ORIGIN}/${value}`;
+}
+
+function createAvatarElement(
+    username,
+    avatarUrl,
+    className = 'post-avatar',
+    userId = null
+) {
     const avatar = document.createElement('span');
+
     avatar.className = className;
-    avatar.setAttribute('aria-hidden', 'true');
+
     const name = String(username || 'User');
+
+    let currentUser = {};
+
+    try {
+        currentUser = JSON.parse(
+            localStorage.getItem('aero_user') || '{}'
+        );
+    } catch {
+        currentUser = {};
+    }
+
+    const isCurrentUser =
+        userId &&
+        currentUser.id &&
+        String(userId) === String(currentUser.id);
+
+    avatar.setAttribute(
+        'role',
+        'button'
+    );
+
+    avatar.setAttribute(
+        'tabindex',
+        '0'
+    );
+
+    avatar.setAttribute(
+        'aria-label',
+        `Open ${name}'s profile`
+    );
+
+    avatar.title =
+        `Open ${name}'s profile`;
+
+    function openProfile(event) {
+
+        event?.preventDefault();
+        event?.stopPropagation();
+
+        if (isCurrentUser) {
+
+            window.location.href =
+                'profile.html';
+
+            return;
+        }
+
+        if (userId) {
+
+            window.location.href =
+                `profile.html?id=${encodeURIComponent(userId)}`;
+
+            return;
+        }
+
+        window.location.href =
+            `profile.html?username=${encodeURIComponent(name)}`;
+    }
+
+    avatar.addEventListener(
+        'click',
+        openProfile
+    );
+
+    avatar.addEventListener(
+        'keydown',
+        event => {
+
+            if (
+                event.key === 'Enter' ||
+                event.key === ' '
+            ) {
+                event.preventDefault();
+
+                openProfile(event);
+            }
+        }
+    );
+
     if (!avatarUrl) {
-        avatar.textContent = name.charAt(0).toUpperCase();
+
+        avatar.textContent =
+            name.charAt(0).toUpperCase();
+
         return avatar;
     }
 
-    const image = document.createElement('img');
-    image.src = avatarUrl.startsWith('http') ? avatarUrl : `${API_ORIGIN}${avatarUrl}`;
-    image.alt = '';
-    image.loading = 'lazy';
+    const image =
+        document.createElement('img');
+
+    image.src =
+        resolveMediaUrl(avatarUrl);
+
+    image.alt =
+        '';
+
+    image.loading =
+        'lazy';
+
     image.onerror = () => {
-        avatar.textContent = name.charAt(0).toUpperCase();
-        avatar.classList.remove('has-image');
+
+        image.remove();
+
+        avatar.textContent =
+            name.charAt(0).toUpperCase();
+
+        avatar.classList.remove(
+            'has-image'
+        );
     };
+
     avatar.appendChild(image);
-    avatar.classList.add('has-image');
+
+    avatar.classList.add(
+        'has-image'
+    );
+
     return avatar;
 }
 
@@ -995,7 +1129,7 @@ const AeroAPI = {
             header.className = 'post-header';
             const authorIdentity = document.createElement('div');
             authorIdentity.className = 'post-author-identity';
-            authorIdentity.appendChild(createAvatarElement(post.username, post.avatar_url));
+            authorIdentity.appendChild(createAvatarElement(post.username, post.avatar_url, 'post-avatar', post.user_id));
             const author = document.createElement('span');
             author.className = 'post-author';
             author.textContent = post.username || 'User';
@@ -1238,7 +1372,7 @@ const AeroAPI = {
                 commentHeader.className = 'comment-header';
                 const avatarWrap = document.createElement('span');
                 avatarWrap.className = 'comment-avatar-wrap';
-                avatarWrap.appendChild(createAvatarElement(comment.username, comment.avatar_url, 'comment-avatar'));
+                avatarWrap.appendChild(createAvatarElement(comment.username, comment.avatar_url, 'comment-avatar', comment.user_id));
                 const avatarBadge = document.createElement('span');
                 avatarBadge.className = 'comment-follow-badge';
                 avatarBadge.textContent = '+';
