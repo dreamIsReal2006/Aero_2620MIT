@@ -1,3 +1,7 @@
+/* =========================================================
+   AERO PROFILE PAGE
+   ========================================================= */
+
 const API_BASE =
     window.location.protocol === 'file:'
         ? 'http://127.0.0.1:5000/api'
@@ -5,85 +9,43 @@ const API_BASE =
 
 const API_ORIGIN = API_BASE.replace(/\/api$/, '');
 
-let currentProfile = null;
-let currentUser = null;
-let isOwnProfile = false;
 
+/* =========================================================
+   HELPERS
+   ========================================================= */
 
-/* =========================
-   Authentication
-========================= */
-
-function getToken() {
-    return localStorage.getItem('aero_token');
+function $(id) {
+    return document.getElementById(id);
 }
 
-function getStoredUser() {
+
+function getCurrentUser() {
     try {
         return JSON.parse(
             localStorage.getItem('aero_user') || '{}'
         );
-    } catch {
+    } catch (error) {
         return {};
     }
 }
 
 
-/* =========================
-   API
-========================= */
-
-async function apiRequest(url, options = {}) {
-
-    const token = getToken();
-
-    const headers = {
-        ...(options.headers || {})
-    };
-
-    if (token) {
-        headers.Authorization = `Bearer ${token}`;
-    }
-
-    if (
-        options.body &&
-        !(options.body instanceof FormData) &&
-        !headers['Content-Type']
-    ) {
-        headers['Content-Type'] = 'application/json';
-    }
-
-    const response = await fetch(url, {
-        ...options,
-        headers
-    });
-
-    let data = null;
-
-    try {
-        data = await response.json();
-    } catch {
-        data = {};
-    }
-
-    if (!response.ok) {
-        throw new Error(
-            data.message ||
-            data.error ||
-            `Request failed (${response.status})`
-        );
-    }
-
-    return data;
+function getToken() {
+    return localStorage.getItem('aero_token');
 }
 
 
-/* =========================
-   URL handling
-========================= */
+function escapeHtml(value = '') {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 
 function resolveMediaUrl(url) {
-
     if (!url) {
         return '';
     }
@@ -94,9 +56,7 @@ function resolveMediaUrl(url) {
         return '';
     }
 
-    if (
-        /^(https?:\/\/|blob:|data:)/i.test(value)
-    ) {
+    if (/^(https?:\/\/|blob:|data:)/i.test(value)) {
         return value;
     }
 
@@ -108,242 +68,251 @@ function resolveMediaUrl(url) {
 }
 
 
-/* =========================
-   DOM helpers
-========================= */
+/* =========================================================
+   API
+   ========================================================= */
 
-function $(id) {
-    return document.getElementById(id);
+async function apiRequest(endpoint, options = {}) {
+    const token = getToken();
+
+    const headers = {
+        ...options.headers
+    };
+
+    if (!(options.body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+    }
+
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(
+        `${API_BASE}${endpoint}`,
+        {
+            ...options,
+            headers
+        }
+    );
+
+    let data = null;
+
+    try {
+        data = await response.json();
+    } catch (error) {
+        data = null;
+    }
+
+    if (!response.ok) {
+        const message =
+            data?.message ||
+            data?.error ||
+            `Request failed (${response.status})`;
+
+        throw new Error(message);
+    }
+
+    return data;
 }
 
-function escapeHtml(value) {
 
-    return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
+/* =========================================================
+   PROFILE STATE
+   ========================================================= */
+
+let profileUser = null;
+let isOwnProfile = false;
 
 
-/* =========================
-   Profile lookup
-========================= */
+/* =========================================================
+   GET PROFILE TARGET
+   ========================================================= */
 
-function getProfileIdentifier() {
-
+function getProfileTarget() {
     const params = new URLSearchParams(
         window.location.search
     );
 
-    const userId = params.get('id');
+    const id = params.get('id');
     const username = params.get('username');
 
     return {
-        userId,
+        id,
         username
     };
 }
 
 
-async function loadOwnProfile() {
-
-    return apiRequest(
-        `${API_BASE}/users/me/profile`
-    );
-}
-
-
-async function loadProfileById(userId) {
-
-    return apiRequest(
-        `${API_BASE}/users/${encodeURIComponent(userId)}/profile`
-    );
-}
-
-
-async function searchUser(username) {
-
-    const data = await apiRequest(
-        `${API_BASE}/search?q=${encodeURIComponent(username)}`
-    );
-
-    const results =
-        Array.isArray(data)
-            ? data
-            : (
-                data.results ||
-                data.users ||
-                data.items ||
-                []
-            );
-
-    const exactMatch = results.find(user =>
-        String(user.username || '').toLowerCase() ===
-        String(username).toLowerCase()
-    );
-
-    return exactMatch || results[0] || null;
-}
-
+/* =========================================================
+   LOAD PROFILE
+   ========================================================= */
 
 async function loadProfile() {
+    const token = getToken();
 
-    const identifier = getProfileIdentifier();
-
-    currentUser = getStoredUser();
+    if (!token) {
+        window.location.href = 'index.html';
+        return;
+    }
 
     try {
+        const target = getProfileTarget();
+        const currentUser = getCurrentUser();
 
-        let data;
+        let profileData;
 
         /*
-         * No profile identifier means
-         * current user's profile.
+         * No ID or username means the current user's profile.
          */
-
-        if (!identifier.userId &&
-            !identifier.username) {
-
-            data = await loadOwnProfile();
+        if (!target.id && !target.username) {
+            profileData = await apiRequest(
+                '/users/me/profile'
+            );
 
             isOwnProfile = true;
-
-        } else if (identifier.userId) {
-
-            data = await loadProfileById(
-                identifier.userId
-            );
-
-            isOwnProfile =
-                currentUser.id &&
-                String(currentUser.id) ===
-                String(identifier.userId);
-
-        } else {
-
-            const user = await searchUser(
-                identifier.username
-            );
-
-            if (!user || !user.id) {
-                throw new Error(
-                    'User not found.'
-                );
-            }
-
-            data = await loadProfileById(
-                user.id
-            );
-
-            isOwnProfile =
-                currentUser.id &&
-                String(currentUser.id) ===
-                String(user.id);
         }
 
-        currentProfile = data;
+        /*
+         * Profile by user ID.
+         */
+        else if (target.id) {
+            profileData = await apiRequest(
+                `/users/${encodeURIComponent(target.id)}/profile`
+            );
 
-        renderProfile(data);
+            isOwnProfile =
+                currentUser.id &&
+                String(currentUser.id) === String(target.id);
+        }
+
+        /*
+         * Profile by username.
+         */
+        else {
+            const searchData = await apiRequest(
+                `/search?q=${encodeURIComponent(target.username)}`
+            );
+
+            const results =
+                searchData?.users ||
+                searchData?.results ||
+                [];
+
+            const matchedUser = results.find(
+                user =>
+                    String(user.username || '').toLowerCase() ===
+                    String(target.username).toLowerCase()
+            );
+
+            if (!matchedUser) {
+                throw new Error('User not found.');
+            }
+
+            profileData = await apiRequest(
+                `/users/${encodeURIComponent(matchedUser.id)}/profile`
+            );
+
+            isOwnProfile =
+                currentUser.id &&
+                String(currentUser.id) ===
+                String(matchedUser.id);
+        }
+
+        profileUser = profileData?.user || null;
+
+        if (!profileUser) {
+            throw new Error('Profile data is unavailable.');
+        }
+
+        renderProfile(
+            profileData,
+            isOwnProfile
+        );
 
     } catch (error) {
-
         console.error(
-            'Aero profile error:',
+            'Unable to load profile:',
             error
         );
 
-        showError(
-            error.message ||
-            'Unable to load profile.'
+        showProfileError(
+            error.message || 'Unable to load profile.'
         );
     }
 }
 
 
-/* =========================
-   Render profile
-========================= */
+/* =========================================================
+   RENDER PROFILE
+   ========================================================= */
 
-function renderProfile(data) {
-
-    const user =
-        data.user || data.profile || data;
-
-    currentProfile = {
-        ...data,
-        user
-    };
-
-    const username =
-        user.username || 'User';
-
-    const email =
-        user.email || '';
-
-    const bio =
-        user.bio || '';
-
-    const avatarUrl =
-        user.avatar_url || '';
+function renderProfile(data, ownProfile) {
+    const user = data.user || {};
 
     $('profile-username').textContent =
-        username;
+        user.username || 'User';
 
-    $('profile-email').textContent =
-        isOwnProfile
-            ? email
-            : '';
+    /*
+     * Email should only be displayed on
+     * the current user's own profile.
+     */
+    if (ownProfile && user.email) {
+        $('profile-email').textContent =
+            user.email;
+    } else {
+        $('profile-email').textContent = '';
+    }
 
     $('profile-bio').textContent =
-        bio;
+        user.bio || '';
 
-    document.title =
-        `${username} - Aero`;
+    $('profile-follower-count').textContent =
+        Number(data.followers_count || 0);
 
-    renderAvatar(
-        username,
-        avatarUrl
+    $('profile-following-count').textContent =
+        Number(data.following_count || 0);
+
+    const posts =
+        Array.isArray(data.posts)
+            ? data.posts
+            : [];
+
+    $('profile-post-count').textContent =
+        posts.length;
+
+    renderProfileAvatar(
+        user.username,
+        user.avatar_url
     );
 
-    renderStats(data);
+    renderPosts(posts);
 
-    renderActions();
-
-    renderPosts(
-        data.posts || []
+    setupProfileActions(
+        user,
+        ownProfile
     );
-
-    $('profile-loading').style.display =
-        'none';
-
-    $('profile-content').style.display =
-        'block';
 }
 
 
-/* =========================
-   Avatar
-========================= */
+/* =========================================================
+   PROFILE AVATAR
+   ========================================================= */
 
-function renderAvatar(
-    username,
-    avatarUrl
-) {
+function renderProfileAvatar(username, avatarUrl) {
+    const avatar = $('profile-avatar');
 
-    const container =
-        $('profile-avatar');
+    if (!avatar) {
+        return;
+    }
 
-    container.innerHTML = '';
-
-    const safeName =
+    const name =
         String(username || 'User');
 
-    if (!avatarUrl) {
+    avatar.innerHTML = '';
 
-        container.textContent =
-            safeName.charAt(0).toUpperCase();
+    if (!avatarUrl) {
+        avatar.textContent =
+            name.charAt(0).toUpperCase();
 
         return;
     }
@@ -355,193 +324,150 @@ function renderAvatar(
         resolveMediaUrl(avatarUrl);
 
     image.alt =
-        `${safeName}'s avatar`;
-
-    image.loading =
-        'lazy';
+        `${name}'s profile picture`;
 
     image.onerror = () => {
+        image.remove();
 
-        container.innerHTML = '';
-
-        container.textContent =
-            safeName.charAt(0).toUpperCase();
+        avatar.textContent =
+            name.charAt(0).toUpperCase();
     };
 
-    container.appendChild(image);
+    avatar.appendChild(image);
 }
 
 
-/* =========================
-   Stats
-========================= */
+/* =========================================================
+   PROFILE ACTIONS
+   ========================================================= */
 
-function renderStats(data) {
-
-    const posts =
-        Array.isArray(data.posts)
-            ? data.posts
-            : [];
-
-    $('profile-post-count').textContent =
-        posts.length;
-
-    $('profile-followers').textContent =
-        data.followers_count ?? 0;
-
-    $('profile-following').textContent =
-        data.following_count ?? 0;
-}
-
-
-/* =========================
-   Buttons
-========================= */
-
-function renderActions() {
-
+function setupProfileActions(user, ownProfile) {
     const followButton =
         $('profile-follow-btn');
 
     const editButton =
         $('profile-edit-btn');
 
-    if (isOwnProfile) {
+    /*
+     * Own profile:
+     * show Edit Profile.
+     *
+     * Editing itself is handled by
+     * Settings > Account.
+     */
+    if (ownProfile) {
+        followButton.hidden = true;
+        editButton.hidden = false;
 
-        followButton.style.display =
-            'none';
-
-        editButton.style.display =
-            'inline-block';
+        editButton.onclick = () => {
+            window.location.href =
+                'settings.html?section=account';
+        };
 
         return;
     }
 
-    editButton.style.display =
-        'none';
+    /*
+     * Other user's profile:
+     * show Follow button.
+     */
+    editButton.hidden = true;
+    followButton.hidden = false;
 
-    followButton.style.display =
-        'inline-block';
+    setupFollowButton(
+        user
+    );
+}
 
-    const user =
-        currentProfile.user || {};
 
-    const following =
-        Boolean(
-            currentProfile.is_following ||
-            user.is_following
-        );
+/* =========================================================
+   FOLLOW
+   ========================================================= */
+
+function setupFollowButton(user) {
+    const button =
+        $('profile-follow-btn');
+
+    if (!button || !user?.id) {
+        return;
+    }
+
+    /*
+     * The backend profile endpoint may provide
+     * is_following in future versions.
+     */
+    let isFollowing =
+        Boolean(user.is_following);
 
     updateFollowButton(
-        following
+        button,
+        isFollowing
     );
+
+    button.onclick = async () => {
+        button.disabled = true;
+
+        try {
+            const data = await apiRequest(
+                `/social/follow/${encodeURIComponent(user.id)}`,
+                {
+                    method: 'POST'
+                }
+            );
+
+            isFollowing =
+                Boolean(data.is_following);
+
+            updateFollowButton(
+                button,
+                isFollowing
+            );
+
+            if (
+                typeof data.followers_count ===
+                'number'
+            ) {
+                $('profile-follower-count')
+                    .textContent =
+                    data.followers_count;
+            }
+
+        } catch (error) {
+            console.error(
+                'Unable to update follow:',
+                error
+            );
+
+            alert(
+                error.message ||
+                'Unable to update follow.'
+            );
+        } finally {
+            button.disabled = false;
+        }
+    };
 }
 
 
-function updateFollowButton(
-    following
-) {
-
-    const button =
-        $('profile-follow-btn');
-
+function updateFollowButton(button, isFollowing) {
     button.textContent =
-        following
+        isFollowing
             ? 'Following'
             : 'Follow';
-
-    button.classList.toggle(
-        'following',
-        following
-    );
 }
 
 
-/* =========================
-   Follow / unfollow
-========================= */
-
-async function toggleFollow() {
-
-    if (!currentProfile ||
-        !currentProfile.user ||
-        !currentProfile.user.id) {
-
-        return;
-    }
-
-    const button =
-        $('profile-follow-btn');
-
-    const userId =
-        currentProfile.user.id;
-
-    button.disabled =
-        true;
-
-    try {
-
-        const data = await apiRequest(
-            `${API_BASE}/social/follow/${userId}`,
-            {
-                method: 'POST'
-            }
-        );
-
-        updateFollowButton(
-            Boolean(data.is_following)
-        );
-
-        if (
-            data.followers_count !==
-            undefined
-        ) {
-            $('profile-followers').textContent =
-                data.followers_count;
-        }
-
-        currentProfile.is_following =
-            Boolean(data.is_following);
-
-    } catch (error) {
-
-        console.error(
-            'Aero follow error:',
-            error
-        );
-
-        alert(
-            error.message ||
-            'Unable to update follow.'
-        );
-
-    } finally {
-
-        button.disabled =
-            false;
-    }
-}
-
-
-/* =========================
-   Posts / Flips
-========================= */
+/* =========================================================
+   POSTS
+   ========================================================= */
 
 function renderPosts(posts) {
-
     const container =
         $('profile-posts');
-
-    const title =
-        $('profile-posts-title');
 
     container.innerHTML = '';
 
     if (!posts.length) {
-
-        title.style.display =
-            'block';
-
         container.innerHTML = `
             <div class="profile-empty">
                 No posts yet.
@@ -551,11 +477,7 @@ function renderPosts(posts) {
         return;
     }
 
-    title.style.display =
-        'block';
-
     posts.forEach(post => {
-
         container.appendChild(
             createPostElement(post)
         );
@@ -564,7 +486,6 @@ function renderPosts(posts) {
 
 
 function createPostElement(post) {
-
     const article =
         document.createElement('article');
 
@@ -572,150 +493,87 @@ function createPostElement(post) {
         'profile-post';
 
     const content =
+        document.createElement('p');
+
+    content.className =
+        'profile-post-content';
+
+    content.textContent =
         post.content || '';
 
-    if (content) {
+    article.appendChild(content);
 
-        const text =
-            document.createElement('p');
+    /*
+     * Images
+     */
+    const images =
+        Array.isArray(post.images)
+            ? post.images
+            : [];
 
-        text.className =
-            'profile-post-content';
+    if (images.length) {
+        const imageContainer =
+            document.createElement('div');
 
-        text.textContent =
-            content;
+        imageContainer.className =
+            'profile-post-images';
 
-        article.appendChild(text);
+        images.forEach(imageUrl => {
+            const image =
+                document.createElement('img');
+
+            image.src =
+                resolveMediaUrl(imageUrl);
+
+            image.alt =
+                'Post image';
+
+            image.loading =
+                'lazy';
+
+            image.onerror = () => {
+                image.remove();
+            };
+
+            imageContainer.appendChild(
+                image
+            );
+        });
+
+        article.appendChild(
+            imageContainer
+        );
     }
 
-    renderPostMedia(
-        article,
-        post
-    );
+    /*
+     * Date
+     */
+    if (post.created_at) {
+        const date =
+            document.createElement('div');
 
-    const date =
-        document.createElement('div');
+        date.className =
+            'profile-post-date';
 
-    date.className =
-        'profile-post-date';
+        date.textContent =
+            formatDate(post.created_at);
 
-    date.textContent =
-        formatDate(
-            post.created_at
-        );
-
-    article.appendChild(date);
+        article.appendChild(date);
+    }
 
     return article;
 }
 
 
-function renderPostMedia(
-    article,
-    post
-) {
+/* =========================================================
+   DATE
+   ========================================================= */
 
-    if (
-        !Array.isArray(post.images) ||
-        post.images.length === 0
-    ) {
-        return;
-    }
-
-    const mediaContainer =
-        document.createElement('div');
-
-    mediaContainer.className =
-        'profile-post-media';
-
-    post.images.forEach(
-        mediaUrl => {
-
-            const url =
-                resolveMediaUrl(mediaUrl);
-
-            if (!url) {
-                return;
-            }
-
-            const isVideo =
-                /\.(mp4|webm|mov|m4v)(?:$|\?)/i
-                    .test(url);
-
-            const element =
-                document.createElement(
-                    isVideo
-                        ? 'video'
-                        : 'img'
-                );
-
-            element.src =
-                url;
-
-            if (isVideo) {
-
-                element.controls =
-                    true;
-
-                element.preload =
-                    'metadata';
-
-                element.playsInline =
-                    true;
-
-            } else {
-
-                element.alt =
-                    'Post media';
-
-                element.loading =
-                    'lazy';
-            }
-
-            element.addEventListener(
-                'error',
-                () => {
-
-                    console.error(
-                        'Aero media failed:',
-                        url
-                    );
-                }
-            );
-
-            mediaContainer.appendChild(
-                element
-            );
-        }
-    );
-
-    if (mediaContainer.children.length) {
-
-        article.appendChild(
-            mediaContainer
-        );
-    }
-}
-
-
-/* =========================
-   Date formatting
-========================= */
-
-function formatDate(timestamp) {
-
-    if (!timestamp) {
-        return '';
-    }
-
+function formatDate(dateValue) {
     const date =
-        new Date(timestamp);
+        new Date(dateValue);
 
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
+    if (Number.isNaN(date.getTime())) {
         return '';
     }
 
@@ -729,144 +587,27 @@ function formatDate(timestamp) {
 }
 
 
-/* =========================
-   Edit profile
-========================= */
+/* =========================================================
+   ERROR
+   ========================================================= */
 
-function openEditModal() {
+function showProfileError(message) {
+    $('profile-username').textContent =
+        'Unable to load profile';
 
-    if (!currentProfile ||
-        !currentProfile.user) {
+    $('profile-email').textContent =
+        '';
 
-        return;
-    }
+    $('profile-bio').textContent =
+        '';
 
-    const user =
-        currentProfile.user;
-
-    $('edit-username').value =
-        user.username || '';
-
-    $('edit-bio').value =
-        user.bio || '';
-
-    $('edit-avatar').value =
-        user.avatar_url || '';
-
-    $('profile-edit-modal')
-        .classList.add('active');
-}
-
-
-function closeEditModal() {
-
-    $('profile-edit-modal')
-        .classList.remove('active');
-}
-
-
-async function saveProfile() {
-
-    const username =
-        $('edit-username').value.trim();
-
-    const bio =
-        $('edit-bio').value.trim();
-
-    const avatarUrl =
-        $('edit-avatar').value.trim();
-
-    if (!username) {
-
-        alert(
-            'Username cannot be empty.'
-        );
-
-        return;
-    }
-
-    const saveButton =
-        $('profile-save-btn');
-
-    saveButton.disabled =
+    $('profile-follow-btn').hidden =
         true;
 
-    try {
+    $('profile-edit-btn').hidden =
+        true;
 
-        const data =
-            await apiRequest(
-                `${API_BASE}/users/me/profile`,
-                {
-                    method: 'PUT',
-
-                    body: JSON.stringify({
-                        username,
-                        bio,
-                        avatar_url: avatarUrl
-                    })
-                }
-            );
-
-        if (data.user) {
-
-            currentProfile.user =
-                data.user;
-        }
-
-        /*
-         * Keep the locally cached user
-         * synchronized with the backend.
-         */
-
-        const storedUser =
-            getStoredUser();
-
-        const updatedUser = {
-            ...storedUser,
-            ...(data.user || {}),
-            username,
-            bio,
-            avatar_url: avatarUrl
-        };
-
-        localStorage.setItem(
-            'aero_user',
-            JSON.stringify(updatedUser)
-        );
-
-        closeEditModal();
-
-        renderProfile(
-            currentProfile
-        );
-
-    } catch (error) {
-
-        console.error(
-            'Aero profile update error:',
-            error
-        );
-
-        alert(
-            error.message ||
-            'Unable to update profile.'
-        );
-
-    } finally {
-
-        saveButton.disabled =
-            false;
-    }
-}
-
-
-/* =========================
-   Errors
-========================= */
-
-function showError(message) {
-
-    $('profile-loading').innerHTML = `
+    $('profile-posts').innerHTML = `
         <div class="profile-error">
             ${escapeHtml(message)}
         </div>
@@ -874,83 +615,36 @@ function showError(message) {
 }
 
 
-/* =========================
-   Navigation
-========================= */
+/* =========================================================
+   BACK BUTTON
+   ========================================================= */
 
-function goHome() {
+function setupBackButton() {
+    const button =
+        $('profile-back-btn');
 
-    /*
-     * Return to Aero's main feed.
-     */
+    if (!button) {
+        return;
+    }
 
-    window.location.href =
-        'index.html';
+    button.addEventListener(
+        'click',
+        () => {
+            window.location.href =
+                'index.html';
+        }
+    );
 }
 
 
-/* =========================
-   Event listeners
-========================= */
-
-function setupEvents() {
-
-    $('profile-back-btn')
-        .addEventListener(
-            'click',
-            goHome
-        );
-
-    $('profile-follow-btn')
-        .addEventListener(
-            'click',
-            toggleFollow
-        );
-
-    $('profile-edit-btn')
-        .addEventListener(
-            'click',
-            openEditModal
-        );
-
-    $('profile-cancel-btn')
-        .addEventListener(
-            'click',
-            closeEditModal
-        );
-
-    $('profile-save-btn')
-        .addEventListener(
-            'click',
-            saveProfile
-        );
-
-    $('profile-edit-modal')
-        .addEventListener(
-            'click',
-            event => {
-
-                if (
-                    event.target.id ===
-                    'profile-edit-modal'
-                ) {
-                    closeEditModal();
-                }
-            }
-        );
-}
-
-
-/* =========================
-   Start
-========================= */
+/* =========================================================
+   INITIALIZE
+   ========================================================= */
 
 document.addEventListener(
     'DOMContentLoaded',
     () => {
-
-        setupEvents();
-
+        setupBackButton();
         loadProfile();
     }
 );
