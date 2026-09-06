@@ -7,7 +7,7 @@ from backend.models import Follow, Message, Note, User
 
 
 def _user_payload(user):
-    return {"id": user.id, "username": user.username, "avatar_url": user.avatar_url or ""}
+    return {"id": user.id, "username": user.username, "display_name": user.display_name or user.username, "avatar_url": user.avatar_url or ""}
 
 
 @chat_bp.get("/friends")
@@ -15,8 +15,8 @@ def _user_payload(user):
 @chat_bp.get("/chat/contacts")
 @token_required
 def get_contacts(current_user):
-    followed_ids = [row.following_id for row in Follow.query.filter_by(follower_id=current_user.id).all()]
-    follower_ids = [row.follower_id for row in Follow.query.filter_by(following_id=current_user.id).all()]
+    followed_ids = [row.following_id for row in Follow.query.filter_by(follower_id=current_user.id, status="approved").all()]
+    follower_ids = [row.follower_id for row in Follow.query.filter_by(following_id=current_user.id, status="approved").all()]
     ids = set(followed_ids + follower_ids)
     contacts = User.query.filter(User.id.in_(ids)).order_by(User.username.asc()).all() if ids else []
     payload = []
@@ -35,7 +35,7 @@ def get_contacts(current_user):
 @chat_bp.get("/notes")
 @token_required
 def get_notes(current_user):
-    followed_ids = [row.following_id for row in Follow.query.filter_by(follower_id=current_user.id).all()]
+    followed_ids = [row.following_id for row in Follow.query.filter_by(follower_id=current_user.id, status="approved").all()]
     notes = Note.query.filter(Note.user_id.in_(followed_ids)).order_by(Note.created_at.desc()).limit(30).all() if followed_ids else []
     return jsonify([{"id": note.id, "content": note.content, "created_at": f"{note.created_at.isoformat()}Z", "author": _user_payload(note.author)} for note in notes])
 

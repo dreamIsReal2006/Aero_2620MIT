@@ -18,6 +18,8 @@ class User(db.Model):
         index=True
     )
 
+    display_name = db.Column(db.String(80), default="", nullable=False)
+
     email = db.Column(
         db.String(120),
         unique=True,
@@ -51,6 +53,8 @@ class User(db.Model):
         nullable=False
     )
 
+    role = db.Column(db.String(20), default="user", nullable=False)
+
     is_banned = db.Column(
         db.Boolean,
         default=False,
@@ -71,3 +75,7 @@ class User(db.Model):
             self.password_hash,
             password
         )
+
+    @property
+    def is_authenticated(self):
+        return True

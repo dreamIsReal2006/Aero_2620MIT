@@ -106,6 +106,20 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const data = await request("/users/me/profile");
             writeUser(data.user || {});
+            const adminButton = byId("admin-dashboard-button");
+            if (adminButton && (data.user?.is_admin === true || data.user?.role === "admin")) {
+                adminButton.classList.remove("hidden");
+                adminButton.addEventListener("click", async () => {
+                    adminButton.disabled = true;
+                    try {
+                        const entry = await request("/admin-entry");
+                        window.location.href = entry.url;
+                    } catch (error) {
+                        showToast(error.message);
+                        adminButton.disabled = false;
+                    }
+                }, { once: true });
+            }
             const notificationData = await request("/settings/notifications");
             const settings = notificationData.settings || {};
             [["toggle-push-notifications", settings.push_notifications], ["toggle-notify-likes", settings.likes], ["toggle-notify-comments", settings.comments]].forEach(([id, checked]) => {
@@ -145,7 +159,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!username || !email) return showToast("Username and email are required");
         button.disabled = true;
         try {
-            const data = await request("/users/me/profile", { method: "PUT", body: { username, email, bio } });
+            const currentUser = JSON.parse(localStorage.getItem("aero_user") || "{}");
+            const data = await request("/users/me/profile", { method: "PUT", body: { username, email, bio, avatar_url: currentUser.avatar_url || "" } });
             writeUser(data.user || {});
             showToast("Account information saved");
         } catch (error) {

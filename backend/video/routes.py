@@ -31,7 +31,7 @@ def _video_payloads(current_user_id):
         },
         "likes_count": VideoLike.query.filter_by(video_id=video.id).count(),
         "is_liked": VideoLike.query.filter_by(video_id=video.id, user_id=current_user_id).first() is not None,
-        "is_following": Follow.query.filter_by(follower_id=current_user_id, following_id=video.user_id).first() is not None,
+        "is_following": Follow.query.filter_by(follower_id=current_user_id, following_id=video.user_id, status="approved").first() is not None,
     } for video in videos]
 
 

@@ -8,6 +8,118 @@
     let activeView = 'main';
     let activeProfileUserId = null;
     let isAuthenticated = Boolean(localStorage.getItem('aero_token'));
+    let profileEditorUser = null;
+    let profileEditorFile = null;
+
+    const profileApiBase = () => window.location.protocol === 'file:'
+        ? 'http://127.0.0.1:5000/api'
+        : `${window.location.origin}/api`;
+
+    function profileAvatarValue(user = {}) {
+        const value = String(user.avatar_url || '');
+        if (value.startsWith('letter:')) return { letter: value.slice(7, 8).toUpperCase() || 'U' };
+        return { url: value ? (value.startsWith('http') ? value : `${window.location.origin}${value}`) : '', letter: String(user.display_name || user.username || 'U').charAt(0).toUpperCase() };
+    }
+
+    function updateSharedUserState(user) {
+        const previous = JSON.parse(localStorage.getItem('aero_user') || '{}');
+        const nextUser = { ...previous, ...user };
+        localStorage.setItem('aero_user', JSON.stringify(nextUser));
+        const name = document.getElementById('nav-username');
+        if (name) name.textContent = nextUser.display_name || nextUser.username || 'User';
+        const avatar = document.getElementById('nav-avatar');
+        if (avatar) {
+            const avatarValue = profileAvatarValue(nextUser);
+            avatar.replaceChildren();
+            if (avatarValue.url) {
+                const image = document.createElement('img');
+                image.src = avatarValue.url;
+                image.alt = '';
+                avatar.appendChild(image);
+            } else avatar.textContent = avatarValue.letter;
+        }
+        window.dispatchEvent(new CustomEvent('aero:user-updated', { detail: nextUser }));
+        return nextUser;
+    }
+
+    function setProfileEditorPreview(value, fallback = 'U') {
+        const preview = document.getElementById('profile-edit-avatar-preview');
+        if (!preview) return;
+        preview.replaceChildren();
+        if (value instanceof File) {
+            const image = document.createElement('img');
+            image.src = URL.createObjectURL(value);
+            image.onload = () => URL.revokeObjectURL(image.src);
+            preview.appendChild(image);
+            return;
+        }
+        const stringValue = String(value || '');
+        if (stringValue && !stringValue.startsWith('letter:') && /^(https?:\/\/|\/)/i.test(stringValue)) {
+            const image = document.createElement('img');
+            image.src = stringValue.startsWith('http') ? stringValue : `${window.location.origin}${stringValue}`;
+            image.alt = '';
+            image.onerror = () => { preview.replaceChildren(); preview.textContent = fallback; };
+            preview.appendChild(image);
+        } else {
+            preview.textContent = (stringValue.replace(/^letter:/, '').charAt(0) || fallback).toUpperCase();
+        }
+    }
+
+    function openProfileEditor(user) {
+        profileEditorUser = { ...user };
+        profileEditorFile = null;
+        const modal = document.getElementById('profile-edit-modal');
+        const avatar = profileAvatarValue(profileEditorUser);
+        document.getElementById('profile-edit-display-name').value = profileEditorUser.display_name || profileEditorUser.username || '';
+        document.getElementById('profile-edit-username').value = profileEditorUser.username || '';
+        document.getElementById('profile-edit-bio').value = profileEditorUser.bio || '';
+        document.getElementById('profile-edit-avatar').value = avatar.url || (avatar.letter ? `letter:${avatar.letter}` : '');
+        document.getElementById('profile-edit-avatar-file').value = '';
+        document.getElementById('profile-edit-feedback').textContent = '';
+        setProfileEditorPreview(profileEditorUser.avatar_url, avatar.letter || 'U');
+        modal?.classList.remove('hidden');
+        document.getElementById('profile-edit-display-name')?.focus();
+    }
+
+    function closeProfileEditor() {
+        document.getElementById('profile-edit-modal')?.classList.add('hidden');
+        profileEditorUser = null;
+        profileEditorFile = null;
+    }
+
+    async function saveProfileEditor(event) {
+        event.preventDefault();
+        const saveButton = document.getElementById('save-profile-edit');
+        const feedback = document.getElementById('profile-edit-feedback');
+        const username = document.getElementById('profile-edit-username').value.trim();
+        const displayName = document.getElementById('profile-edit-display-name').value.trim();
+        const bio = document.getElementById('profile-edit-bio').value.trim();
+        let avatarUrl = document.getElementById('profile-edit-avatar').value.trim();
+        if (!username || !displayName) { feedback.textContent = 'Display name and handle are required.'; return; }
+        saveButton.disabled = true;
+        feedback.textContent = '';
+        try {
+            if (profileEditorFile) {
+                const formData = new FormData();
+                formData.append('file', profileEditorFile);
+                const uploadResponse = await fetch(`${profileApiBase()}/uploads`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: formData });
+                const uploadData = await uploadResponse.json().catch(() => ({}));
+                if (!uploadResponse.ok) throw new Error(uploadData.message || 'Unable to upload avatar');
+                avatarUrl = uploadData.url;
+            } else if (/^[A-Za-z]$/.test(avatarUrl)) {
+                avatarUrl = `letter:${avatarUrl.toUpperCase()}`;
+            }
+            const updated = await window.AeroAPI.updateProfile({ username, display_name: displayName, bio, avatar_url: avatarUrl });
+            const nextUser = updateSharedUserState(updated);
+            closeProfileEditor();
+            await loadProfileView(nextUser.id);
+            window.showNotice?.('Profile updated successfully.', 'success');
+        } catch (error) {
+            feedback.textContent = error.message || 'Unable to update profile.';
+        } finally {
+            saveButton.disabled = false;
+        }
+    }
 
     function setActiveNavItem(view) {
         document.querySelectorAll('.dock-item').forEach((element) => element.classList.remove('active'));
@@ -100,7 +212,8 @@
                 const authorPosts = await postsResponse.json().catch(() => []);
                 if (postsResponse.ok && Array.isArray(authorPosts)) posts = authorPosts;
             }
-            const avatar = user.avatar_url ? (user.avatar_url.startsWith('http') ? user.avatar_url : `${window.location.origin}${user.avatar_url}`) : '';
+            const avatarValue = profileAvatarValue(user);
+            const avatar = avatarValue.url;
             const initials = (user.username || 'U').charAt(0).toUpperCase();
             const followText = (count) => count && Number(count) > 0 ? String(count) : '0';
             const isOwnProfile = profileUserId === currentUserId;
@@ -120,10 +233,12 @@
                         </div>
                     </div>
                     <div class="profile-avatar-wrap">
-                        ${avatar ? `<img class="profile-avatar" src="${avatar}" alt="${(user.username || 'User').replace(/"/g, '&quot;')}" />` : `<span class="profile-avatar profile-avatar-empty">${initials}</span>`}
+                        ${avatar ? `<img class="profile-avatar" src="${avatar}" alt="${(user.username || 'User').replace(/"/g, '&quot;')}" />` : `<span class="profile-avatar profile-avatar-empty">${avatarValue.letter || initials}</span>`}
                     </div>
                 </div>
             `;
+
+            header.querySelector('.profile-edit-btn')?.addEventListener('click', () => openProfileEditor(user));
 
             if (!isOwnProfile) {
                 header.querySelector('.profile-follow-btn')?.addEventListener('click', async (event) => {
@@ -259,7 +374,35 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('profile-edit-form')?.addEventListener('submit', saveProfileEditor);
+        document.getElementById('close-profile-edit')?.addEventListener('click', closeProfileEditor);
+        document.getElementById('cancel-profile-edit')?.addEventListener('click', closeProfileEditor);
+        document.getElementById('profile-edit-modal')?.addEventListener('click', (event) => {
+            if (event.target.id === 'profile-edit-modal') closeProfileEditor();
+        });
+        document.getElementById('profile-edit-avatar-file')?.addEventListener('change', (event) => {
+            profileEditorFile = event.target.files?.[0] || null;
+            if (profileEditorFile) setProfileEditorPreview(profileEditorFile);
+        });
+        document.getElementById('profile-edit-avatar')?.addEventListener('input', (event) => {
+            if (!profileEditorFile) setProfileEditorPreview(event.target.value, String(document.getElementById('profile-edit-display-name')?.value || 'U').charAt(0).toUpperCase());
+        });
         document.addEventListener('click', (event) => {
+            const adminLink = event.target.closest('#admin-dashboard-link');
+            if (adminLink) {
+                event.preventDefault();
+                const apiBase = window.location.protocol === 'file:'
+                    ? 'http://127.0.0.1:5000/api'
+                    : `${window.location.origin}/api`;
+                fetch(`${apiBase}/admin-entry`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+                }).then(async (response) => {
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok || !data.url) throw new Error(data.message || 'Unable to open Admin Dashboard');
+                    window.location.href = data.url;
+                }).catch((error) => window.showNotice?.(error.message, 'error'));
+                return;
+            }
             const dockButton = event.target.closest('#home-nav-btn, #video-dock-btn, #chat-dock-btn');
             if (dockButton) {
                 const view = dockButton.id === 'home-nav-btn' ? 'main' : dockButton.id === 'video-dock-btn' ? 'shorts' : 'chat';

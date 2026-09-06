@@ -13,3 +13,5 @@ from backend.models.message import Message
 from backend.models.video_comment import VideoComment
 from backend.models.video_like import VideoLike
 from backend.models.note import Note
+from backend.models.moderation_log import ModerationLog
+from backend.models.appeal_ticket import AppealTicket

@@ -2,6 +2,8 @@ const API_BASE = window.location.protocol === 'file:'
     ? 'http://127.0.0.1:5000/api'
     : `${window.location.origin}/api`;
 const API_ORIGIN = API_BASE.replace(/\/api$/, '');
+const ADMIN_ROUTE = window.location.pathname.split('/').filter(Boolean).find(segment => segment.startsWith('admin_')) || 'admin_default_fallback';
+const ADMIN_API_BASE = `${API_ORIGIN}/api/${ADMIN_ROUTE}`;
 
 const searchState = {
     highlightedIndex: -1,
@@ -52,8 +54,10 @@ function createAvatarElement(username, avatarUrl, className = 'post-avatar') {
     avatar.className = className;
     avatar.setAttribute('aria-hidden', 'true');
     const name = String(username || 'User');
-    if (!avatarUrl) {
-        avatar.textContent = name.charAt(0).toUpperCase();
+    if (!avatarUrl || String(avatarUrl).startsWith('letter:')) {
+        avatar.textContent = String(avatarUrl || '').startsWith('letter:')
+            ? String(avatarUrl).slice(7, 8).toUpperCase() || name.charAt(0).toUpperCase()
+            : name.charAt(0).toUpperCase();
         return avatar;
     }
 
@@ -274,7 +278,7 @@ async function loadSearchPageResults() {
 
     try {
         const response = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`, {
-            headers: { 'Accept': 'application/json' }
+            headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
         });
         if (!response.ok) throw new Error('Search results request failed');
 
@@ -340,7 +344,7 @@ async function fetchSearchResults(query) {
 
     try {
         const response = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`, {
-            headers: { 'Accept': 'application/json' }
+            headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
         });
         if (!response.ok) {
             throw new Error('Search request failed');
@@ -805,14 +809,24 @@ function setupMediaAndChat() {
     });
 }
 
+function createBookmarkAvatarMarkup(post, authorName) {
+    authorName = String(authorName || 'User');
+    const avatarUrl = post.author_avatar || post.avatar_url || post.user?.avatar_url || '';
+    if (avatarUrl) {
+        const normalizedUrl = avatarUrl.startsWith('http') ? avatarUrl : `${API_ORIGIN}${avatarUrl}`;
+        const fallback = escapeHtml(authorName.trim().charAt(0).toUpperCase() || 'U');
+        return `<img src="${escapeHtml(normalizedUrl)}" alt="@${escapeHtml(authorName)}" onerror="this.outerHTML='<span>${fallback}</span>'">`;
+    }
+    return `<span>${escapeHtml(authorName.trim().charAt(0).toUpperCase() || 'U')}</span>`;
+}
+
 function createBookmarkItemMarkup(post) {
     const authorName = post.username || 'User';
-    const avatarUrl = post.author_avatar || post.avatar_url || post.user?.avatar_url || '/static/default-avatar.png';
     const excerpt = (post.content || '').trim() || 'Saved post';
     const createdAt = formatRelativeTime(post.created_at);
     return `
-        <article class="bookmark-item" data-bookmark-id="${post.id}">
-            <span class="bookmark-item-avatar" aria-hidden="true"><img src="${escapeHtml(avatarUrl.startsWith('http') ? avatarUrl : `${API_ORIGIN}${avatarUrl}`)}" alt="" onerror="this.remove()">${escapeHtml(authorName).slice(0, 1).toUpperCase()}</span>
+        <article class="bookmark-item" data-bookmark-id="${post.id}" tabindex="0" role="button" aria-label="Open post by @${escapeHtml(authorName)}">
+            <span class="bookmark-item-avatar" aria-hidden="true">${createBookmarkAvatarMarkup(post, authorName)}</span>
             <div class="bookmark-item-content">
                 <div class="bookmark-item-header">
                     <span class="bookmark-item-author">@${escapeHtml(authorName)}</span>
@@ -880,8 +894,22 @@ async function loadBookmarksDrawer() {
         }
 
         list.innerHTML = posts.map(createBookmarkItemMarkup).join('');
+        list.querySelectorAll('.bookmark-item').forEach((item) => {
+            const openPost = () => openBookmarkedPost(Number(item.dataset.bookmarkId));
+            item.addEventListener('click', (event) => {
+                if (event.target.closest('.bookmark-item-remove')) return;
+                openPost();
+            });
+            item.addEventListener('keydown', (event) => {
+                if ((event.key === 'Enter' || event.key === ' ') && !event.target.closest('.bookmark-item-remove')) {
+                    event.preventDefault();
+                    openPost();
+                }
+            });
+        });
         list.querySelectorAll('.bookmark-item-remove').forEach((button) => {
-            button.addEventListener('click', async () => {
+            button.addEventListener('click', async (event) => {
+                event.stopPropagation();
                 const postId = Number(button.dataset.bookmarkId);
                 const item = button.closest('.bookmark-item');
                 if (!item || Number.isNaN(postId)) return;
@@ -929,6 +957,28 @@ async function loadBookmarksDrawer() {
     }
 }
 
+async function openBookmarkedPost(postId) {
+    if (!Number.isInteger(postId) || postId <= 0) return;
+    setBookmarkDrawerVisibility(false);
+    let postElement = document.querySelector(`#posts-feed [data-post-id="${postId}"]`);
+    if (!postElement) {
+        try {
+            await AeroAPI.renderFeed();
+            postElement = document.querySelector(`#posts-feed [data-post-id="${postId}"]`);
+        } catch (error) {
+            showNotice(error.message || 'Unable to open bookmarked post.', 'error');
+            return;
+        }
+    }
+    if (postElement) {
+        postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        postElement.classList.add('bookmark-focus');
+        window.setTimeout(() => postElement.classList.remove('bookmark-focus'), 1200);
+    } else {
+        showNotice('This post is no longer available.', 'info');
+    }
+}
+
 function closeNotice(overlay) {
     if (!overlay || overlay.classList.contains('is-closing')) return;
     overlay.classList.add('is-closing');
@@ -951,6 +1001,11 @@ const AeroAPI = {
                 localStorage.setItem('aero_user', JSON.stringify(data.user));
                 this.transitionToApp();
             } else {
+                if (data.suspended) {
+                    sessionStorage.setItem('aero_suspended_username', data.username || username);
+                    window.location.href = 'suspended.html';
+                    return;
+                }
                 showNotice(data.message || 'Sign in failed', 'error');
             }
         } catch (err) {
@@ -1107,41 +1162,41 @@ const AeroAPI = {
     },
 
     async getAdminStats() {
-        const res = await fetch(`${API_BASE}/admin/stats`, {
+        const res = await fetch(`${ADMIN_API_BASE}/stats`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Unable to load admin statistics');
-        return data;
+        if (!res.ok || data.success === false) throw new Error(data.error || data.message || 'Unable to load admin statistics');
+        return data.data;
     },
 
     async getAdminReports() {
-        const res = await fetch(`${API_BASE}/admin/reports`, {
+        const res = await fetch(`${ADMIN_API_BASE}/reports`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Unable to load reports');
-        return data;
+        if (!res.ok || data.success === false) throw new Error(data.error || data.message || 'Unable to load reports');
+        return data.data;
     },
 
     async adminDeletePost(postId) {
-        const res = await fetch(`${API_BASE}/admin/posts/${postId}`, {
+        const res = await fetch(`${ADMIN_API_BASE}/posts/${postId}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Unable to delete post');
-        return data;
+        if (!res.ok || data.success === false) throw new Error(data.error || data.message || 'Unable to delete post');
+        return data.data;
     },
 
     async adminToggleBan(userId) {
-        const res = await fetch(`${API_BASE}/admin/users/${userId}/ban`, {
+        const res = await fetch(`${ADMIN_API_BASE}/users/${userId}/toggle_ban`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Unable to update user status');
-        return data;
+        if (!res.ok || data.success === false) throw new Error(data.error || data.message || 'Unable to update user status');
+        return data.data;
     },
 
     showReportModal(postId) {
@@ -1320,14 +1375,22 @@ const AeroAPI = {
 
         feedContainer.innerHTML = '';
         const posts = await this.fetchPosts(feedType);
+        const uniquePosts = [];
+        const seenPostIds = new Set();
+        (Array.isArray(posts) ? posts : []).forEach((post) => {
+            const postId = Number(post?.id);
+            if (!Number.isInteger(postId) || seenPostIds.has(postId)) return;
+            seenPostIds.add(postId);
+            uniquePosts.push(post);
+        });
 
-        if (!posts || posts.length === 0) {
+        if (uniquePosts.length === 0) {
             feedContainer.innerHTML = `<div class="post-card glass-card text-center"><p>No posts available yet.</p></div>`;
             return;
         }
 
         const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
-        posts.forEach(post => {
+        uniquePosts.forEach(post => {
             const postEl = document.createElement('div');
             postEl.className = 'post-card glass-card pop-in g2-card';
             postEl.dataset.postId = String(post.id);
@@ -1335,11 +1398,23 @@ const AeroAPI = {
             header.className = 'post-header';
             const authorIdentity = document.createElement('div');
             authorIdentity.className = 'post-author-identity';
-            authorIdentity.appendChild(createAvatarElement(post.username, post.avatar_url));
+            const profileLink = document.createElement('a');
+            profileLink.className = 'post-author-link';
+            profileLink.href = `#profile/${encodeURIComponent(post.user_id)}`;
+            profileLink.setAttribute('aria-label', `Open @${post.username || 'User'} profile`);
+            profileLink.addEventListener('click', (event) => {
+                event.preventDefault();
+                const userId = Number(post.user_id);
+                if (Number.isInteger(userId) && userId > 0) {
+                    window.navigateToUserProfile?.(userId);
+                }
+            });
+            profileLink.appendChild(createAvatarElement(post.username, post.avatar_url));
             const author = document.createElement('span');
             author.className = 'post-author';
             author.textContent = post.username || 'User';
-            authorIdentity.appendChild(author);
+            profileLink.appendChild(author);
+            authorIdentity.appendChild(profileLink);
             const postTime = document.createElement('time');
             postTime.className = 'post-relative-time';
             postTime.dateTime = post.created_at || '';

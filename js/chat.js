@@ -13,14 +13,47 @@
         return document.getElementById('chat-contacts-list') || document.getElementById('chat-contact-list');
     }
 
+    function contactAvatarUrl(contact) {
+        const value = contact?.avatar_url || contact?.avatarUrl || contact?.avatar || '';
+        return value && !String(value).startsWith('letter:')
+            ? (String(value).startsWith('http') ? String(value) : `${window.location.origin}${value}`)
+            : '';
+    }
+
+    function renderChatHeader(contact) {
+        const name = contact?.username || contact?.name || 'User';
+        const nameElement = document.getElementById('chat-active-name');
+        const header = document.getElementById('chat-active-header');
+        const avatarElement = document.getElementById('chat-active-avatar');
+        if (!header || !avatarElement) return;
+        if (nameElement) nameElement.textContent = `@${name}`;
+        avatarElement.replaceChildren();
+        const avatarUrl = contactAvatarUrl(contact);
+        const letterAvatar = String(contact?.avatar_url || contact?.avatarUrl || contact?.avatar || '').startsWith('letter:')
+            ? String(contact.avatar_url || contact.avatarUrl || contact.avatar).slice(7, 8).toUpperCase()
+            : String(name).charAt(0).toUpperCase();
+        if (avatarUrl) {
+            const image = document.createElement('img');
+            image.src = avatarUrl;
+            image.alt = `@${name}`;
+            image.loading = 'lazy';
+            image.onerror = () => { avatarElement.replaceChildren(); avatarElement.textContent = letterAvatar || 'U'; };
+            avatarElement.appendChild(image);
+        } else {
+            avatarElement.textContent = letterAvatar || 'U';
+        }
+    }
+
     function createChatContactButton(contact) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'chat-contact';
         button.dataset.userId = String(contact.id);
-        const avatarText = String(contact.username || contact.name || 'U').charAt(0).toUpperCase();
+        const avatarUrl = contactAvatarUrl(contact);
+        const avatarValue = String(contact.avatar_url || contact.avatarUrl || contact.avatar || '');
+        const avatarText = avatarValue.startsWith('letter:') ? avatarValue.slice(7, 8).toUpperCase() : String(contact.username || contact.name || 'U').charAt(0).toUpperCase();
         button.innerHTML = `
-            <span class="chat-contact-avatar">${contact.avatar_url ? `<img src="${contact.avatar_url.startsWith('http') ? contact.avatar_url : `${window.location.origin}${contact.avatar_url}`}" alt="" loading="lazy">` : avatarText}</span>
+            <span class="chat-contact-avatar">${avatarUrl ? `<img src="${avatarUrl}" alt="" loading="lazy">` : avatarText}</span>
             <span><strong>@${escapeText(contact.username || contact.name || 'User')}</strong><small>${escapeText(contact.latest_message || 'Start a conversation')}</small></span>
         `;
         button.addEventListener('click', () => {
@@ -56,8 +89,7 @@
     window.selectChatContact = async function selectChatContact(contact) {
         if (!contact) return;
         window.activeChatUser = contact;
-        const chatHeader = document.getElementById('chat-active-header');
-        if (chatHeader) chatHeader.textContent = `@${contact.username || contact.name || 'User'}`;
+        renderChatHeader(contact);
         const list = getChatContactList();
         if (list) {
             list.querySelectorAll('.chat-contact').forEach((item) => {

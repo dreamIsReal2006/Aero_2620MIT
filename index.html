@@ -51,7 +51,7 @@
                     <p class="form-subheading">Create an account to join Aero.</p>
                     
                     <div class="input-group">
-                        <input type="text" id="signup-username" placeholder="Username" required>
+                        <input type="text" id="signup-username" placeholder="Username" pattern="[A-Za-z0-9_ ]{3,30}" title="3-30 letters, numbers, underscores, or spaces" required>
                     </div>
                     <div class="input-group">
                         <input type="email" id="signup-email" placeholder="Email Address" required>
@@ -162,7 +162,7 @@
             </div>
 
             <div class="nav-right">
-                <a id="admin-dashboard-link" class="admin-nav-link hidden" href="admin.html">Admin Dashboard</a>
+                <a id="admin-dashboard-link" class="admin-nav-link hidden" href="#">Admin Dashboard</a>
                 <div id="user-avatar-btn" class="user-pill glass-pill" role="button" tabindex="0" aria-label="Open profile">
                     <span id="nav-avatar" class="user-avatar user-avatar-nav" aria-hidden="true">U</span>
                     <span id="nav-username">User</span>
@@ -260,7 +260,7 @@
 
         <main id="view-chat" class="chat-wrapper view-container glass-card aero-glass-panel hidden" aria-label="Chat">
             <aside class="chat-sidebar"><div class="chat-sidebar-header"><strong id="chat-current-username">Messages</strong><button type="button" class="chat-compose-btn" aria-label="New message">✎</button></div><input id="chat-contact-search" class="chat-search" type="search" placeholder="Search contacts" aria-label="Search contacts"><div class="chat-notes"></div><div id="chat-contacts-list" class="chat-contacts-list"></div></aside>
-            <section class="chat-panel"><div id="chat-active-header" class="chat-active-header"></div><div id="chat-messages-list" class="chat-messages"></div><form id="chat-form" class="chat-form"><input id="chat-input" type="text" maxlength="2000" placeholder="Message..." aria-label="Message"><button type="button" id="chat-emoji-btn" aria-label="Add emoji">☺</button><button type="button" id="chat-gif-btn" aria-label="Add GIF">GIF</button><button type="submit" aria-label="Send message">➤</button></form></section>
+            <section class="chat-panel"><div id="chat-active-header" class="chat-active-header"><span id="chat-active-avatar" class="chat-active-avatar" aria-hidden="true">U</span><span id="chat-active-name">Select a contact</span></div><div id="chat-messages-list" class="chat-messages"></div><form id="chat-form" class="chat-form"><input id="chat-input" type="text" maxlength="2000" placeholder="Message..." aria-label="Message"><button type="button" id="chat-emoji-btn" aria-label="Add emoji">☺</button><button type="button" id="chat-gif-btn" aria-label="Add GIF">GIF</button><button type="submit" aria-label="Send message">➤</button></form></section>
         </aside>
 
         <aside id="short-comments-drawer" class="short-comments-drawer glass-card hidden" aria-label="Short video comments">
@@ -300,6 +300,28 @@
             <input id="short-upload-file" class="visually-hidden-file" type="file" accept="video/mp4,video/webm" required>
             <input id="short-upload-caption" class="video-title-input" type="text" maxlength="2000" placeholder="Video Title" aria-label="Video title">
             <footer class="create-post-footer"><button type="submit" class="btn btn-primary g2-btn">Upload</button></footer>
+        </form>
+    </div>
+
+    <div id="profile-edit-modal" class="profile-edit-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="profile-edit-title">
+        <form id="profile-edit-form" class="profile-edit-modal glass-card aero-glass-panel">
+            <header class="profile-edit-header">
+                <div><span class="profile-edit-kicker">Profile</span><h2 id="profile-edit-title">Edit Profile</h2></div>
+                <button type="button" id="close-profile-edit" class="modal-close-btn" aria-label="Close profile editor">&times;</button>
+            </header>
+            <div class="profile-edit-avatar-field">
+                <span id="profile-edit-avatar-preview" class="profile-edit-avatar-preview" aria-hidden="true">U</span>
+                <div class="profile-edit-avatar-controls">
+                    <label for="profile-edit-avatar">Avatar letter or image URL</label>
+                    <input id="profile-edit-avatar" type="text" maxlength="500" placeholder="K or https://..."><label class="profile-edit-file-label" for="profile-edit-avatar-file">Choose image</label>
+                    <input id="profile-edit-avatar-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+                </div>
+            </div>
+            <label class="profile-edit-field">Display Name<input id="profile-edit-display-name" type="text" maxlength="80" required></label>
+            <label class="profile-edit-field">Handle / User ID<input id="profile-edit-username" type="text" maxlength="30" pattern="[A-Za-z0-9_ ]{3,30}" required></label>
+            <label class="profile-edit-field">Bio<textarea id="profile-edit-bio" maxlength="150" rows="4"></textarea></label>
+            <p id="profile-edit-feedback" class="profile-edit-feedback" role="alert"></p>
+            <footer class="profile-edit-actions"><button type="button" id="cancel-profile-edit" class="btn profile-edit-cancel">Cancel</button><button type="submit" id="save-profile-edit" class="btn btn-primary">Save Changes</button></footer>
         </form>
     </div>
 

@@ -3,6 +3,7 @@ import os
 import secrets
 import smtplib
 import traceback
+import re
 from email.mime.text import MIMEText
 from functools import wraps
 
@@ -12,7 +13,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from backend import db
 from backend.auth import auth_bp
-from backend.models import Comment, Follow, Like, OTPCode, Post, Report, User
+from backend.models import AppealTicket, Comment, Follow, Like, OTPCode, Post, Report, User
 
 
 def make_token(user):
@@ -94,14 +95,15 @@ def send_otp_email(receiver_email, otp_code):
         return False
 
 
-def issue_otp(email):
+def issue_otp(email, commit=True):
     code = f"{secrets.randbelow(900000) + 100000}"
     otp = db.session.get(OTPCode, email) or OTPCode(email=email)
     otp.code_hash = generate_password_hash(code)
     otp.expires_at = dt.datetime.utcnow() + dt.timedelta(minutes=10)
     otp.attempts = 0
     db.session.add(otp)
-    db.session.commit()
+    if commit:
+        db.session.commit()
     return send_otp_email(email, code)
 
 
@@ -117,8 +119,8 @@ def signup():
     email = str(data.get("email", "")).strip().lower()
     password = str(data.get("password", ""))
     confirm_password = str(data.get("confirm_password", data.get("confirmPassword", password)))
-    if len(username) < 3 or len(username) > 30 or not username.replace("_", "").isalnum():
-        return jsonify({"message": "Username must be 3-30 letters, numbers, or underscores"}), 400
+    if len(username) < 3 or len(username) > 30 or not re.fullmatch(r"[A-Za-z0-9_ ]+", username):
+        return jsonify({"message": "Username must be 3-30 letters, numbers, underscores, or spaces"}), 400
     if "@" not in email or len(email) > 254:
         return jsonify({"message": "Invalid email address"}), 400
     if len(password) < 8 or len(password) > 128:
@@ -132,20 +134,22 @@ def signup():
 
     user = None
     try:
-        if User.query.filter((User.username.ilike(username)) | (User.email.ilike(email))).first():
+        existing = User.query.filter((User.username.ilike(username)) | (User.email.ilike(email))).first()
+        if existing and existing.active:
             return jsonify({"message": "Username or email is already registered"}), 409
-        user = User(username=username, email=email, active=False)
+        user = existing or User(username=username, email=email, active=False)
+        user.username = username
+        user.email = email
+        user.active = False
         user.set_password(password)
         db.session.add(user)
         db.session.flush()
-        if not issue_otp(email):
+        if not issue_otp(email, commit=False):
             raise RuntimeError("OTP email could not be sent. Check SMTP configuration")
+        db.session.commit()
         return jsonify({"message": "Verification code sent to your email"}), 200
     except RuntimeError as error:
         db.session.rollback()
-        if user and db.session.get(User, user.id):
-            db.session.delete(user)
-        db.session.commit()
         db.session.query(OTPCode).filter_by(email=email).delete()
         db.session.commit()
         return jsonify({"message": str(error)}), 502
@@ -183,7 +187,7 @@ def verify_otp():
     db.session.commit()
     session["user_id"] = user.id
     return jsonify({"token": make_token(user), "user": {
-        "id": user.id, "username": user.username, "email": user.email,
+        "id": user.id, "username": user.username, "display_name": user.display_name or user.username, "email": user.email,
         "bio": user.bio or "", "avatar_url": user.avatar_url or "",
         "is_admin": user.is_admin, "is_banned": user.is_banned,
         "is_private": user.is_private, "show_online_status": user.show_online_status,
@@ -251,13 +255,28 @@ def signin():
         return jsonify({"message": "Incorrect username or password"}), 401
     if not user.active:
         return jsonify({"message": "Account has not been activated by email"}), 403
+    if user.is_banned:
+        return jsonify({"message": "Account suspended", "suspended": True, "username": user.username}), 403
     session["user_id"] = user.id
     return jsonify({"token": make_token(user), "user": {
-        "id": user.id, "username": user.username, "email": user.email,
+        "id": user.id, "username": user.username, "display_name": user.display_name or user.username, "email": user.email,
         "bio": user.bio or "", "avatar_url": user.avatar_url or "",
         "is_admin": user.is_admin, "is_banned": user.is_banned,
         "is_private": user.is_private, "show_online_status": user.show_online_status,
     }}), 200
+
+
+@auth_bp.post("/appeals")
+def submit_appeal():
+    data = request.get_json(silent=True) or {}
+    username = str(data.get("username", "")).strip()
+    content = str(data.get("content", "")).strip()
+    user = User.query.filter(User.username.ilike(username)).first()
+    if not user or not user.is_banned or not content or len(content) > 2000:
+        return jsonify({"message": "A banned username and appeal text are required"}), 400
+    db.session.add(AppealTicket(user_id=user.id, content=content))
+    db.session.commit()
+    return jsonify({"message": "Appeal submitted"}), 201
 
 
 @auth_bp.put("/password")

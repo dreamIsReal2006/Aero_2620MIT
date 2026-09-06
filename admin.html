@@ -9,22 +9,33 @@
 </head>
 <body class="light-mode admin-page">
     <main class="admin-shell">
-        <header class="admin-header glass-card">
+        <header class="admin-header admin-card glass-card">
             <div>
                 <a class="admin-back-link" href="index.html">&larr; Back to Aero</a>
                 <h1>Admin Dashboard</h1>
             </div>
-            <button id="admin-logout" class="btn admin-toolbar-btn" type="button">Sign out</button>
         </header>
 
         <div id="admin-error" class="admin-state hidden"></div>
         <section class="admin-stats" aria-label="Platform statistics">
-            <article class="admin-stat-card glass-card"><span>Total Users</span><strong id="admin-users-count">-</strong></article>
-            <article class="admin-stat-card glass-card"><span>Total Posts</span><strong id="admin-posts-count">-</strong></article>
-            <article class="admin-stat-card glass-card"><span>Pending Reports</span><strong id="admin-reports-count">-</strong></article>
+            <article class="admin-stat-card admin-card glass-card"><span>Total Users</span><strong id="admin-users-count">-</strong></article>
+            <article class="admin-stat-card admin-card glass-card"><span>Total Posts</span><strong id="admin-posts-count">-</strong></article>
+            <article class="admin-stat-card admin-card glass-card"><span>Pending Reports</span><strong id="admin-reports-count">-</strong></article>
+        </section>
+        <section class="admin-reports-section admin-card glass-card">
+            <div class="admin-section-heading"><div><span class="admin-eyebrow">Account access</span><h2>Users</h2></div></div>
+            <label class="admin-search-field" for="admin-user-search">
+                <span class="admin-search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 5 5"></path></svg></span>
+                <input id="admin-user-search" type="search" placeholder="Search by username or email" autocomplete="off">
+            </label>
+            <div id="admin-users-list" class="admin-users-list"></div>
+        </section>
+        <section class="admin-reports-section admin-card glass-card">
+            <div class="admin-section-heading"><div><span class="admin-eyebrow">Support queue</span><h2>Appeals</h2></div></div>
+            <div id="admin-appeals-list" class="admin-users-list"></div>
         </section>
 
-        <section class="admin-reports-section glass-card">
+        <section class="admin-reports-section admin-card glass-card">
             <div class="admin-section-heading"><div><span class="admin-eyebrow">Moderation queue</span><h2>Pending Reports</h2></div><button id="admin-refresh" class="btn admin-toolbar-btn" type="button">Refresh</button></div>
             <div class="admin-table-wrap">
                 <table class="admin-reports-table">
@@ -35,7 +46,7 @@
         </section>
     </main>
     <div id="admin-post-preview-modal" class="admin-post-preview-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="admin-post-preview-title">
-        <article class="admin-post-preview glass-card">
+        <article class="admin-post-preview admin-card glass-card">
             <button id="close-admin-post-preview" class="admin-preview-close" type="button" aria-label="Close post preview">&times;</button>
             <div id="admin-post-preview-content"></div>
         </article>

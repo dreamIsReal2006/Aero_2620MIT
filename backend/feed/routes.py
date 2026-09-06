@@ -5,15 +5,17 @@ import uuid
 from pathlib import Path
 
 from flask import current_app, jsonify, request, send_from_directory
+from sqlalchemy import or_
 from werkzeug.utils import secure_filename
 
 from backend import db
 from backend.auth.routes import token_required
 from backend.feed import feed_bp
 from backend.models import Comment, Follow, Like, Notification, Post, User, UserInteraction
+from backend.privacy import visible_author_ids as get_visible_author_ids
 
 ALLOWED_MEDIA_TYPES = {
-    "jpg": "image/", "jpeg": "image/", "png": "image/", "webp": "image/",
+    "jpg": "image/", "jpeg": "image/", "png": "image/", "webp": "image/", "gif": "image/",
     "mp4": "video/", "webm": "video/", "mov": "video/",
 }
 
@@ -28,7 +30,7 @@ def post_payload(post, current_user_id=None):
         post_id=post.id, user_id=current_user_id, type="bookmark"
     ).first() is not None
     is_following = current_user_id is not None and Follow.query.filter_by(
-        follower_id=current_user_id, following_id=post.user_id
+        follower_id=current_user_id, following_id=post.user_id, status="approved"
     ).first() is not None
     share_count = UserInteraction.query.filter(
         UserInteraction.post_id == post.id,
@@ -57,14 +59,32 @@ def post_payload(post, current_user_id=None):
     }
 
 
+def visible_posts_query(current_user):
+    author_ids = get_visible_author_ids(current_user)
+    return Post.query.join(User).filter(
+        or_(
+            User.is_private.is_(False),
+            User.id.in_(author_ids),
+        )
+    )
+
+
 @feed_bp.get("/search")
-def search():
+@token_required
+def search(current_user):
     query = str(request.args.get("q", "")).strip()
     if not query:
         return jsonify({"users": [], "posts": []})
     pattern = f"%{query}%"
-    users = User.query.filter(User.username.ilike(pattern)).order_by(User.username).limit(5).all()
-    posts = Post.query.join(User).filter(Post.content.ilike(pattern)).order_by(Post.created_at.desc()).limit(5).all()
+    followed_ids = get_visible_author_ids(current_user)
+    users = User.query.filter(
+        User.username.ilike(pattern),
+        (User.is_private.is_(False)) | User.id.in_(followed_ids),
+    ).order_by(User.username).limit(5).all()
+    posts = Post.query.join(User).filter(
+        Post.content.ilike(pattern),
+        (User.is_private.is_(False)) | User.id.in_(followed_ids),
+    ).distinct().order_by(Post.created_at.desc()).limit(5).all()
     return jsonify({
         "users": [{"id": user.id, "username": user.username, "email": user.email} for user in users],
         "posts": [{"id": post.id, "content": post.content, "username": post.author.username} for post in posts],
@@ -82,17 +102,18 @@ def get_posts(current_user):
         ).all()
     }
     author_id = request.args.get("author_id", type=int)
+    followed_ids = [follow.following_id for follow in Follow.query.filter_by(
+        follower_id=current_user.id, status="approved"
+    ).all()]
+    queried_posts = visible_posts_query(current_user).distinct().order_by(Post.created_at.desc()).all()
+    unique_posts = {post.id: post for post in queried_posts}
     posts = [
         post_payload(post, current_user.id)
-        for post in Post.query.all()
+        for post in unique_posts.values()
         if post.id not in excluded_ids and (author_id is None or post.user_id == author_id)
     ]
     if author_id is not None:
         return jsonify(sorted(posts, key=lambda post: post["created_at"], reverse=True))
-    followed_ids = [
-        follow.following_id
-        for follow in Follow.query.filter_by(follower_id=current_user.id).all()
-    ]
     if feed_type == "following":
         posts = [post for post in posts if post["user_id"] in followed_ids]
     else:
@@ -204,7 +225,9 @@ def get_bookmarked_posts(current_user):
     ]
     if not bookmarked_ids:
         return jsonify([]), 200
-    posts = Post.query.filter(Post.id.in_(bookmarked_ids)).order_by(Post.created_at.desc()).all()
+    posts = visible_posts_query(current_user).filter(
+        Post.id.in_(set(bookmarked_ids))
+    ).distinct().order_by(Post.created_at.desc()).all()
     return jsonify([post_payload(post, current_user.id) for post in posts]), 200
 
 
