@@ -18,6 +18,12 @@ class User(db.Model):
         index=True
     )
 
+    display_name = db.Column(
+        db.String(80),
+        default="",
+        nullable=False
+    )
+
     email = db.Column(
         db.String(120),
         unique=True,
@@ -49,6 +55,24 @@ class User(db.Model):
         nullable=False
     )
 
+    push_notifications = db.Column(
+        db.Boolean,
+        default=True,
+        nullable=False
+    )
+
+    notify_likes = db.Column(
+        db.Boolean,
+        default=True,
+        nullable=False
+    )
+
+    notify_comments = db.Column(
+        db.Boolean,
+        default=True,
+        nullable=False
+    )
+
     password_hash = db.Column(
         db.String(255),
         nullable=False
@@ -63,6 +87,12 @@ class User(db.Model):
     is_admin = db.Column(
         db.Boolean,
         default=False,
+        nullable=False
+    )
+
+    role = db.Column(
+        db.String(20),
+        default="user",
         nullable=False
     )
 
@@ -86,3 +116,7 @@ class User(db.Model):
             self.password_hash,
             password
         )
+
+    @property
+    def is_authenticated(self):
+        return True

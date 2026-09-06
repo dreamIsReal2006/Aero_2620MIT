@@ -1,10 +1,12 @@
 import json
+import re
 
 from flask import jsonify, request
 
 from backend import db
 from backend.auth.routes import token_required
-from backend.models import Follow, Post, Report, User
+from backend.models import Comment, Follow, Notification, Post, Report, User, Video, VideoLike
+from backend.privacy import can_view_user_content
 from backend.social import social_bp
 
 
@@ -18,6 +20,7 @@ def serialize_post(post):
 
 
 @social_bp.post("/social/follow/<int:user_id>")
+@social_bp.post("/users/<int:user_id>/follow")
 @token_required
 def toggle_follow(current_user, user_id):
     if current_user.id == user_id:
@@ -32,6 +35,7 @@ def toggle_follow(current_user, user_id):
     follow = Follow.query.filter_by(
         follower_id=current_user.id,
         following_id=user_id,
+        status="approved",
     ).first()
     if follow:
         db.session.delete(follow)
@@ -41,11 +45,20 @@ def toggle_follow(current_user, user_id):
             follower_id=current_user.id,
             following_id=user_id,
         ))
+        if target_user.push_notifications:
+            db.session.add(Notification(
+                recipient_id=user_id,
+                actor_id=current_user.id,
+                type="follow",
+                message=f"@{current_user.username} followed you",
+            ))
         is_following = True
     db.session.commit()
 
-    followers_count = Follow.query.filter_by(following_id=user_id).count()
-    following_count = Follow.query.filter_by(follower_id=user_id).count()
+    # The chat contact list is derived from the follow relationship; once the follow
+    # row is saved, the user is automatically available in the contact list.
+    followers_count = Follow.query.filter_by(following_id=user_id, status="approved").count()
+    following_count = Follow.query.filter_by(follower_id=user_id, status="approved").count()
     return jsonify({
         "message": "User followed successfully" if is_following else "User unfollowed successfully",
         "user_id": user_id,
@@ -56,18 +69,20 @@ def toggle_follow(current_user, user_id):
 
 
 @social_bp.get("/users/<int:user_id>/profile")
-def get_profile(user_id):
+@token_required
+def get_profile(current_user, user_id):
     user = db.session.get(User, user_id)
     if not user:
         return jsonify({"message": "User not found"}), 404
 
-    followers_count = Follow.query.filter_by(following_id=user_id).count()
-    following_count = Follow.query.filter_by(follower_id=user_id).count()
-    posts = Post.query.filter_by(user_id=user_id).order_by(Post.created_at.desc()).all()
+    followers_count = Follow.query.filter_by(following_id=user_id, status="approved").count()
+    following_count = Follow.query.filter_by(follower_id=user_id, status="approved").count()
+    posts = Post.query.filter_by(user_id=user_id).order_by(Post.created_at.desc()).all() if can_view_user_content(current_user, user) else []
     return jsonify({
         "user": {
             "id": user.id,
             "username": user.username,
+            "display_name": user.display_name or user.username,
             "email": user.email,
             "bio": user.bio or "",
             "avatar_url": user.avatar_url or "",
@@ -79,16 +94,92 @@ def get_profile(user_id):
     }), 200
 
 
+@social_bp.get("/users/<int:user_id>")
+@token_required
+def get_user_profile(current_user, user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    followers_count = Follow.query.filter_by(following_id=user_id, status="approved").count()
+    following_count = Follow.query.filter_by(follower_id=user_id, status="approved").count()
+    allowed = can_view_user_content(current_user, user)
+    posts = Post.query.filter_by(user_id=user_id).order_by(Post.created_at.desc()).all() if allowed else []
+    is_following = Follow.query.filter_by(
+        follower_id=current_user.id,
+        following_id=user_id,
+        status="approved",
+    ).first() is not None
+    return jsonify({
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "display_name": user.display_name or user.username,
+            "email": user.email,
+            "bio": user.bio or "",
+            "avatar_url": user.avatar_url or "",
+            "created_at": user.created_at.isoformat(),
+        },
+        "is_following": is_following,
+        "followers_count": followers_count,
+        "following_count": following_count,
+        "posts": [serialize_post(post) for post in posts],
+    }), 200
+
+
+@social_bp.get("/users/<int:user_id>/content")
+@token_required
+def get_user_content(current_user, user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    if not can_view_user_content(current_user, user):
+        return jsonify({"type": "posts", "items": []}), 200
+
+    content_type = str(request.args.get("type", "posts")).strip().lower()
+    if content_type == "posts":
+        items = [serialize_post(post) for post in Post.query.filter_by(user_id=user_id, type="original").order_by(Post.created_at.desc()).all()]
+    elif content_type == "reposts":
+        items = [serialize_post(post) for post in Post.query.filter_by(user_id=user_id).filter(Post.type.in_(["repost", "quote"])).order_by(Post.created_at.desc()).all()]
+    elif content_type == "replies":
+        items = []
+        for comment in Comment.query.filter_by(user_id=user_id).order_by(Comment.created_at.desc()).all():
+            post = db.session.get(Post, comment.post_id)
+            if post:
+                items.append({
+                    "id": comment.id,
+                    "content": comment.content,
+                    "created_at": comment.created_at.isoformat(),
+                    "post": {"id": post.id, "content": post.content, "username": post.author.username},
+                })
+    elif content_type == "shorts":
+        items = [{
+            "id": video.id,
+            "video_url": video.video_url,
+            "caption": video.caption,
+            "created_at": video.created_at.isoformat(),
+            "views_count": 0,
+            "likes_count": VideoLike.query.filter_by(video_id=video.id).count(),
+        } for video in Video.query.filter_by(user_id=user_id).order_by(Video.created_at.desc()).all()]
+    else:
+        return jsonify({"message": "Unknown profile content type"}), 400
+    return jsonify({"type": content_type, "items": items}), 200
+
+
 @social_bp.put("/users/me/profile")
 @token_required
 def update_my_profile(current_user):
     data = request.get_json(silent=True) or {}
     username = str(data.get("username", current_user.username)).strip()
+    display_name = str(data.get("display_name", current_user.display_name or username)).strip()
     email = str(data.get("email", current_user.email)).strip().lower()
     bio = str(data.get("bio", "")).strip()
-    avatar_url = str(data.get("avatar_url", "")).strip()
-    if len(username) < 3 or len(username) > 30 or not username.replace("_", "").isalnum():
-        return jsonify({"message": "Username must be 3-30 letters, numbers, or underscores"}), 400
+    avatar_url = data.get("avatar_url")
+    if len(display_name) > 80:
+        return jsonify({"message": "Display name must be 80 characters or fewer"}), 400
+    if len(username) < 3 or len(username) > 30 or not re.fullmatch(r"[A-Za-z0-9_ ]+", username):
+        return jsonify({"message": "Username must be 3-30 letters, numbers, underscores, or spaces"}), 400
     if "@" not in email or len(email) > 254:
         return jsonify({"message": "Invalid email address"}), 400
     duplicate = User.query.filter(
@@ -99,19 +190,26 @@ def update_my_profile(current_user):
         return jsonify({"message": "Username or email is already registered"}), 409
     if len(bio) > 150:
         return jsonify({"message": "Bio must be 150 characters or fewer"}), 400
-    if len(avatar_url) > 500:
+    if avatar_url is not None and len(str(avatar_url).strip()) > 500:
         return jsonify({"message": "Avatar URL is too long"}), 400
 
-    current_user.username = username
-    current_user.email = email
-    current_user.bio = bio
-    current_user.avatar_url = avatar_url
-    db.session.commit()
+    try:
+        current_user.username = username
+        current_user.display_name = display_name or username
+        current_user.email = email
+        current_user.bio = bio
+        if avatar_url is not None:
+            current_user.avatar_url = str(avatar_url).strip()
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({"message": "Unable to update profile right now"}), 500
     return jsonify({
         "message": "Profile updated successfully",
         "user": {
             "id": current_user.id,
             "username": current_user.username,
+            "display_name": current_user.display_name,
             "email": current_user.email,
             "bio": current_user.bio,
             "avatar_url": current_user.avatar_url,
@@ -123,13 +221,18 @@ def update_my_profile(current_user):
     }), 200
 
 
+@social_bp.get("/users/me")
 @social_bp.get("/users/me/profile")
 @token_required
 def get_my_profile(current_user):
+    followers_count = Follow.query.filter_by(following_id=current_user.id, status="approved").count()
+    following_count = Follow.query.filter_by(follower_id=current_user.id, status="approved").count()
+    posts = Post.query.filter_by(user_id=current_user.id).order_by(Post.created_at.desc()).all()
     return jsonify({
         "user": {
             "id": current_user.id,
             "username": current_user.username,
+            "display_name": current_user.display_name,
             "email": current_user.email,
             "bio": current_user.bio or "",
             "avatar_url": current_user.avatar_url or "",
@@ -137,7 +240,10 @@ def get_my_profile(current_user):
             "is_banned": current_user.is_banned,
             "is_private": current_user.is_private,
             "show_online_status": current_user.show_online_status,
-        }
+        },
+        "followers_count": followers_count,
+        "following_count": following_count,
+        "posts": [serialize_post(post) for post in posts],
     }), 200
 
 

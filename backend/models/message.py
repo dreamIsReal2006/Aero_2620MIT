@@ -27,6 +27,18 @@ class Message(db.Model):
         nullable=False
     )
 
+    media_url = db.Column(
+        db.String(500),
+        default="",
+        nullable=False
+    )
+
+    type = db.Column(
+        db.String(20),
+        default="text",
+        nullable=False
+    )
+
     is_read = db.Column(
         db.Boolean,
         default=False,

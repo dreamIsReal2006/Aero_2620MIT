@@ -1,14 +1,20 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('aero_token');
     const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
-    const apiBase = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000/api' : `${window.location.origin}/api`;
-    if (!token || user.is_admin !== true) {
+    const adminRoute = window.location.pathname.split('/').filter(Boolean).find(segment => segment.startsWith('admin_')) || 'admin_default_fallback';
+    const apiBase = window.location.protocol === 'file:'
+        ? `http://127.0.0.1:5000/api/${adminRoute}`
+        : `${window.location.origin}/api/${adminRoute}`;
+    if (!token || (user.is_admin !== true && user.role !== 'admin')) {
         window.location.href = 'index.html';
         return;
     }
 
     const errorBox = document.getElementById('admin-error');
     const reportsBody = document.getElementById('admin-reports-body');
+    const usersList = document.getElementById('admin-users-list');
+    const userSearch = document.getElementById('admin-user-search');
+    const appealsList = document.getElementById('admin-appeals-list');
     const previewModal = document.getElementById('admin-post-preview-modal');
     const previewContent = document.getElementById('admin-post-preview-content');
     const showError = error => {
@@ -17,21 +23,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         errorBox.classList.remove('hidden');
     };
     const request = async (path, options = {}) => {
+        const requestOptions = { ...options };
+        if (requestOptions.body && typeof requestOptions.body !== 'string') {
+            requestOptions.headers = { 'Content-Type': 'application/json', ...(requestOptions.headers || {}) };
+            requestOptions.body = JSON.stringify(requestOptions.body);
+        }
         const response = await fetch(`${apiBase}${path}`, {
-            ...options,
-            headers: { Accept: 'application/json', Authorization: `Bearer ${token}`, ...(options.headers || {}) }
+            ...requestOptions,
+            headers: { Accept: 'application/json', Authorization: `Bearer ${token}`, ...(requestOptions.headers || {}) }
         });
         const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.message || 'Admin request failed');
-        return data;
+        if (!response.ok || data.success === false) throw new Error(data.error || data.message || 'Admin request failed');
+        return data.data;
     };
     const updateStats = async () => {
-        const stats = await request('/admin/stats');
-        document.getElementById('admin-users-count').textContent = stats.users_count;
-        document.getElementById('admin-posts-count').textContent = stats.posts_count;
-        document.getElementById('admin-reports-count').textContent = stats.pending_reports_count;
+        const stats = await request('/stats');
+        document.getElementById('admin-users-count').textContent = stats.total_users;
+        document.getElementById('admin-posts-count').textContent = stats.total_posts;
+        document.getElementById('admin-reports-count').textContent = stats.pending_reports;
     };
     const escapeHtml = value => String(value || '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+    const renderUsers = users => {
+        if (!usersList) return;
+        usersList.innerHTML = users.length ? users.map(user => `<div class="admin-user-row" data-user-id="${user.id}"><strong>@${escapeHtml(user.username)}</strong><span class="admin-user-role">${escapeHtml(user.role || 'user')}</span><span class="admin-user-status">${user.is_banned ? 'Banned' : 'Active'}</span><button class="btn admin-action-btn ban-user-btn" type="button">${user.is_banned ? 'Unban' : 'Ban'}</button><button class="btn admin-action-btn permission-btn" type="button" data-role="${escapeHtml(user.role || 'user')}">${user.role === 'admin' ? 'Demote to User' : 'Promote to Admin'}</button></div>`).join('') : '<p class="admin-empty">No matching users.</p>';
+    };
+    const renderAppeals = appeals => {
+        if (!appealsList) return;
+        appealsList.innerHTML = appeals.map(appeal => `<div class="admin-user-row" data-appeal-id="${appeal.id}"><strong>@${escapeHtml(appeal.username)}</strong><span>${escapeHtml(appeal.content)}</span><button class="btn admin-action-btn appeal-approve-btn" type="button">Approve</button><button class="btn admin-action-btn appeal-reject-btn" type="button">Reject</button></div>`).join('') || '<p class="admin-empty">No pending appeals.</p>';
+    };
     const imageUrl = value => value && value.startsWith('http') ? value : `${window.location.origin}${value || ''}`;
 
     const openPreview = post => {
@@ -150,7 +169,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         errorBox?.classList.add('hidden');
         reportsBody.innerHTML = '<tr><td colspan="4" class="admin-empty">Loading reports...</td></tr>';
         try {
-            renderReports(await request('/admin/reports'));
+            renderReports(await request('/reports'));
+            renderAppeals(await request('/appeals'));
             await updateStats();
         } catch (error) { showError(error); }
     };
@@ -163,28 +183,73 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             if (deleteButton) {
                 deleteButton.disabled = true;
-                await request(`/admin/posts/${encodeURIComponent(deleteButton.dataset.postId)}`, { method: 'DELETE' });
+                await request(`/posts/${encodeURIComponent(deleteButton.dataset.postId)}`, { method: 'DELETE' });
                 removeRow(row);
             } else if (dismissButton) {
                 dismissButton.disabled = true;
-                await Promise.all(dismissButton.dataset.reportIds.split(',').map(id => request(`/admin/reports/${id}/dismiss`, { method: 'PATCH' })));
+                await Promise.all(dismissButton.dataset.reportIds.split(',').map(id => request(`/reports/${id}/dismiss`, { method: 'PATCH' })));
                 removeRow(row);
             } else if (banButton) {
                 banButton.disabled = true;
-                await request(`/admin/users/${banButton.dataset.userId}/ban`, { method: 'POST' });
-                await loadDashboard();
+                const result = await request(`/users/${banButton.dataset.userId}/toggle_ban`, { method: 'POST' });
+                banButton.textContent = result.user.is_banned ? 'Unban' : 'Ban User';
             } else return;
             await updateStats();
+        } catch (error) { showError(error); }
+    });
+    let searchTimer;
+    let searchRequestId = 0;
+    userSearch?.addEventListener('input', () => {
+        window.clearTimeout(searchTimer);
+        const query = userSearch.value.trim();
+        if (!query) {
+            searchRequestId += 1;
+            renderUsers([]);
+            return;
+        }
+        searchTimer = window.setTimeout(async () => {
+            const requestId = ++searchRequestId;
+            usersList.innerHTML = '<p class="admin-empty">Searching...</p>';
+            try {
+                const users = await request(`/search_users?q=${encodeURIComponent(query)}`);
+                if (requestId === searchRequestId) renderUsers(users);
+            } catch (error) {
+                if (requestId === searchRequestId) showError(error);
+            }
+        }, 300);
+    });
+    usersList?.addEventListener('click', async event => {
+        const button = event.target.closest('.ban-user-btn, .permission-btn');
+        if (!button) return;
+        const row = button.closest('[data-user-id]');
+        button.disabled = true;
+        try {
+            if (button.classList.contains('ban-user-btn')) {
+                const result = await request(`/users/${row.dataset.userId}/toggle_ban`, { method: 'POST' });
+                row.querySelector('.admin-user-status').textContent = result.user.is_banned ? 'Banned' : 'Active';
+                button.textContent = result.user.is_banned ? 'Unban' : 'Ban';
+            } else {
+                const isAdmin = button.dataset.role === 'admin';
+                const result = await request(`/users/${row.dataset.userId}/${isAdmin ? 'demote' : 'promote'}`, { method: 'POST' });
+                const nextRole = result.user.role || 'user';
+                row.querySelector('.admin-user-role').textContent = nextRole;
+                button.dataset.role = nextRole;
+                button.textContent = nextRole === 'admin' ? 'Demote to User' : 'Promote to Admin';
+            }
+        } catch (error) { showError(error); button.disabled = false; }
+    });
+    appealsList?.addEventListener('click', async event => {
+        const button = event.target.closest('.appeal-approve-btn, .appeal-reject-btn');
+        if (!button) return;
+        const row = button.closest('[data-appeal-id]');
+        try {
+            await request(`/appeals/${row.dataset.appealId}/${button.classList.contains('appeal-approve-btn') ? 'approve' : 'reject'}`, { method: 'PATCH' });
+            row.remove();
         } catch (error) { showError(error); }
     });
 
     document.getElementById('close-admin-post-preview')?.addEventListener('click', closePreview);
     previewModal?.addEventListener('click', event => { if (event.target === previewModal) closePreview(); });
     document.getElementById('admin-refresh')?.addEventListener('click', loadDashboard);
-    document.getElementById('admin-logout')?.addEventListener('click', () => {
-        localStorage.removeItem('aero_token');
-        localStorage.removeItem('aero_user');
-        window.location.href = 'index.html';
-    });
     await loadDashboard();
 });
