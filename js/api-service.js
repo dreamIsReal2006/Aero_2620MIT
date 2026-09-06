@@ -714,6 +714,18 @@ function setupNotificationDrawer() {
 
 let activeChatUser = null;
 let chatPollTimer = null;
+let unreadChatPollTimer = null;
+
+async function loadUnreadChatCount() {
+    const badge = document.getElementById('chat-unread-badge');
+    if (!badge || !localStorage.getItem('aero_token')) return;
+    const response = await fetch(`${API_BASE}/chat/unread-count`, { headers: { 'Authorization': `******'aero_token')}` } });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.message || 'Unable to load unread message count');
+    const unreadCount = Number(payload.unread_count || 0);
+    badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+    badge.classList.toggle('hidden', unreadCount === 0);
+}
 
 async function loadShortVideos() {
     const feed = document.getElementById('video-feed');
@@ -739,6 +751,12 @@ async function loadChatContacts() {
     if (!list) return;
     const response = await fetch(`${API_BASE}/chat/contacts`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
     const contacts = await response.json();
+    const unreadCount = (contacts || []).reduce((total, contact) => total + Number(contact.unread_count || 0), 0);
+    const badge = document.getElementById('chat-unread-badge');
+    if (badge) {
+        badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+        badge.classList.toggle('hidden', unreadCount === 0);
+    }
     list.innerHTML = (contacts || []).map((contact) => `<button type="button" class="chat-contact ${contact.unread_count ? 'unread' : ''}" data-user-id="${contact.id}"><span class="chat-contact-avatar">${escapeHtml((contact.username || 'U').charAt(0).toUpperCase())}</span><span><strong>@${escapeHtml(contact.username)}</strong><small>${escapeHtml(contact.latest_message || 'Start a conversation')}</small></span></button>`).join('') || '<div class="bookmarks-empty">No contacts yet.</div>';
     list.querySelectorAll('.chat-contact').forEach((item) => item.addEventListener('click', () => selectChatContact(contacts.find((contact) => String(contact.id) === item.dataset.userId))));
 }
@@ -749,6 +767,7 @@ async function selectChatContact(contact) {
     window.activeChatUser = contact;
     document.getElementById('chat-active-header').textContent = `@${contact.username}`;
     await loadChatMessages();
+    await loadChatContacts();
     window.clearInterval(chatPollTimer);
     chatPollTimer = window.setInterval(loadChatMessages, 5000);
 }
@@ -768,6 +787,11 @@ function setupMediaAndChat() {
     document.getElementById('chat-dock-btn')?.addEventListener('click', () => { window.AeroRouter?.navigate('chat'); loadChatContacts(); });
     document.getElementById('close-chat-drawer')?.addEventListener('click', () => { document.getElementById('view-chat').classList.add('hidden'); window.clearInterval(chatPollTimer); });
     document.getElementById('chat-contact-search')?.addEventListener('input', (event) => document.querySelectorAll('.chat-contact').forEach((item) => item.classList.toggle('hidden', !item.textContent.toLowerCase().includes(event.target.value.toLowerCase()))));
+    if (localStorage.getItem('aero_token')) {
+        loadChatContacts();
+        loadUnreadChatCount().catch(() => {});
+        unreadChatPollTimer = window.setInterval(() => loadUnreadChatCount().catch(() => {}), 10000);
+    }
     const getChatInput = () => document.getElementById('chat-input') || document.getElementById('chat-message-input');
     document.getElementById('chat-emoji-btn')?.addEventListener('click', () => { const input = getChatInput(); if (!input) return; input.value += ' 😊'; input.focus(); });
     const chatGifUrls = ['https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif', 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif', 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif'];

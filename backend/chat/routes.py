@@ -27,9 +27,23 @@ def get_contacts(current_user):
         ).order_by(Message.created_at.desc()).first()
         item = _user_payload(user)
         item["latest_message"] = latest.content if latest else ""
-        item["unread_count"] = 0
+        item["unread_count"] = Message.query.filter_by(
+            sender_id=user.id,
+            recipient_id=current_user.id,
+            is_read=False
+        ).count()
         payload.append(item)
     return jsonify(payload)
+
+
+@chat_bp.get("/chat/unread-count")
+@token_required
+def get_unread_count(current_user):
+    count = Message.query.filter_by(
+        recipient_id=current_user.id,
+        is_read=False
+    ).count()
+    return jsonify({"unread_count": count})
 
 
 @chat_bp.get("/notes")
@@ -47,10 +61,17 @@ def get_messages(current_user):
         user_id = int(request.args.get("contact_id", request.args.get("user_id", "0")))
     except ValueError:
         user_id = 0
-    messages = Message.query.filter(
+    conversation_filter = (
         ((Message.sender_id == current_user.id) & (Message.recipient_id == user_id)) |
         ((Message.sender_id == user_id) & (Message.recipient_id == current_user.id))
-    ).order_by(Message.created_at.asc()).limit(200).all()
+    )
+    Message.query.filter(
+        Message.sender_id == user_id,
+        Message.recipient_id == current_user.id,
+        Message.is_read.is_(False)
+    ).update({Message.is_read: True}, synchronize_session=False)
+    db.session.commit()
+    messages = Message.query.filter(conversation_filter).order_by(Message.created_at.asc()).limit(200).all()
     return jsonify([{
         "id": message.id,
         "content": message.content,
