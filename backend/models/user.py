@@ -1,5 +1,5 @@
 from backend import db
-# introducing password hashing
+
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
@@ -18,11 +18,59 @@ class User(db.Model):
         index=True
     )
 
+    display_name = db.Column(
+        db.String(80),
+        default="",
+        nullable=False
+    )
+
     email = db.Column(
         db.String(120),
         unique=True,
         nullable=False,
         index=True
+    )
+
+    bio = db.Column(
+        db.String(150),
+        default="",
+        nullable=False
+    )
+
+    avatar_url = db.Column(
+        db.String(500),
+        default="",
+        nullable=False
+    )
+
+    is_private = db.Column(
+        db.Boolean,
+        default=False,
+        nullable=False
+    )
+
+    show_online_status = db.Column(
+        db.Boolean,
+        default=True,
+        nullable=False
+    )
+
+    push_notifications = db.Column(
+        db.Boolean,
+        default=True,
+        nullable=False
+    )
+
+    notify_likes = db.Column(
+        db.Boolean,
+        default=True,
+        nullable=False
+    )
+
+    notify_comments = db.Column(
+        db.Boolean,
+        default=True,
+        nullable=False
     )
 
     password_hash = db.Column(
@@ -39,6 +87,12 @@ class User(db.Model):
     is_admin = db.Column(
         db.Boolean,
         default=False,
+        nullable=False
+    )
+
+    role = db.Column(
+        db.String(20),
+        default="user",
         nullable=False
     )
 
@@ -62,3 +116,7 @@ class User(db.Model):
             self.password_hash,
             password
         )
+
+    @property
+    def is_authenticated(self):
+        return True
