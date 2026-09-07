@@ -378,7 +378,7 @@
         document.getElementById('close-profile-edit')?.addEventListener('click', closeProfileEditor);
         document.getElementById('cancel-profile-edit')?.addEventListener('click', closeProfileEditor);
         document.getElementById('profile-edit-modal')?.addEventListener('click', (event) => {
-            if (event.target.id === 'profile-edit-modal') closeProfileEditor();
+            if (!event.target.closest('.profile-edit-modal')) closeProfileEditor();
         });
         document.getElementById('profile-edit-avatar-file')?.addEventListener('change', (event) => {
             profileEditorFile = event.target.files?.[0] || null;
@@ -388,6 +388,14 @@
             if (!profileEditorFile) setProfileEditorPreview(event.target.value, String(document.getElementById('profile-edit-display-name')?.value || 'U').charAt(0).toUpperCase());
         });
         document.addEventListener('click', (event) => {
+            const chatWindow = document.getElementById('view-chat');
+            if (chatWindow && !chatWindow.classList.contains('hidden') && !event.target.closest('#view-chat') && !event.target.closest('#chat-dock-btn')) {
+                navigate('main');
+            }
+            const profileView = document.getElementById('profile-view');
+            if (profileView && !profileView.classList.contains('hidden') && !event.target.closest('#profile-view .profile-view-shell') && !event.target.closest('#user-avatar-btn') && !event.target.closest('#profile-edit-modal')) {
+                navigate('main');
+            }
             const adminLink = event.target.closest('#admin-dashboard-link');
             if (adminLink) {
                 event.preventDefault();
