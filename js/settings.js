@@ -171,6 +171,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     const savedSettings = readSettings();
+    const languageSelect = byId("language-select");
+    const supportedLanguages = ["en", "ms", "zh"];
+    const selectedLanguage = supportedLanguages.includes(savedSettings.language) ? savedSettings.language : "en";
+    if (languageSelect) languageSelect.value = selectedLanguage;
+    languageSelect?.addEventListener("change", (event) => {
+        const language = supportedLanguages.includes(event.target.value) ? event.target.value : "en";
+        localStorage.setItem("aero_settings", JSON.stringify({ ...readSettings(), language }));
+        document.documentElement.lang = language;
+        window.dispatchEvent(new CustomEvent("aero:language-change", { detail: { language } }));
+        showToast("Language preference updated");
+    });
+    document.documentElement.lang = selectedLanguage;
+
     const themeSelect = byId("theme-select");
     const selectedTheme = window.AeroTheme?.getTheme() || savedSettings.theme || "system";
     if (themeSelect) themeSelect.value = selectedTheme;

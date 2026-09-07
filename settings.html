@@ -76,6 +76,18 @@
 
                 <button
                     class="settings-tab"
+                    data-section="languages"
+                >
+                    <svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <path d="M3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9S14.5 18.5 12 21M12 3c-2.5 2.5-3.8 5.5-3.8 9S9.5 18.5 12 21"></path>
+                    </svg>
+                    <span>Languages</span>
+                </button>
+
+
+                <button
+                    class="settings-tab"
                     data-section="notifications"
                 >
                     <svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -280,6 +292,53 @@
                                 <option value="system">
                                     System
                                 </option>
+
+                            </select>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- =====================
+                     LANGUAGES
+                ====================== -->
+
+                <div
+                    class="settings-section"
+                    id="section-languages"
+                >
+
+                    <div class="section-heading">
+
+                        <h2>Languages</h2>
+
+                        <p>Choose the language you prefer to use in Aero.</p>
+
+                    </div>
+
+
+                    <div class="settings-card">
+
+                        <div class="setting-row">
+
+                            <div>
+
+                                <h3>App Language</h3>
+
+                                <p>Your language preference will be saved to this device.</p>
+
+                            </div>
+
+
+                            <select id="language-select" aria-label="App language">
+
+                                <option value="en">English</option>
+                                <option value="ms">Bahasa Melayu</option>
+                                <option value="zh">Chinese</option>
 
                             </select>
 
