@@ -928,6 +928,82 @@ function createBookmarkItemMarkup(post) {
     `;
 }
 
+const VIEW_HISTORY_KEY = 'aero_view_history';
+const VIEW_HISTORY_LIMIT = 20;
+
+function readViewHistory() {
+    try {
+        const history = JSON.parse(localStorage.getItem(VIEW_HISTORY_KEY) || '[]');
+        return Array.isArray(history) ? history : [];
+    } catch {
+        return [];
+    }
+}
+
+function renderViewHistory() {
+    const list = document.getElementById('history-list');
+    if (!list) return;
+    const history = readViewHistory();
+    list.innerHTML = history.length ? history.map((post) => `
+        <article class="history-item bookmark-item" data-history-id="${post.id}" tabindex="0" role="button" aria-label="Open post by @${escapeHtml(post.username || 'User')}">
+            <span class="bookmark-item-avatar" aria-hidden="true">${createBookmarkAvatarMarkup(post, post.username)}</span>
+            <div class="bookmark-item-content">
+                <div class="bookmark-item-header"><span class="bookmark-item-author">@${escapeHtml(post.username || 'User')}</span><span class="bookmark-item-time">${formatRelativeTime(post.viewed_at)}</span></div>
+                <p class="bookmark-item-text">${escapeHtml(post.content || 'Viewed post')}</p>
+            </div>
+        </article>
+    `).join('') : '<div class="bookmarks-empty"><div class="bookmarks-empty-icon">◷</div><div>No viewed posts yet.</div></div>';
+    list.querySelectorAll('.history-item').forEach((item) => {
+        const openPost = async () => {
+            document.getElementById('history-drawer')?.classList.add('hidden');
+            document.getElementById('history-dock-btn')?.classList.remove('active');
+            let post = document.querySelector(`#posts-feed [data-post-id="${item.dataset.historyId}"]`);
+            if (!post) {
+                await AeroAPI.renderFeed();
+                post = document.querySelector(`#posts-feed [data-post-id="${item.dataset.historyId}"]`);
+            }
+            post?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        };
+        item.addEventListener('click', openPost);
+        item.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openPost(); }
+        });
+    });
+}
+
+function recordViewedPost(post) {
+    const entry = {
+        id: Number(post.id),
+        username: post.username || 'User',
+        avatar_url: post.avatar_url || '',
+        content: post.content || '',
+        viewed_at: new Date().toISOString()
+    };
+    const history = [entry, ...readViewHistory().filter((item) => Number(item.id) !== entry.id)].slice(0, VIEW_HISTORY_LIMIT);
+    localStorage.setItem(VIEW_HISTORY_KEY, JSON.stringify(history));
+    if (!document.getElementById('history-drawer')?.classList.contains('hidden')) renderViewHistory();
+}
+
+function setupViewHistory() {
+    const drawer = document.getElementById('history-drawer');
+    const button = document.getElementById('history-dock-btn');
+    button?.addEventListener('click', () => {
+        const opening = drawer?.classList.contains('hidden');
+        drawer?.classList.toggle('hidden', !opening);
+        button.classList.toggle('active', Boolean(opening));
+        if (opening) renderViewHistory();
+    });
+    document.getElementById('close-history-drawer')?.addEventListener('click', () => {
+        drawer?.classList.add('hidden');
+        button?.classList.remove('active');
+    });
+    document.getElementById('clear-history-btn')?.addEventListener('click', () => {
+        localStorage.removeItem(VIEW_HISTORY_KEY);
+        renderViewHistory();
+    });
+    renderViewHistory();
+}
+
 const trendingGifs = [
     { name: 'Celebrate', url: 'https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif' },
     { name: 'Happy', url: 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif' },
@@ -1484,6 +1560,9 @@ const AeroAPI = {
             const postEl = document.createElement('div');
             postEl.className = 'post-card glass-card pop-in g2-card';
             postEl.dataset.postId = String(post.id);
+            postEl.addEventListener('click', (event) => {
+                if (!event.target.closest('button, a, input, textarea, select, video, .post-dropdown-menu, .repost-menu')) recordViewedPost(post);
+            });
             const header = document.createElement('div');
             header.className = 'post-header';
             const authorIdentity = document.createElement('div');
@@ -2204,6 +2283,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSearchInteraction();
     setupSearchPage();
     setupCreatePostExperience();
+    setupViewHistory();
     setupPostScrollBehavior();
 
     // Sign in and sign up toggle

@@ -182,6 +182,7 @@
                 <div class="feed-tabs" aria-label="Feed tabs">
                     <button id="tab-for-you" type="button" class="feed-tab active">For You</button>
                     <button id="tab-following" type="button" class="feed-tab">Following</button>
+                       <button class="feed-history-btn" id="history-dock-btn" type="button" aria-label="View history" title="View history"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5l3 2M4 7v4H8"></path></svg></button>
                 </div>
                 <div class="compose-card glass-card g2-card compose-trigger" id="compose-trigger" role="button" tabindex="0" aria-label="Create a new post">
                     <div class="compose-trigger-copy"><span id="quick-post-avatar" class="compose-trigger-avatar" aria-hidden="true">U</span><span>Share what's on your mind...</span></div>
@@ -250,6 +251,15 @@
                 <button type="button" class="drawer-close-btn" id="close-bookmarks-drawer" aria-label="Close bookmarks">&times;</button>
             </div>
             <div id="bookmarks-list" class="bookmarks-list" aria-live="polite"></div>
+        </aside>
+
+        <aside id="history-drawer" class="history-drawer glass-card hidden" aria-label="View history">
+            <div class="bookmarks-drawer-header">
+                <div><span class="bookmarks-kicker">Recently viewed</span><h2>View History</h2></div>
+                <button type="button" class="drawer-close-btn" id="close-history-drawer" aria-label="Close view history">&times;</button>
+            </div>
+            <div class="history-drawer-actions"><button type="button" class="history-clear-btn" id="clear-history-btn">Clear history</button></div>
+            <div id="history-list" class="bookmarks-list" aria-live="polite"></div>
         </aside>
 
         <aside id="notifications-drawer" class="notifications-drawer glass-card aero-glass-panel hidden" aria-label="Notifications Drawer">

@@ -1921,7 +1921,8 @@ body.dark-mode .action-bar-capsule {
     fill: currentColor;
 }
 
-.bookmarks-drawer {
+.bookmarks-drawer,
+.history-drawer {
     position: fixed;
     top: 88px;
     right: 24px;
@@ -1936,6 +1937,11 @@ body.dark-mode .action-bar-capsule {
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     animation: drawerIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+.history-drawer.hidden { display: none !important; }
+.history-drawer-actions { display: flex; justify-content: flex-end; margin: -8px 2px 8px; }
+.history-clear-btn { border: 0; padding: 6px 8px; border-radius: 8px; background: transparent; color: var(--accent-primary); cursor: pointer; font: inherit; font-size: .78rem; }
+.history-clear-btn:hover { background: var(--accent-light-fill); }
 
 .notifications-drawer {
     position: fixed;
@@ -2000,6 +2006,22 @@ body.dark-mode .action-bar-capsule {
     color: var(--text-primary);
     border-color: var(--accent-primary);
 }
+.feed-history-btn {
+    width: 32px;
+    height: 32px;
+    margin-left: auto;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.feed-history-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.feed-history-btn:hover { background: var(--accent-light-fill); color: var(--accent-primary); }
+.feed-history-btn.active { background: var(--accent-light-fill); color: var(--accent-primary); }
 .dock-btn:active { transform: scale(.95); }
 .dock-btn.active { animation: dockActivePulse .3s ease both; box-shadow: 0 0 0 5px var(--accent-light-fill); }
 @keyframes dockActivePulse { from { transform: scale(.95); } to { transform: scale(1.05); } }
