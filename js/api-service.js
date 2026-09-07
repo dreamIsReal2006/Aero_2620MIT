@@ -715,6 +715,67 @@ function setupNotificationDrawer() {
 let activeChatUser = null;
 let chatPollTimer = null;
 let unreadChatPollTimer = null;
+let unreadChatCount = null;
+let unreadMessageAudioContext = null;
+let unreadMessageSoundPending = false;
+
+function getUnreadMessageAudioContext() {
+    if (unreadMessageAudioContext) return unreadMessageAudioContext;
+    const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextConstructor) return null;
+    unreadMessageAudioContext = new AudioContextConstructor();
+    return unreadMessageAudioContext;
+}
+
+function playUnreadMessageSound() {
+    const audioContext = getUnreadMessageAudioContext();
+    if (!audioContext || audioContext.state !== 'running') {
+        unreadMessageSoundPending = true;
+        return;
+    }
+
+    const tones = [
+        { frequency: 1046.5, start: 0, duration: 0.12 },
+        { frequency: 1318.5, start: 0.14, duration: 0.12 },
+        { frequency: 1568, start: 0.28, duration: 0.18 }
+    ];
+    const now = audioContext.currentTime;
+    tones.forEach(({ frequency, start, duration }) => {
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.value = frequency;
+        gain.gain.setValueAtTime(0.0001, now + start);
+        gain.gain.exponentialRampToValueAtTime(0.16, now + start + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + start + duration);
+        oscillator.connect(gain);
+        gain.connect(audioContext.destination);
+        oscillator.start(now + start);
+        oscillator.stop(now + start + duration);
+    });
+}
+
+function setupUnreadMessageSoundUnlock() {
+    const unlock = () => {
+        const audioContext = getUnreadMessageAudioContext();
+        if (!audioContext) return;
+        if (audioContext.state === 'running') {
+            document.removeEventListener('pointerdown', unlock);
+            document.removeEventListener('keydown', unlock);
+            return;
+        }
+        audioContext.resume().then(() => {
+            document.removeEventListener('pointerdown', unlock);
+            document.removeEventListener('keydown', unlock);
+            if (unreadMessageSoundPending) {
+                unreadMessageSoundPending = false;
+                playUnreadMessageSound();
+            }
+        }).catch(() => {});
+    };
+    document.addEventListener('pointerdown', unlock);
+    document.addEventListener('keydown', unlock);
+}
 
 async function loadUnreadChatCount() {
     const badge = document.getElementById('chat-unread-badge');
@@ -723,6 +784,10 @@ async function loadUnreadChatCount() {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.message || 'Unable to load unread message count');
     const unreadCount = Number(payload.unread_count || 0);
+    if (unreadChatCount !== null && unreadCount > unreadChatCount) {
+        playUnreadMessageSound();
+    }
+    unreadChatCount = unreadCount;
     badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
     badge.classList.toggle('hidden', unreadCount === 0);
 }
@@ -784,6 +849,7 @@ async function loadChatMessages() {
 }
 
 function setupMediaAndChat() {
+    setupUnreadMessageSoundUnlock();
     document.getElementById('chat-dock-btn')?.addEventListener('click', () => { window.AeroRouter?.navigate('chat'); loadChatContacts(); });
     document.getElementById('close-chat-drawer')?.addEventListener('click', () => { document.getElementById('view-chat').classList.add('hidden'); window.clearInterval(chatPollTimer); });
     document.getElementById('chat-contact-search')?.addEventListener('input', (event) => document.querySelectorAll('.chat-contact').forEach((item) => item.classList.toggle('hidden', !item.textContent.toLowerCase().includes(event.target.value.toLowerCase()))));
