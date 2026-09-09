@@ -1488,12 +1488,16 @@ const AeroAPI = {
             postEl.setAttribute('role', 'button');
             postEl.setAttribute('aria-label', `Open post by @${post.username || 'User'}`);
             postEl.addEventListener('click', (event) => {
-                if (!event.target.closest('button, a, input, textarea, select, video, .post-dropdown-menu, .repost-menu')) window.ViewHistory?.recordViewedPost(post);
+                if (!event.target.closest('button, a, input, textarea, select, video, .post-dropdown-menu, .repost-menu')) {
+                    window.ViewHistory?.recordViewedPost(post);
+                    window.ViewHistory?.showOnlyPost(post.id);
+                }
             });
             postEl.addEventListener('keydown', (event) => {
                 if ((event.key === 'Enter' || event.key === ' ') && event.target === postEl) {
                     event.preventDefault();
                     window.ViewHistory?.recordViewedPost(post);
+                    window.ViewHistory?.showOnlyPost(post.id);
                 }
             });
             const header = document.createElement('div');

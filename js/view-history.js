@@ -46,16 +46,51 @@
         document.getElementById('history-dock-btn')?.classList.toggle('active', isOpen);
     }
 
+    function showOnlyPost(postId) {
+        const feed = document.getElementById('posts-feed');
+        const target = feed?.querySelector(`[data-post-id="${CSS.escape(String(postId))}"]`);
+        const main = document.getElementById('view-main');
+        if (!feed || !target || !main) return;
+
+        feed.querySelectorAll('[data-post-id]').forEach((post) => post.classList.toggle('hidden', post !== target));
+        main.querySelector('.compose-trigger')?.classList.add('hidden');
+        main.classList.add('is-post-focused');
+        let backButton = document.getElementById('back-to-feed-btn');
+        if (!backButton) {
+            backButton = document.createElement('button');
+            backButton.id = 'back-to-feed-btn';
+            backButton.type = 'button';
+            backButton.className = 'back-to-feed-btn';
+            backButton.textContent = 'Back to feed';
+            backButton.addEventListener('click', restoreFeed);
+            feed.before(backButton);
+        }
+        backButton.classList.remove('hidden');
+    }
+
+    function restoreFeed() {
+        const feed = document.getElementById('posts-feed');
+        const main = document.getElementById('view-main');
+        feed?.querySelectorAll('[data-post-id]').forEach((post) => post.classList.remove('hidden'));
+        main?.querySelector('.compose-trigger')?.classList.remove('hidden');
+        main?.classList.remove('is-post-focused');
+        document.getElementById('back-to-feed-btn')?.classList.add('hidden');
+    }
+
     function openHistoryPost(postId) {
         setDrawerOpen(false);
         window.AeroRouter?.navigate('main');
         const findPost = () => document.querySelector(`#posts-feed [data-post-id="${CSS.escape(String(postId))}"]`);
         const scrollToPost = () => findPost()?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         if (findPost()) {
+            showOnlyPost(postId);
             scrollToPost();
             return;
         }
-        window.AeroAPI?.renderFeed?.().then(scrollToPost).catch(() => {});
+        window.AeroAPI?.renderFeed?.().then(() => {
+            showOnlyPost(postId);
+            scrollToPost();
+        }).catch(() => {});
     }
 
     function render() {
@@ -114,6 +149,6 @@
         render();
     }
 
-    window.ViewHistory = { recordViewedPost };
+    window.ViewHistory = { recordViewedPost, showOnlyPost, restoreFeed };
     document.addEventListener('DOMContentLoaded', setup);
 })();

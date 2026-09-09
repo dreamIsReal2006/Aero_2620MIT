@@ -2337,6 +2337,22 @@ html.dark-mode .shorts-empty-upload, body.dark-mode .shorts-empty-upload { borde
     outline-offset: 3px;
 }
 
+.back-to-feed-btn {
+    border: 0;
+    padding: 8px 0;
+    margin: 0 0 12px;
+    background: transparent;
+    color: var(--accent-primary);
+    cursor: pointer;
+    font: inherit;
+    font-size: .84rem;
+    font-weight: 700;
+}
+
+.back-to-feed-btn::before { content: '< '; }
+.back-to-feed-btn.hidden { display: none; }
+.back-to-feed-btn:hover { color: var(--text-primary); }
+
 .bookmark-item-header {
     display: flex;
     align-items: center;
