@@ -109,6 +109,17 @@
                     <span>Security</span>
                 </button>
 
+                <button
+                    class="settings-tab"
+                    data-section="screen-time"
+                >
+                    <svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="8.5"></circle>
+                        <path d="M12 7v5l3 2"></path>
+                    </svg>
+                    <span>Screen Time</span>
+                </button>
+
             </aside>
 
 
@@ -577,6 +588,37 @@
 
                 </div>
 
+                <div
+                    class="settings-section"
+                    id="section-screen-time"
+                >
+                    <div class="section-heading">
+                        <h2>Screen Time</h2>
+                        <p>See how much time you spend actively using Aero.</p>
+                    </div>
+
+                    <div class="settings-card screen-time-card">
+                        <div class="screen-time-summary">
+                            <div>
+                                <span class="screen-time-label">Today</span>
+                                <strong id="screen-time-today">0m</strong>
+                            </div>
+                            <div class="screen-time-average">
+                                <span class="screen-time-label">Daily average</span>
+                                <strong id="screen-time-average">0m</strong>
+                                <small>last 7 days</small>
+                            </div>
+                        </div>
+
+                        <div class="screen-time-chart-wrap">
+                            <div class="screen-time-chart" id="screen-time-chart" aria-label="Screen time for the last seven days"></div>
+                        </div>
+                        <div class="screen-time-days" id="screen-time-days"></div>
+                        <p class="screen-time-note">Only time while Aero is open and visible is counted.</p>
+                        <button class="secondary-button" id="reset-screen-time" type="button">Reset Screen Time</button>
+                    </div>
+                </div>
+
             </section>
 
         </div>
@@ -792,6 +834,7 @@
     </div>
 
 
+    <script src="js/screen-time.js"></script>
     <script src="js/settings.js"></script>
 
 </body>

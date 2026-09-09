@@ -305,6 +305,42 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     byId("back-button")?.addEventListener("click", () => { window.location.href = "index.html"; });
+
+    function renderScreenTime() {
+        const chart = byId("screen-time-chart");
+        const daysElement = byId("screen-time-days");
+        if (!chart || !daysElement || !window.AeroScreenTime) return;
+
+        const now = new Date();
+        const days = Array.from({ length: 7 }, (_, index) => {
+            const date = new Date(now);
+            date.setHours(0, 0, 0, 0);
+            date.setDate(now.getDate() - (6 - index));
+            return { date, key: window.AeroScreenTime.dayKey(date), milliseconds: 0 };
+        });
+        const usage = window.AeroScreenTime.getUsage();
+        days.forEach((day) => { day.milliseconds = Number(usage[day.key]) || 0; });
+
+        const maxMilliseconds = Math.max(...days.map((day) => day.milliseconds), 3600000);
+        const today = days[days.length - 1].milliseconds;
+        const average = days.reduce((total, day) => total + day.milliseconds, 0) / days.length;
+        byId("screen-time-today").textContent = window.AeroScreenTime.formatDuration(today);
+        byId("screen-time-average").textContent = window.AeroScreenTime.formatDuration(average);
+        chart.innerHTML = days.map((day) => {
+            const height = day.milliseconds ? Math.max(7, (day.milliseconds / maxMilliseconds) * 100) : 4;
+            return `<span class="screen-time-bar${day.key === days[days.length - 1].key ? " is-today" : ""}" style="height: ${height}%" title="${window.AeroScreenTime.formatDuration(day.milliseconds)}"></span>`;
+        }).join("");
+        daysElement.innerHTML = days.map((day) => `<span>${day.date.toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2)}</span>`).join("");
+    }
+
+    byId("reset-screen-time")?.addEventListener("click", () => {
+        window.AeroScreenTime?.reset();
+        renderScreenTime();
+        showToast("Screen time reset");
+    });
+    renderScreenTime();
+    window.setInterval(renderScreenTime, 15000);
+
     document.querySelectorAll(".modal-overlay").forEach((modal) => modal.addEventListener("click", (event) => {
         if (event.target === modal) closeModal(modal);
     }));
