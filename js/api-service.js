@@ -1484,8 +1484,17 @@ const AeroAPI = {
             const postEl = document.createElement('div');
             postEl.className = 'post-card glass-card pop-in g2-card';
             postEl.dataset.postId = String(post.id);
+            postEl.tabIndex = 0;
+            postEl.setAttribute('role', 'button');
+            postEl.setAttribute('aria-label', `Open post by @${post.username || 'User'}`);
             postEl.addEventListener('click', (event) => {
                 if (!event.target.closest('button, a, input, textarea, select, video, .post-dropdown-menu, .repost-menu')) window.ViewHistory?.recordViewedPost(post);
+            });
+            postEl.addEventListener('keydown', (event) => {
+                if ((event.key === 'Enter' || event.key === ' ') && event.target === postEl) {
+                    event.preventDefault();
+                    window.ViewHistory?.recordViewedPost(post);
+                }
             });
             const header = document.createElement('div');
             header.className = 'post-header';
@@ -1907,15 +1916,6 @@ const AeroAPI = {
                 if (!isHidden) await loadComments();
             });
             feedContainer.appendChild(postEl);
-            if ('IntersectionObserver' in window) {
-                const historyObserver = new IntersectionObserver((entries, observer) => {
-                    if (entries.some((entry) => entry.isIntersecting)) {
-                        window.ViewHistory?.recordViewedPost(post);
-                        observer.disconnect();
-                    }
-                }, { threshold: 0.5 });
-                historyObserver.observe(postEl);
-            }
         });
     },
 

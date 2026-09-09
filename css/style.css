@@ -1762,6 +1762,7 @@ body.dark-mode .fab-new-post .fab-plus {
 .post-card {
     padding: 20px;
     margin-bottom: 20px;
+    cursor: pointer;
 }
 
 .post-header {
@@ -2329,6 +2330,11 @@ html.dark-mode .shorts-empty-upload, body.dark-mode .shorts-empty-upload { borde
     background: rgba(0, 0, 0, 0.04);
     color: var(--text-primary);
     cursor: pointer;
+}
+
+.post-card:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 3px;
 }
 
 .bookmark-item-header {
