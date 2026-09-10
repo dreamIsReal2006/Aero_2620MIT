@@ -127,6 +127,12 @@ def create_app():
                 db.session.execute(text("ALTER TABLE posts ADD COLUMN parent_id INTEGER"))
             if "type" not in post_columns:
                 db.session.execute(text("ALTER TABLE posts ADD COLUMN type VARCHAR(12) NOT NULL DEFAULT 'original'"))
+            message_columns = {
+                column[1]
+                for column in db.session.execute(text("PRAGMA table_info(messages)"))
+            }
+            if "is_read" not in message_columns:
+                db.session.execute(text("ALTER TABLE messages ADD COLUMN is_read BOOLEAN NOT NULL DEFAULT 0"))
             columns = {
                 column[1]
                 for column in db.session.execute(text("PRAGMA table_info(users)"))
@@ -170,6 +176,10 @@ def create_app():
             if "show_online_status" not in columns:
                 db.session.execute(text(
                     "ALTER TABLE users ADD COLUMN show_online_status BOOLEAN NOT NULL DEFAULT 1"
+                ))
+            if "last_seen_at" not in columns:
+                db.session.execute(text(
+                    "ALTER TABLE users ADD COLUMN last_seen_at DATETIME"
                 ))
             for column_name in ("push_notifications", "notify_likes", "notify_comments"):
                 if column_name not in columns:

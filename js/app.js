@@ -232,7 +232,7 @@
                             <span><strong>${followText(payload.following_count)}</strong> Following</span>
                         </div>
                     </div>
-                    <div class="profile-avatar-wrap">
+                    <div class="profile-avatar-wrap ${user.is_online ? 'is-online' : ''}">
                         ${avatar ? `<img class="profile-avatar" src="${avatar}" alt="${(user.username || 'User').replace(/"/g, '&quot;')}" />` : `<span class="profile-avatar profile-avatar-empty">${avatarValue.letter || initials}</span>`}
                     </div>
                 </div>
@@ -272,7 +272,7 @@
                 header.querySelector('.profile-message-btn')?.addEventListener('click', () => {
                     window.switchView('chat');
                     window.loadChatContacts?.();
-                    window.selectChatContact?.({ id: profileUserId, username: user.username, avatar_url: user.avatar_url });
+                    window.selectChatContact?.({ id: profileUserId, username: user.username, avatar_url: user.avatar_url, is_online: user.is_online });
                 });
             }
 
@@ -280,9 +280,9 @@
                 <article class="post-card glass-card pop-in g2-card">
                     <div class="post-header">
                         <div class="post-author-identity">
-                            <img class="post-avatar" src="${avatar}" alt="@${(user.username || 'User').replace(/"/g, '&quot;')}" />
+                            <span class="post-avatar ${user.is_online ? 'is-online' : ''}"><img src="${avatar}" alt="@${(user.username || 'User').replace(/"/g, '&quot;')}" /></span>
                             <span class="post-author">@${user.username || 'user'}</span>
-                            <time class="post-relative-time">${new Date(post.created_at || Date.now()).toLocaleDateString()}</time>
+                            <time class="post-relative-time">${window.AeroFormatRelativeTime?.(post.created_at) || new Date(post.created_at || Date.now()).toLocaleDateString()}</time>
                         </div>
                     </div>
                     <div class="post-content">${(post.content || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]))}</div>
@@ -327,7 +327,7 @@
             container.innerHTML = items.map((item) => {
                 const content = contentType === 'replies' ? item.content : item.content;
                 const summary = contentType === 'replies' ? `<small class="profile-content-context">On @${escape(item.post?.username)}: ${escape(item.post?.content)}</small>` : '';
-                return `<article class="post-card glass-card pop-in g2-card"><div class="post-header"><div class="post-author-identity"><img class="post-avatar" src="${escape(avatar)}" alt="@${escape(user.username)}"><span class="post-author">@${escape(user.username)}</span><time class="post-relative-time">${new Date(item.created_at || Date.now()).toLocaleDateString()}</time></div></div><div class="post-content">${escape(content)}</div>${summary}</article>`;
+                return `<article class="post-card glass-card pop-in g2-card"><div class="post-header"><div class="post-author-identity"><span class="post-avatar ${user.is_online ? 'is-online' : ''}"><img src="${escape(avatar)}" alt="@${escape(user.username)}"></span><span class="post-author">@${escape(user.username)}</span><time class="post-relative-time">${window.AeroFormatRelativeTime?.(item.created_at) || new Date(item.created_at || Date.now()).toLocaleDateString()}</time></div></div><div class="post-content">${escape(content)}</div>${summary}</article>`;
             }).join('');
         } catch (error) {
             container.innerHTML = `<div class="post-card glass-card text-center"><p>${error.message}</p></div>`;

@@ -906,6 +906,96 @@ body.dark-mode select#theme-select option {
 
 .revoke-session { flex-shrink: 0; }
 
+.screen-time-card {
+    padding: 22px 25px 20px;
+}
+
+.screen-time-summary {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--border);
+}
+
+.screen-time-summary > div {
+    display: grid;
+    gap: 5px;
+}
+
+.screen-time-label {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.screen-time-summary strong {
+    font-size: 30px;
+}
+
+.screen-time-average {
+    text-align: right;
+}
+
+.screen-time-average strong {
+    font-size: 18px;
+}
+
+.screen-time-average small {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.screen-time-chart-wrap {
+    height: 155px;
+    display: flex;
+    align-items: flex-end;
+    padding: 24px 8px 0;
+}
+
+.screen-time-chart {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    gap: 12px;
+}
+
+.screen-time-bar {
+    width: min(34px, 12%);
+    min-height: 4px;
+    border-radius: 8px 8px 3px 3px;
+    background: var(--hover);
+    border: 1px solid var(--border);
+    transition: height 0.25s ease, background 0.2s ease;
+}
+
+.screen-time-bar.is-today {
+    background: var(--primary);
+    border-color: transparent;
+}
+
+.screen-time-days {
+    display: flex;
+    justify-content: space-around;
+    gap: 12px;
+    padding: 9px 8px 0;
+    color: var(--muted);
+    font-size: 11px;
+    text-align: center;
+}
+
+.screen-time-days span {
+    width: min(34px, 12%);
+}
+
+.screen-time-note {
+    margin: 22px 0 15px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
 
 /* =================================
    RESPONSIVE

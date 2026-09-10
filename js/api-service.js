@@ -37,21 +37,26 @@ function formatRelativeTime(timestamp) {
         ? `${timestamp}Z`
         : timestamp;
     const elapsedSeconds = Math.max(0, (Date.now() - new Date(normalizedTimestamp).getTime()) / 1000);
-    if (elapsedSeconds < 60) return '刚刚';
+    const isChinese = window.AeroI18n?.getLanguage?.() === 'zh';
+    if (elapsedSeconds < 60) return isChinese ? '刚刚' : 'just now';
     const minutes = Math.floor(elapsedSeconds / 60);
-    if (minutes < 60) return `${minutes}分钟`;
+    if (minutes < 60) return isChinese ? `${minutes}分钟` : `${minutes}m ago`;
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}小时`;
+    if (hours < 24) return isChinese ? `${hours}小时` : `${hours}h ago`;
     const days = Math.floor(hours / 24);
-    if (days < 30) return `${days}天`;
+    if (days < 30) return isChinese ? `${days}天` : `${days}d ago`;
     const months = Math.floor(days / 30);
-    if (months < 12) return `${months}个月`;
-    return `${Math.floor(months / 12)}年`;
+    if (months < 12) return isChinese ? `${months}个月` : `${months}mo ago`;
+    const years = Math.floor(months / 12);
+    return isChinese ? `${years}年` : `${years}y ago`;
 }
 
-function createAvatarElement(username, avatarUrl, className = 'post-avatar') {
+window.AeroFormatRelativeTime = formatRelativeTime;
+
+function createAvatarElement(username, avatarUrl, className = 'post-avatar', isOnline = false) {
     const avatar = document.createElement('span');
     avatar.className = className;
+    avatar.classList.toggle('is-online', Boolean(isOnline));
     avatar.setAttribute('aria-hidden', 'true');
     const name = String(username || 'User');
     if (!avatarUrl || String(avatarUrl).startsWith('letter:')) {
@@ -86,6 +91,23 @@ function syncCurrentUserAvatars(user = {}) {
         const nextAvatar = createAvatarElement(user.username, user.avatar_url, className);
         nextAvatar.id = id;
         currentAvatar.replaceWith(nextAvatar);
+    });
+}
+
+async function updatePresence() {
+    if (!localStorage.getItem('aero_token')) return;
+    await fetch(`${API_BASE}/users/me/presence`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+    }).catch(() => {});
+}
+
+function setupPresenceHeartbeat() {
+    updatePresence();
+    window.setInterval(updatePresence, 30000);
+    window.addEventListener('focus', updatePresence);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') updatePresence();
     });
 }
 
@@ -228,7 +250,7 @@ function renderSearchPageResults(payload = { users: [], posts: [] }, tab = 'all'
         const content = item.content || 'Untitled post';
         const author = item.username || 'Unknown author';
         return `
-            <article class="search-page-card search-post-card" data-navigate="/post/${encodeURIComponent(item.id || '')}" tabindex="0" role="button" aria-label="Open post by ${escapeHtml(author)}">
+            <article class="search-page-card search-post-card" data-post-id="${item.id || ''}" tabindex="0" role="button" aria-label="Open post by ${escapeHtml(author)}">
                 <div class="search-page-copy">
                     <div class="search-page-title">${highlightMatch(content, query)}</div>
                     <div class="search-page-meta">by ${highlightMatch(author, query)}</div>
@@ -240,8 +262,12 @@ function renderSearchPageResults(payload = { users: [], posts: [] }, tab = 'all'
 
     feed.innerHTML = itemMarkup;
 
-    feed.querySelectorAll('[data-navigate]').forEach((card) => {
+    feed.querySelectorAll('[data-navigate], [data-post-id]').forEach((card) => {
         const go = () => {
+            if (card.dataset.postId) {
+                openSearchPost(Number(card.dataset.postId));
+                return;
+            }
             const target = card.getAttribute('data-navigate');
             if (target) window.location.href = target;
         };
@@ -443,7 +469,27 @@ function triggerSearchItemNavigation(item) {
     }
 
     if (type === 'post' && postId) {
-        window.location.href = `/post/${encodeURIComponent(postId)}`;
+        openSearchPost(Number(postId));
+    }
+}
+
+async function openSearchPost(postId) {
+    if (!Number.isInteger(postId) || postId <= 0) return;
+    closeSearchPanel();
+    setSearchPageVisibility(false);
+    window.AeroRouter?.navigate('main');
+    let postElement = document.querySelector(`#posts-feed [data-post-id="${postId}"]`);
+    if (!postElement) {
+        await AeroAPI.renderFeed();
+        postElement = document.querySelector(`#posts-feed [data-post-id="${postId}"]`);
+    }
+    if (postElement) {
+        window.ViewHistory?.showOnlyPost(postId);
+        postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        postElement.classList.add('bookmark-focus');
+        window.setTimeout(() => postElement.classList.remove('bookmark-focus'), 1200);
+    } else {
+        showNotice('This post is no longer available.', 'info');
     }
 }
 
@@ -650,6 +696,46 @@ function setBookmarkDrawerVisibility(isOpen) {
 
 let notificationItems = [];
 let notificationTab = 'all';
+let notificationUnreadCount = null;
+let chatUnreadCount = null;
+let chatContactsPollTimer = null;
+const chatMessageSnapshots = new Map();
+const notificationSound = new Audio(`${API_ORIGIN}/notification.mp3`);
+notificationSound.preload = 'auto';
+let notificationSoundUnlocked = false;
+let notificationSoundPending = false;
+
+function playNotificationSound() {
+    if (!notificationSoundUnlocked) {
+        notificationSoundPending = true;
+        return;
+    }
+    notificationSound.currentTime = 0;
+    notificationSound.play().catch(() => {});
+}
+
+function setupNotificationSoundUnlock() {
+    const unlock = () => {
+        notificationSoundUnlocked = true;
+        notificationSound.load();
+        document.removeEventListener('pointerdown', unlock);
+        document.removeEventListener('keydown', unlock);
+        if (notificationSoundPending) {
+            notificationSoundPending = false;
+            playNotificationSound();
+        }
+    };
+    document.addEventListener('pointerdown', unlock, { once: true });
+    document.addEventListener('keydown', unlock, { once: true });
+}
+
+function updateDockBadge(buttonId, count) {
+    const badge = document.querySelector(`#${buttonId} .dock-badge`);
+    if (!badge) return;
+    const unreadCount = Number(count) || 0;
+    badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+    badge.classList.toggle('hidden', unreadCount < 1);
+}
 
 function setNotificationDrawerVisibility(isOpen) {
     const drawer = document.getElementById('notifications-drawer');
@@ -683,11 +769,15 @@ async function loadNotifications(markRead = true) {
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || 'Unable to load notifications');
         notificationItems = data.notifications || [];
-        const badge = document.querySelector('#notification-dock-btn .dock-badge');
-        badge?.classList.toggle('hidden', !(data.unread_count > 0));
+        const unreadCount = Number(data.unread_count) || 0;
+        if (!markRead && notificationUnreadCount !== null && unreadCount > notificationUnreadCount) playNotificationSound();
+        notificationUnreadCount = unreadCount;
+        updateDockBadge('notification-dock-btn', unreadCount);
         renderNotifications();
         if (markRead) {
             await fetch(`${API_BASE}/notifications/read-all`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+            notificationUnreadCount = 0;
+            updateDockBadge('notification-dock-btn', 0);
         }
     } catch (error) {
         const list = document.getElementById('notifications-list');
@@ -696,6 +786,7 @@ async function loadNotifications(markRead = true) {
 }
 
 function setupNotificationDrawer() {
+    setupNotificationSoundUnlock();
     const button = document.getElementById('notification-dock-btn');
     button?.addEventListener('click', () => {
         const drawer = document.getElementById('notifications-drawer');
@@ -709,7 +800,10 @@ function setupNotificationDrawer() {
         document.querySelectorAll('.notification-tab').forEach((item) => item.classList.toggle('active', item === tab));
         renderNotifications();
     }));
-    if (localStorage.getItem('aero_token')) loadNotifications(false);
+    if (localStorage.getItem('aero_token')) {
+        loadNotifications(false);
+        window.setInterval(() => loadNotifications(false), 5000);
+    }
 }
 
 let activeChatUser = null;
@@ -739,16 +833,60 @@ async function loadChatContacts() {
     if (!list) return;
     const response = await fetch(`${API_BASE}/chat/contacts`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
     const contacts = await response.json();
-    list.innerHTML = (contacts || []).map((contact) => `<button type="button" class="chat-contact ${contact.unread_count ? 'unread' : ''}" data-user-id="${contact.id}"><span class="chat-contact-avatar">${escapeHtml((contact.username || 'U').charAt(0).toUpperCase())}</span><span><strong>@${escapeHtml(contact.username)}</strong><small>${escapeHtml(contact.latest_message || 'Start a conversation')}</small></span></button>`).join('') || '<div class="bookmarks-empty">No contacts yet.</div>';
+    list.innerHTML = (contacts || []).map((contact) => {
+        const avatarUrl = contact.avatar_url && !String(contact.avatar_url).startsWith('letter:')
+            ? (String(contact.avatar_url).startsWith('http') ? contact.avatar_url : `${API_ORIGIN}${contact.avatar_url}`)
+            : '';
+        const avatarText = String(contact.avatar_url || '').startsWith('letter:')
+            ? String(contact.avatar_url).slice(7, 8).toUpperCase()
+            : (contact.username || 'U').charAt(0).toUpperCase();
+        const avatar = avatarUrl
+            ? `<img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy" onerror="this.remove()">`
+            : escapeHtml(avatarText || 'U');
+        return `<button type="button" class="chat-contact ${contact.unread_count ? 'unread' : ''}" data-user-id="${contact.id}"><span class="chat-contact-avatar ${contact.is_online ? 'is-online' : ''}">${avatar}</span><span><strong>@${escapeHtml(contact.username)}</strong><small>${escapeHtml(contact.latest_message || 'Start a conversation')}</small></span></button>`;
+    }).join('') || '<div class="bookmarks-empty">No contacts yet.</div>';
     list.querySelectorAll('.chat-contact').forEach((item) => item.addEventListener('click', () => selectChatContact(contacts.find((contact) => String(contact.id) === item.dataset.userId))));
+}
+
+async function loadUnreadChatCount() {
+    if (!localStorage.getItem('aero_token')) return;
+    const response = await fetch(`${API_BASE}/chat/unread-count`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Unable to load unread messages');
+    const unreadCount = Number(data.unread_count) || 0;
+    if (chatUnreadCount !== null && unreadCount > chatUnreadCount) playNotificationSound();
+    chatUnreadCount = unreadCount;
+    updateDockBadge('chat-dock-btn', unreadCount);
 }
 
 async function selectChatContact(contact) {
     if (!contact) return;
     activeChatUser = contact;
     window.activeChatUser = contact;
-    document.getElementById('chat-active-header').textContent = `@${contact.username}`;
+    const activeAvatar = document.getElementById('chat-active-avatar');
+    const activeName = document.getElementById('chat-active-name');
+    if (activeName) activeName.textContent = `@${contact.username}`;
+    if (activeAvatar) {
+        activeAvatar.classList.toggle('is-online', Boolean(contact.is_online));
+        activeAvatar.replaceChildren();
+        const avatarUrl = contact.avatar_url && !String(contact.avatar_url).startsWith('letter:')
+            ? (String(contact.avatar_url).startsWith('http') ? contact.avatar_url : `${API_ORIGIN}${contact.avatar_url}`)
+            : '';
+        if (avatarUrl) {
+            const image = document.createElement('img');
+            image.src = avatarUrl;
+            image.alt = `@${contact.username}`;
+            image.onerror = () => { activeAvatar.textContent = (contact.username || 'U').charAt(0).toUpperCase(); };
+            activeAvatar.appendChild(image);
+        } else {
+            activeAvatar.textContent = String(contact.avatar_url || '').startsWith('letter:')
+                ? String(contact.avatar_url).slice(7, 8).toUpperCase()
+                : (contact.username || 'U').charAt(0).toUpperCase();
+        }
+    }
     await loadChatMessages();
+    await loadChatContacts();
+    await loadUnreadChatCount();
     window.clearInterval(chatPollTimer);
     chatPollTimer = window.setInterval(loadChatMessages, 5000);
 }
@@ -759,6 +897,14 @@ async function loadChatMessages() {
     const response = await fetch(`${API_BASE}/chat/messages?contact_id=${contact.id}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
     const messages = await response.json();
     const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
+    const snapshotKey = String(contact.id);
+    const previousIds = chatMessageSnapshots.get(snapshotKey);
+    const messageIds = new Set((messages || []).map((message) => String(message.id)));
+    if (previousIds) {
+        const hasNewIncomingMessage = (messages || []).some((message) => message.sender_id !== currentUser.id && !previousIds.has(String(message.id)));
+        if (hasNewIncomingMessage) playNotificationSound();
+    }
+    chatMessageSnapshots.set(snapshotKey, messageIds);
     const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
     box.innerHTML = (messages || []).map((message) => `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}">${escapeHtml(message.content)}</div>`).join('');
     box.scrollTop = box.scrollHeight;
@@ -766,6 +912,12 @@ async function loadChatMessages() {
 
 function setupMediaAndChat() {
     document.getElementById('chat-dock-btn')?.addEventListener('click', () => { window.AeroRouter?.navigate('chat'); loadChatContacts(); });
+    if (localStorage.getItem('aero_token')) {
+        loadChatContacts();
+        loadUnreadChatCount().catch(() => {});
+        chatContactsPollTimer = window.setInterval(loadChatContacts, 5000);
+        window.setInterval(() => loadUnreadChatCount().catch(() => {}), 5000);
+    }
     document.getElementById('close-chat-drawer')?.addEventListener('click', () => { document.getElementById('view-chat').classList.add('hidden'); window.clearInterval(chatPollTimer); });
     document.getElementById('chat-contact-search')?.addEventListener('input', (event) => document.querySelectorAll('.chat-contact').forEach((item) => item.classList.toggle('hidden', !item.textContent.toLowerCase().includes(event.target.value.toLowerCase()))));
     const getChatInput = () => document.getElementById('chat-input') || document.getElementById('chat-message-input');
@@ -1409,7 +1561,7 @@ const AeroAPI = {
                     window.navigateToUserProfile?.(userId);
                 }
             });
-            profileLink.appendChild(createAvatarElement(post.username, post.avatar_url));
+            profileLink.appendChild(createAvatarElement(post.username, post.avatar_url, 'post-avatar', post.is_online));
             const author = document.createElement('span');
             author.className = 'post-author';
             author.textContent = post.username || 'User';
@@ -1909,6 +2061,10 @@ const AeroAPI = {
 
 window.AeroAPI = AeroAPI;
 window.apiService = AeroAPI;
+window.addEventListener('aero:language-change', () => {
+    const feed = document.getElementById('posts-feed');
+    if (feed && localStorage.getItem('aero_token')) AeroAPI.renderFeed().catch(() => {});
+});
 window.toggleFollowUser = async (userId, userMeta = {}) => {
     const api = window.apiService || window.api;
     if (api && typeof api.toggleFollow === 'function') return api.toggleFollow(userId, userMeta);
@@ -2109,6 +2265,7 @@ function setupPostScrollBehavior() {
 // Page event handlers
 document.addEventListener('DOMContentLoaded', () => {
     AeroAPI.initAppState();
+    setupPresenceHeartbeat();
     setupNotificationDrawer();
     setupMediaAndChat();
     setupSearchInteraction();

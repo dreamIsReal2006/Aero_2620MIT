@@ -13,6 +13,7 @@ from backend.auth.routes import token_required
 from backend.feed import feed_bp
 from backend.models import Comment, Follow, Like, Notification, Post, User, UserInteraction
 from backend.privacy import visible_author_ids as get_visible_author_ids
+from backend.presence import is_user_online
 
 ALLOWED_MEDIA_TYPES = {
     "jpg": "image/", "jpeg": "image/", "png": "image/", "webp": "image/", "gif": "image/",
@@ -43,6 +44,7 @@ def post_payload(post, current_user_id=None):
         "user_id": post.user_id,
         "username": post.author.username,
         "avatar_url": post.author.avatar_url or "",
+        "is_online": is_user_online(post.author, current_user_id),
         "content": post.content,
         "images": json.loads(post.images_json or "[]"),
         "likes_count": likes_count,

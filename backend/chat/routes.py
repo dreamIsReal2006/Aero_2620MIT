@@ -4,10 +4,11 @@ from backend import db
 from backend.auth.routes import token_required
 from backend.chat import chat_bp
 from backend.models import Follow, Message, Note, User
+from backend.presence import is_user_online
 
 
-def _user_payload(user):
-    return {"id": user.id, "username": user.username, "display_name": user.display_name or user.username, "avatar_url": user.avatar_url or ""}
+def _user_payload(user, viewer_id=None):
+    return {"id": user.id, "username": user.username, "display_name": user.display_name or user.username, "avatar_url": user.avatar_url or "", "is_online": is_user_online(user, viewer_id)}
 
 
 @chat_bp.get("/friends")
@@ -25,11 +26,22 @@ def get_contacts(current_user):
             ((Message.sender_id == current_user.id) & (Message.recipient_id == user.id)) |
             ((Message.sender_id == user.id) & (Message.recipient_id == current_user.id))
         ).order_by(Message.created_at.desc()).first()
-        item = _user_payload(user)
+        item = _user_payload(user, current_user.id)
         item["latest_message"] = latest.content if latest else ""
-        item["unread_count"] = 0
+        item["unread_count"] = Message.query.filter_by(
+            sender_id=user.id, recipient_id=current_user.id, is_read=False
+        ).count()
         payload.append(item)
     return jsonify(payload)
+
+
+@chat_bp.get("/chat/unread-count")
+@token_required
+def get_unread_count(current_user):
+    unread_count = Message.query.filter_by(
+        recipient_id=current_user.id, is_read=False
+    ).count()
+    return jsonify({"unread_count": unread_count})
 
 
 @chat_bp.get("/notes")
@@ -37,7 +49,7 @@ def get_contacts(current_user):
 def get_notes(current_user):
     followed_ids = [row.following_id for row in Follow.query.filter_by(follower_id=current_user.id, status="approved").all()]
     notes = Note.query.filter(Note.user_id.in_(followed_ids)).order_by(Note.created_at.desc()).limit(30).all() if followed_ids else []
-    return jsonify([{"id": note.id, "content": note.content, "created_at": f"{note.created_at.isoformat()}Z", "author": _user_payload(note.author)} for note in notes])
+    return jsonify([{"id": note.id, "content": note.content, "created_at": f"{note.created_at.isoformat()}Z", "author": _user_payload(note.author, current_user.id)} for note in notes])
 
 
 @chat_bp.get("/chat/messages")
@@ -51,6 +63,10 @@ def get_messages(current_user):
         ((Message.sender_id == current_user.id) & (Message.recipient_id == user_id)) |
         ((Message.sender_id == user_id) & (Message.recipient_id == current_user.id))
     ).order_by(Message.created_at.asc()).limit(200).all()
+    Message.query.filter_by(sender_id=user_id, recipient_id=current_user.id, is_read=False).update(
+        {Message.is_read: True}, synchronize_session=False
+    )
+    db.session.commit()
     return jsonify([{
         "id": message.id,
         "content": message.content,

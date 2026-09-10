@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <script src="js/theme.js"></script>
+    <script src="js/i18n.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aero - Settings</title>
     <link rel="icon" type="image/png" sizes="16x16" href="./assets/img/logo.png">
@@ -73,6 +74,17 @@
                     <span>Appearance</span>
                 </button>
 
+                <button
+                    class="settings-tab"
+                    data-section="languages"
+                >
+                    <svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <path d="M3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9S14.5 18.5 12 21M12 3c-2.5 2.5-3.8 5.5-3.8 9S9.5 18.5 12 21"></path>
+                    </svg>
+                    <span>Languages</span>
+                </button>
+
 
                 <button
                     class="settings-tab"
@@ -83,6 +95,17 @@
                         <path d="M10 21h4"></path>
                     </svg>
                     <span>Notifications</span>
+                </button>
+
+                <button
+                    class="settings-tab"
+                    data-section="screen-time"
+                >
+                    <svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="8.5"></circle>
+                        <path d="M12 7v5l3 2"></path>
+                    </svg>
+                    <span>Screen Time</span>
                 </button>
 
 
@@ -291,6 +314,30 @@
 
 
 
+                <div
+                    class="settings-section"
+                    id="section-languages"
+                >
+                    <div class="section-heading">
+                        <h2>Languages</h2>
+                        <p>Choose the language you prefer to use in Aero.</p>
+                    </div>
+                    <div class="settings-card">
+                        <div class="setting-row">
+                            <div>
+                                <h3>App Language</h3>
+                                <p>Choose between English and Chinese.</p>
+                            </div>
+                            <select data-language-select id="language-select" aria-label="App language">
+                                <option value="en">English</option>
+                                <option value="zh">中文</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+
+
                 <!-- =====================
                      NOTIFICATIONS
                 ====================== -->
@@ -429,7 +476,7 @@
 
                                 <input
                                     type="checkbox"
-                                    id="toggle-online-status"
+                                    id="toggle-private-account"
                                 >
 
                                 <span class="slider"></span>
@@ -457,7 +504,7 @@
 
                                 <input
                                     type="checkbox"
-                                    disabled
+                                    id="toggle-online-status"
                                 >
 
                                 <span class="slider"></span>
@@ -575,6 +622,36 @@
 
                     </div>
 
+                </div>
+
+                <div
+                    class="settings-section"
+                    id="section-screen-time"
+                >
+                    <div class="section-heading">
+                        <h2>Screen Time</h2>
+                        <p>See how much time you spend actively using Aero.</p>
+                    </div>
+
+                    <div class="settings-card screen-time-card">
+                        <div class="screen-time-summary">
+                            <div>
+                                <span class="screen-time-label">Today</span>
+                                <strong id="screen-time-today">0m</strong>
+                            </div>
+                            <div class="screen-time-average">
+                                <span class="screen-time-label">Daily average</span>
+                                <strong id="screen-time-average">0m</strong>
+                                <small>last 7 days</small>
+                            </div>
+                        </div>
+                        <div class="screen-time-chart-wrap">
+                            <div class="screen-time-chart" id="screen-time-chart" aria-label="Screen time for the last seven days"></div>
+                        </div>
+                        <div class="screen-time-days" id="screen-time-days"></div>
+                        <p class="screen-time-note">Only time while Aero is open and visible is counted.</p>
+                        <button class="secondary-button" id="reset-screen-time" type="button">Reset Screen Time</button>
+                    </div>
                 </div>
 
             </section>
@@ -792,6 +869,7 @@
     </div>
 
 
+    <script src="js/screen-time.js"></script>
     <script src="js/settings.js"></script>
 
 </body>

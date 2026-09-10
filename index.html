@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <script src="js/theme.js"></script>
+    <script src="js/i18n.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aero - Liquid Social Platform</title>
     <link rel="icon" type="image/png" sizes="16x16" href="./assets/img/logo.png">
@@ -175,13 +176,13 @@
             <aside class="floating-dock dock-left glass-dock aero-glass-panel">
                  <button class="dock-btn dock-item active" id="home-nav-btn" type="button" aria-label="Home" title="Home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"></path><path d="M9 21v-7h6v7"></path></svg></button>
                 <button class="dock-btn dock-item" id="video-dock-btn" aria-label="Short videos" title="Short videos"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m8 5 2-3m4 3 2-3m-8 9 4 2.5L8 14v-5Z"></path></svg></button>
-                <button class="dock-btn dock-item" id="chat-dock-btn" aria-label="Chat" title="Chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.5-.7L4 20l1.7-3.6A7.2 7.2 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z"></path></svg></button>
+                <button class="dock-btn dock-item" id="chat-dock-btn" aria-label="Chat" title="Chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.5-.7L4 20l1.7-3.6A7.2 7.2 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z"></path></svg><span class="dock-badge hidden" aria-label="Unread messages"></span></button>
             </aside>
 
             <main class="feed-container view-container" id="view-main">
                 <div class="feed-tabs" aria-label="Feed tabs">
-                    <button id="tab-for-you" type="button" class="feed-tab active">For You</button>
-                    <button id="tab-following" type="button" class="feed-tab">Following</button>
+                    <button id="tab-for-you" type="button" class="feed-tab active" data-i18n="For You">For You</button>
+                    <button id="tab-following" type="button" class="feed-tab" data-i18n="Following">Following</button>
                 </div>
                 <div class="compose-card glass-card g2-card compose-trigger" id="compose-trigger" role="button" tabindex="0" aria-label="Create a new post">
                     <div class="compose-trigger-copy"><span id="quick-post-avatar" class="compose-trigger-avatar" aria-hidden="true">U</span><span>Share what's on your mind...</span></div>
@@ -325,6 +326,7 @@
         </form>
     </div>
 
+    <script src="js/screen-time.js"></script>
     <script src="js/api-service.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/shorts.js"></script>

@@ -28,6 +28,7 @@
         if (!header || !avatarElement) return;
         if (nameElement) nameElement.textContent = `@${name}`;
         avatarElement.replaceChildren();
+        avatarElement.classList.toggle('is-online', Boolean(contact?.is_online));
         const avatarUrl = contactAvatarUrl(contact);
         const letterAvatar = String(contact?.avatar_url || contact?.avatarUrl || contact?.avatar || '').startsWith('letter:')
             ? String(contact.avatar_url || contact.avatarUrl || contact.avatar).slice(7, 8).toUpperCase()
@@ -53,7 +54,7 @@
         const avatarValue = String(contact.avatar_url || contact.avatarUrl || contact.avatar || '');
         const avatarText = avatarValue.startsWith('letter:') ? avatarValue.slice(7, 8).toUpperCase() : String(contact.username || contact.name || 'U').charAt(0).toUpperCase();
         button.innerHTML = `
-            <span class="chat-contact-avatar">${avatarUrl ? `<img src="${avatarUrl}" alt="" loading="lazy">` : avatarText}</span>
+            <span class="chat-contact-avatar ${contact.is_online ? 'is-online' : ''}">${avatarUrl ? `<img src="${avatarUrl}" alt="" loading="lazy">` : avatarText}</span>
             <span><strong>@${escapeText(contact.username || contact.name || 'User')}</strong><small>${escapeText(contact.latest_message || 'Start a conversation')}</small></span>
         `;
         button.addEventListener('click', () => {

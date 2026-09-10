@@ -32,6 +32,7 @@ class User(db.Model):
 
     is_private = db.Column(db.Boolean, default=False, nullable=False)
     show_online_status = db.Column(db.Boolean, default=True, nullable=False)
+    last_seen_at = db.Column(db.DateTime, nullable=True, index=True)
     push_notifications = db.Column(db.Boolean, default=True, nullable=False)
     notify_likes = db.Column(db.Boolean, default=True, nullable=False)
     notify_comments = db.Column(db.Boolean, default=True, nullable=False)

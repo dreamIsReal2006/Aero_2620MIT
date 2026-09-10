@@ -6,6 +6,7 @@ from flask import jsonify, request
 from backend import db
 from backend.auth.routes import token_required
 from backend.models import Comment, Follow, Notification, Post, Report, User, Video, VideoLike
+from backend.presence import is_user_online
 from backend.privacy import can_view_user_content
 from backend.social import social_bp
 
@@ -17,6 +18,14 @@ def serialize_post(post):
         "images": json.loads(post.images_json or "[]"),
         "created_at": post.created_at.isoformat(),
     }
+
+
+@social_bp.post("/users/me/presence")
+@token_required
+def update_presence(current_user):
+    current_user.last_seen_at = db.func.now()
+    db.session.commit()
+    return jsonify({"online": True}), 200
 
 
 @social_bp.post("/social/follow/<int:user_id>")
@@ -86,6 +95,7 @@ def get_profile(current_user, user_id):
             "email": user.email,
             "bio": user.bio or "",
             "avatar_url": user.avatar_url or "",
+            "is_online": is_user_online(user, current_user.id),
             "created_at": user.created_at.isoformat(),
         },
         "followers_count": followers_count,
@@ -118,6 +128,7 @@ def get_user_profile(current_user, user_id):
             "email": user.email,
             "bio": user.bio or "",
             "avatar_url": user.avatar_url or "",
+            "is_online": is_user_online(user, current_user.id),
             "created_at": user.created_at.isoformat(),
         },
         "is_following": is_following,

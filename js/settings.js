@@ -41,6 +41,21 @@ document.addEventListener("DOMContentLoaded", () => {
         return data;
     }
 
+    async function updatePresence() {
+        if (!token()) return;
+        await fetch(`${API_BASE}/users/me/presence`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${token()}` }
+        }).catch(() => {});
+    }
+
+    updatePresence();
+    window.setInterval(updatePresence, 30000);
+    window.addEventListener("focus", updatePresence);
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") updatePresence();
+    });
+
     function applyTheme(theme) {
         let actualTheme = theme;
         if (theme === "system") actualTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -54,6 +69,34 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch {
             return { theme: "light" };
         }
+    }
+
+    function renderScreenTime() {
+        const chart = byId("screen-time-chart");
+        const daysElement = byId("screen-time-days");
+        if (!chart || !daysElement || !window.AeroScreenTime) return;
+
+        const now = new Date();
+        const days = Array.from({ length: 7 }, (_, index) => {
+            const date = new Date(now);
+            date.setHours(0, 0, 0, 0);
+            date.setDate(now.getDate() - (6 - index));
+            return { date, key: window.AeroScreenTime.dayKey(date), milliseconds: 0 };
+        });
+        const usage = window.AeroScreenTime.getUsage();
+        days.forEach((day) => { day.milliseconds = Number(usage[day.key]) || 0; });
+
+        const maxMilliseconds = Math.max(...days.map((day) => day.milliseconds), 3600000);
+        const today = days[days.length - 1].milliseconds;
+        const average = days.reduce((total, day) => total + day.milliseconds, 0) / days.length;
+        byId("screen-time-today").textContent = window.AeroScreenTime.formatDuration(today);
+        byId("screen-time-average").textContent = window.AeroScreenTime.formatDuration(average);
+        chart.innerHTML = days.map((day) => {
+            const height = day.milliseconds ? Math.max(7, (day.milliseconds / maxMilliseconds) * 100) : 4;
+            const todayClass = day.key === days[days.length - 1].key ? " is-today" : "";
+            return `<span class="screen-time-bar${todayClass}" style="height: ${height}%" title="${window.AeroScreenTime.formatDuration(day.milliseconds)}"></span>`;
+        }).join("");
+        daysElement.innerHTML = days.map((day) => `<span>${day.date.toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2)}</span>`).join("");
     }
 
     function writeUser(user) {
@@ -207,28 +250,54 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }));
 
-    [
-        ["toggle-push-notifications", "push_notifications"],
-        ["toggle-notify-likes", "likes"],
-        ["toggle-notify-comments", "comments"]
-    ].forEach(([id, field]) => byId(id)?.addEventListener("change", async (event) => {
-        const toggle = event.currentTarget;
+    async function saveNotificationSetting(toggle, field, value) {
         toggle.disabled = true;
         try {
             await request("/settings/notifications", {
                 method: "PUT",
-                body: { [field]: toggle.checked }
+                body: { [field]: value }
             });
             const user = JSON.parse(localStorage.getItem("aero_user") || "{}");
-            user[field] = toggle.checked;
+            const userField = field === "likes" ? "notify_likes" : field === "comments" ? "notify_comments" : field;
+            user[userField] = value;
             localStorage.setItem("aero_user", JSON.stringify(user));
             showToast("Notification settings updated");
         } catch (error) {
-            toggle.checked = !toggle.checked;
+            toggle.checked = !value;
             showToast(error.message);
         } finally {
             toggle.disabled = false;
         }
+    }
+
+    const pushNotificationToggle = byId("toggle-push-notifications");
+    pushNotificationToggle?.addEventListener("change", async (event) => {
+        const toggle = event.currentTarget;
+        const nextValue = toggle.checked;
+        if (nextValue) {
+            if (!("Notification" in window)) {
+                toggle.checked = false;
+                showToast("This browser does not support notifications");
+                return;
+            }
+
+            let permission = Notification.permission;
+            if (permission === "default") permission = await Notification.requestPermission();
+            if (permission !== "granted") {
+                toggle.checked = false;
+                showToast(permission === "denied" ? "Notification permission was denied" : "Notification permission is required");
+                return;
+            }
+        }
+        await saveNotificationSetting(toggle, "push_notifications", nextValue);
+    });
+
+    [
+        ["toggle-notify-likes", "likes"],
+        ["toggle-notify-comments", "comments"]
+    ].forEach(([id, field]) => byId(id)?.addEventListener("change", async (event) => {
+        const toggle = event.currentTarget;
+        await saveNotificationSetting(toggle, field, toggle.checked);
     }));
 
     function closeModal(modal) { modal?.classList.add("hidden"); }
@@ -305,6 +374,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     byId("back-button")?.addEventListener("click", () => { window.location.href = "index.html"; });
+
+    byId("reset-screen-time")?.addEventListener("click", () => {
+        window.AeroScreenTime?.reset();
+        renderScreenTime();
+        showToast("Screen time reset");
+    });
+    renderScreenTime();
+    window.setInterval(renderScreenTime, 15000);
+
     document.querySelectorAll(".modal-overlay").forEach((modal) => modal.addEventListener("click", (event) => {
         if (event.target === modal) closeModal(modal);
     }));
