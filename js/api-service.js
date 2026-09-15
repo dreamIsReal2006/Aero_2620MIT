@@ -79,6 +79,15 @@ function createAvatarElement(username, avatarUrl, className = 'post-avatar', isO
     return avatar;
 }
 
+function roleBadge(role) {
+    const normalized = ['admin', 'moderator'].includes(role) ? role : '';
+    if (!normalized) return '';
+    const icon = normalized === 'admin'
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Z"></path><path d="m9 12 2 2 4-4"></path></svg>'
+        : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Z"></path><path d="M8 12h8M12 8v8"></path></svg>';
+    return `<span class="role-badge ${normalized}" title="${normalized === 'admin' ? 'Administrator' : 'Moderator'}">${icon}<span>${normalized}</span></span>`;
+}
+
 function syncCurrentUserAvatars(user = {}) {
     const avatarTargets = [
         ['nav-avatar', 'user-avatar user-avatar-nav'],
@@ -93,6 +102,10 @@ function syncCurrentUserAvatars(user = {}) {
         currentAvatar.replaceWith(nextAvatar);
     });
 }
+
+window.addEventListener('aero:user-updated', (event) => {
+    syncCurrentUserAvatars(event.detail || JSON.parse(localStorage.getItem('aero_user') || '{}'));
+});
 
 async function updatePresence() {
     if (!localStorage.getItem('aero_token')) return;
@@ -608,6 +621,7 @@ function setupSearchInteraction() {
         if (metaKey && event.key.toLowerCase() === 'k') {
             event.preventDefault();
             openSearchPanel();
+            document.getElementById('global-search')?.focus();
         }
     });
 
@@ -885,6 +899,21 @@ async function selectChatContact(contact) {
         }
     }
     await loadChatMessages();
+    const blockButton = document.getElementById('chat-block-btn');
+    if (blockButton) {
+        blockButton.classList.remove('hidden');
+        blockButton.classList.remove('is-blocked');
+        blockButton.textContent = 'Block';
+        const blockResponse = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+        const blockData = await blockResponse.json().catch(() => ({}));
+        blockButton.classList.toggle('is-blocked', Boolean(blockData.blocked));
+        blockButton.textContent = blockData.blocked ? 'Unblock' : 'Block';
+        const chatInput = document.getElementById('chat-input');
+        const chatAlert = document.getElementById('chat-inline-alert');
+        if (chatInput) chatInput.disabled = Boolean(blockData.blocked);
+        chatAlert?.classList.toggle('hidden', !blockData.blocked);
+        if (chatAlert && blockData.blocked) chatAlert.textContent = 'You have blocked this user.';
+    }
     await loadChatContacts();
     await loadUnreadChatCount();
     window.clearInterval(chatPollTimer);
@@ -906,7 +935,17 @@ async function loadChatMessages() {
     }
     chatMessageSnapshots.set(snapshotKey, messageIds);
     const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
-    box.innerHTML = (messages || []).map((message) => `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}">${escapeHtml(message.content)}</div>`).join('');
+    const formatBytes = (value) => { const size = Number(value) || 0; if (size < 1024) return `${size} B`; if (size < 1048576) return `${Math.round(size / 1024)} KB`; return `${(size / 1048576).toFixed(1)} MB`; };
+    const mediaMarkup = (message) => {
+        const url = message.media_url ? (String(message.media_url).startsWith('http') ? message.media_url : `${API_ORIGIN}${message.media_url}`) : '';
+        if (!url) return '';
+        if (message.type === 'image' || message.type === 'gif') return `<button type="button" class="chat-media-preview" data-lightbox-src="${escapeHtml(url)}"><img src="${escapeHtml(url)}" alt="Attached image" loading="lazy"></button>`;
+        if (message.type === 'video') return `<video class="chat-inline-video" src="${escapeHtml(url)}" controls preload="metadata"></video>`;
+        return `<a class="chat-document-card" href="${escapeHtml(url)}" download><span class="chat-document-ext">${escapeHtml((message.file_name || 'FILE').split('.').pop().slice(0, 5).toUpperCase())}</span><span><strong>${escapeHtml(message.file_name || 'Attached document')}</strong><small>${formatBytes(message.file_size)}</small></span><span class="chat-document-download" aria-hidden="true">↓</span></a>`;
+    };
+    box.innerHTML = (messages || []).map((message) => `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}"><div class="chat-bubble-content">${mediaMarkup(message)}${message.content ? escapeHtml(message.content) : ''}</div><div class="chat-message-meta"><time>${escapeHtml(message.created_at ? new Date(message.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '')}</time>${message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : ''}</div></div>`).join('');
+    box.querySelectorAll('[data-lightbox-src]').forEach((item) => item.addEventListener('click', () => { const lightbox = document.getElementById('chat-lightbox'); const image = document.getElementById('chat-lightbox-image'); image.src = item.dataset.lightboxSrc; lightbox.classList.remove('hidden'); }));
+    box.querySelectorAll('[data-delete-message]').forEach((button) => button.addEventListener('click', async () => { const response = await fetch(`${API_BASE}/chat/messages/${button.dataset.deleteMessage}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }); if (response.ok) button.closest('.chat-message')?.remove(); }));
     box.scrollTop = box.scrollHeight;
 }
 
@@ -921,6 +960,32 @@ function setupMediaAndChat() {
     document.getElementById('close-chat-drawer')?.addEventListener('click', () => { document.getElementById('view-chat').classList.add('hidden'); window.clearInterval(chatPollTimer); });
     document.getElementById('chat-contact-search')?.addEventListener('input', (event) => document.querySelectorAll('.chat-contact').forEach((item) => item.classList.toggle('hidden', !item.textContent.toLowerCase().includes(event.target.value.toLowerCase()))));
     const getChatInput = () => document.getElementById('chat-input') || document.getElementById('chat-message-input');
+    const attachButton = document.getElementById('chat-attach-btn');
+    const fileInput = document.getElementById('chat-file-input');
+    const attachmentMenu = document.getElementById('chat-attachment-menu');
+    const inlineAlert = document.getElementById('chat-inline-alert');
+    const blockButton = document.getElementById('chat-block-btn');
+    const setBlockedState = (blocked) => { blockButton?.classList.toggle('is-blocked', blocked); if (blockButton) blockButton.textContent = blocked ? 'Unblock' : 'Block'; const input = getChatInput(); if (input) input.disabled = blocked; inlineAlert?.classList.toggle('hidden', !blocked); if (inlineAlert) inlineAlert.textContent = blocked ? 'You have blocked this user.' : ''; };
+    const blockModal = document.getElementById('chat-block-confirm-modal');
+    const blockModalBody = document.getElementById('chat-block-confirm-body');
+    let blockModalPending = null;
+    const closeBlockModal = () => { blockModal?.classList.remove('is-open'); window.setTimeout(() => blockModal?.classList.add('hidden'), 200); blockModalPending = null; };
+    window.openChatBlockConfirmation = (contact, onConfirm) => {
+        blockModalPending = { contact, onConfirm };
+        if (blockModalBody) blockModalBody.textContent = `Are you sure you want to block @${contact.username}? You will no longer receive messages from this account.`;
+        blockModal?.classList.remove('hidden');
+        requestAnimationFrame(() => blockModal?.classList.add('is-open'));
+    };
+    document.getElementById('chat-block-cancel')?.addEventListener('click', closeBlockModal);
+    blockModal?.addEventListener('click', (event) => { if (event.target === blockModal) closeBlockModal(); });
+    document.getElementById('chat-block-confirm')?.addEventListener('click', async () => { const pending = blockModalPending; if (!pending) return; const confirmButton = document.getElementById('chat-block-confirm'); confirmButton.disabled = true; try { await pending.onConfirm(); closeBlockModal(); } finally { confirmButton.disabled = false; } });
+    const refreshBlockState = async (contact) => { const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }); const data = await response.json().catch(() => ({})); setBlockedState(response.ok && Boolean(data.blocked)); };
+    blockButton?.addEventListener('click', async () => { const contact = activeChatUser || window.activeChatUser; if (!contact) return; const blocked = blockButton.classList.contains('is-blocked'); const toggle = async () => { const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, { method: blocked ? 'DELETE' : 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }); if (response.ok) { setBlockedState(!blocked); window.showNotice?.(blocked ? 'User unblocked.' : 'You have blocked this user.', 'success'); } }; if (blocked) await toggle(); else window.openChatBlockConfirmation?.(contact, toggle); });
+    attachButton?.addEventListener('click', () => attachmentMenu?.classList.toggle('hidden'));
+    attachmentMenu?.addEventListener('click', (event) => { const button = event.target.closest('[data-attachment-kind]'); if (!button) return; fileInput.accept = button.dataset.attachmentKind === 'media' ? 'image/*,video/*' : button.dataset.attachmentKind === 'document' ? '.pdf,.txt,.doc,.docx,.xls,.xlsx' : 'image/*,video/*,.pdf,.txt,.doc,.docx,.xls,.xlsx'; attachmentMenu.classList.add('hidden'); fileInput.click(); });
+    fileInput?.addEventListener('change', () => fileInput.files[0] && window.selectChatAttachment?.(fileInput.files[0]));
+    window.selectChatAttachment = async (file) => { const formData = new FormData(); formData.append('file', file); const response = await fetch(`${API_BASE}/chat/uploads`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: formData }); const data = await response.json().catch(() => ({})); if (!response.ok) { window.showNotice?.(data.message || 'Unable to upload attachment.', 'error'); return; } const input = getChatInput(); input.dataset.mediaUrl = data.url; input.dataset.messageType = data.type; input.dataset.fileName = data.file_name; input.dataset.fileSize = data.file_size; input.placeholder = data.file_name; input.focus(); };
+    document.getElementById('chat-lightbox-close')?.addEventListener('click', () => document.getElementById('chat-lightbox')?.classList.add('hidden'));
     document.getElementById('chat-emoji-btn')?.addEventListener('click', () => { const input = getChatInput(); if (!input) return; input.value += ' 😊'; input.focus(); });
     const chatGifUrls = ['https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif', 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif', 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif'];
     document.getElementById('chat-gif-btn')?.addEventListener('click', () => {
@@ -946,6 +1011,7 @@ function setupMediaAndChat() {
         const contact = activeChatUser || window.activeChatUser;
         const content = input?.value.trim();
         const mediaUrl = input?.dataset.mediaUrl || '';
+        const messageType = input?.dataset.messageType || 'text';
         if (!contact || (!content && !mediaUrl)) return;
         const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
         if (box) {
@@ -956,9 +1022,11 @@ function setupMediaAndChat() {
             box.appendChild(message);
             box.scrollTop = box.scrollHeight;
         }
-        const response = await fetch(`${API_BASE}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: JSON.stringify({ user_id: contact.id, recipient_id: contact.id, content, media_url: mediaUrl, type: input.dataset.messageType || 'text' }) });
-        if (response.ok) { input.value = ''; delete input.dataset.mediaUrl; delete input.dataset.messageType; await loadChatMessages(); }
+        const response = await fetch(`${API_BASE}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: JSON.stringify({ user_id: contact.id, recipient_id: contact.id, content, media_url: mediaUrl, type: messageType, file_name: input.dataset.fileName || '', file_size: input.dataset.fileSize || 0 }) });
+        if (response.ok) { input.value = ''; ['mediaUrl', 'messageType', 'fileName', 'fileSize'].forEach((key) => delete input.dataset[key]); input.placeholder = 'Message...'; await loadChatMessages(); }
     });
+    document.getElementById('chat-form')?.addEventListener('dragover', (event) => event.preventDefault());
+    document.getElementById('chat-form')?.addEventListener('drop', (event) => { event.preventDefault(); const file = event.dataTransfer.files?.[0]; if (file) window.selectChatAttachment(file); });
 }
 
 function createBookmarkAvatarMarkup(post, authorName) {
@@ -1520,6 +1588,16 @@ const AeroAPI = {
         return data;
     },
 
+    async deleteComment(commentId) {
+        const res = await fetch(`${API_ORIGIN}/interact/comments/${commentId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.message || 'Unable to delete comment');
+        return data;
+    },
+
     // Feed rendering and DOM updates
     async renderFeed(feedType = 'for_you') {
         const feedContainer = document.getElementById('posts-feed');
@@ -1544,12 +1622,25 @@ const AeroAPI = {
         const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
         uniquePosts.forEach(post => {
             const postEl = document.createElement('div');
-            postEl.className = 'post-card glass-card pop-in g2-card';
+            postEl.className = 'post-card glass-card liquid-glass liquid-glass-interactive pop-in g2-card';
             postEl.dataset.postId = String(post.id);
+            const recordPostView = () => window.ViewHistory?.recordViewedPost(post);
+            postEl.addEventListener('click', (event) => {
+                if (!event.target.closest('button, a, input, textarea, video')) recordPostView();
+            });
+            if ('IntersectionObserver' in window) {
+                const observer = new IntersectionObserver((entries) => {
+                    if (entries.some((entry) => entry.isIntersecting)) {
+                        recordPostView();
+                        observer.disconnect();
+                    }
+                }, { threshold: 0.6 });
+                observer.observe(postEl);
+            }
             const header = document.createElement('div');
             header.className = 'post-header';
             const authorIdentity = document.createElement('div');
-            authorIdentity.className = 'post-author-identity';
+            authorIdentity.className = 'post-author-info post-author-identity';
             const profileLink = document.createElement('a');
             profileLink.className = 'post-author-link';
             profileLink.href = `#profile/${encodeURIComponent(post.user_id)}`;
@@ -1564,7 +1655,7 @@ const AeroAPI = {
             profileLink.appendChild(createAvatarElement(post.username, post.avatar_url, 'post-avatar', post.is_online));
             const author = document.createElement('span');
             author.className = 'post-author';
-            author.textContent = post.username || 'User';
+            author.innerHTML = `${escapeHtml(post.username || 'User')}${roleBadge(post.role)}`;
             profileLink.appendChild(author);
             authorIdentity.appendChild(profileLink);
             const postTime = document.createElement('time');
@@ -1580,7 +1671,7 @@ const AeroAPI = {
             moreButton.title = 'Post options';
             moreButton.textContent = '\u22ee';
             const optionsMenu = document.createElement('div');
-            optionsMenu.className = 'post-dropdown-menu post-menu';
+            optionsMenu.className = 'post-dropdown-menu post-menu liquid-glass liquid-glass-interactive';
             const isOwnPost = post.user_id === currentUser.id;
             const isAdmin = currentUser.is_admin === true;
             const openDeleteModal = () => {
@@ -1849,7 +1940,7 @@ const AeroAPI = {
                 avatarBadge.textContent = '+';
                 avatarWrap.appendChild(avatarBadge);
                 const meta = document.createElement('strong');
-                meta.textContent = `@${comment.username || `user${comment.user_id}`}`;
+                meta.innerHTML = `@${escapeHtml(comment.username || `user${comment.user_id}`)}${roleBadge(comment.role)}`;
                 const time = document.createElement('time');
                 time.className = 'comment-relative-time';
                 time.dateTime = comment.created_at || '';
@@ -1918,7 +2009,25 @@ const AeroAPI = {
                 shareButton.className = 'comment-action-btn';
                 shareButton.textContent = '↗';
                 shareButton.setAttribute('aria-label', 'Share comment');
+                const effectiveRole = currentUser.is_admin === true ? 'admin' : currentUser.role;
+                const canDeleteComment = comment.user_id === currentUser.id || ['admin', 'moderator'].includes(effectiveRole);
+                const deleteButton = document.createElement('button');
+                deleteButton.type = 'button';
+                deleteButton.className = 'comment-action-btn comment-delete-btn';
+                deleteButton.textContent = 'Delete';
+                deleteButton.setAttribute('aria-label', 'Delete comment');
+                deleteButton.addEventListener('click', async () => {
+                    deleteButton.disabled = true;
+                    try {
+                        await this.deleteComment(comment.id);
+                        item.remove();
+                    } catch (error) {
+                        deleteButton.disabled = false;
+                        showNotice(error.message, 'error');
+                    }
+                });
                 commentActions.append(likeButton, replyButton, repostButton, shareButton);
+                if (canDeleteComment) commentActions.appendChild(deleteButton);
                 item.append(commentHeader, body, commentActions);
                 if (comment.replies && comment.replies.length) {
                     const replies = document.createElement('div');
@@ -2009,10 +2118,23 @@ const AeroAPI = {
         document.getElementById('settings-nav-btn')?.addEventListener('click', () => {
             window.location.href = 'settings.html';
         });
+        const rightDock = document.querySelector('.dock-right');
+        const rightDockScroll = rightDock?.querySelector('.dock-scroll-wrapper');
+        const scrollDockTo = (top) => rightDockScroll?.scrollTo({ top, behavior: 'smooth' });
+        rightDock?.addEventListener('mousemove', (event) => {
+            const bounds = rightDock.getBoundingClientRect();
+            scrollDockTo(event.clientY - bounds.top >= bounds.height / 2 ? rightDockScroll.scrollHeight : 0);
+        });
+        rightDock?.addEventListener('mouseleave', () => scrollDockTo(0));
+        const mobileMenuButton = document.getElementById('mobile-menu-btn');
+        const mobileDrawer = document.getElementById('mobile-nav-drawer');
+        const closeMobileMenu = () => { mobileDrawer?.classList.add('hidden'); mobileMenuButton?.classList.remove('is-open'); mobileMenuButton?.setAttribute('aria-expanded', 'false'); };
+        mobileMenuButton?.addEventListener('click', () => { const opening = mobileDrawer?.classList.contains('hidden'); mobileDrawer?.classList.toggle('hidden', !opening); mobileMenuButton.classList.toggle('is-open', opening); mobileMenuButton.setAttribute('aria-expanded', String(Boolean(opening))); });
+        mobileDrawer?.addEventListener('click', (event) => { const button = event.target.closest('[data-mobile-nav]'); if (!button) return; document.getElementById(button.dataset.mobileNav)?.click(); closeMobileMenu(); });
         const token = localStorage.getItem('aero_token');
         const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
         const adminLink = document.getElementById('admin-dashboard-link');
-        if (adminLink) adminLink.classList.toggle('hidden', user.is_admin !== true);
+        if (adminLink) adminLink.classList.toggle('hidden', user.is_admin !== true && !['admin', 'moderator'].includes(user.role));
         
         const authOverlay = document.getElementById('auth-overlay');
         const mainApp = document.getElementById('main-app');
@@ -2042,7 +2164,7 @@ const AeroAPI = {
         const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
         window.setFabAuthState?.(true);
         const adminLink = document.getElementById('admin-dashboard-link');
-        if (adminLink) adminLink.classList.toggle('hidden', user.is_admin !== true);
+        if (adminLink) adminLink.classList.toggle('hidden', user.is_admin !== true && !['admin', 'moderator'].includes(user.role));
         authOverlay.classList.remove('hidden');
         mainApp.classList.remove('hidden');
         mainApp.classList.add('app-entering');
@@ -2164,7 +2286,7 @@ function updateCreatePostState() {
     createPostState.files.forEach((file, index) => {
         const card = document.createElement('div');
         card.className = 'media-preview-item';
-        const objectUrl = URL.createObjectURL(file);
+        const objectUrl = file.previewUrl || (file.previewUrl = URL.createObjectURL(file));
         const isVideo = file.type.startsWith('video/');
         const media = document.createElement(isVideo ? 'video' : 'img');
         media.src = objectUrl;
@@ -2186,6 +2308,7 @@ function updateCreatePostState() {
         remove.setAttribute('aria-label', `Remove ${file.name}`);
         remove.addEventListener('click', () => {
             URL.revokeObjectURL(objectUrl);
+            delete file.previewUrl;
             createPostState.files.splice(index, 1);
             updateCreatePostState();
         });

@@ -21,6 +21,15 @@
         return { url: value ? (value.startsWith('http') ? value : `${window.location.origin}${value}`) : '', letter: String(user.display_name || user.username || 'U').charAt(0).toUpperCase() };
     }
 
+    function profileRoleBadge(role) {
+        const normalized = ['admin', 'moderator'].includes(role) ? role : '';
+        if (!normalized) return '';
+        const icon = normalized === 'admin'
+            ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Z"></path><path d="m9 12 2 2 4-4"></path></svg>'
+            : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Z"></path><path d="M8 12h8M12 8v8"></path></svg>';
+        return `<span class="role-badge ${normalized}">${icon}<span>${normalized}</span></span>`;
+    }
+
     function updateSharedUserState(user) {
         const previous = JSON.parse(localStorage.getItem('aero_user') || '{}');
         const nextUser = { ...previous, ...user };
@@ -222,7 +231,7 @@
                 <div class="profile-header-main">
                     <div class="profile-header-copy">
                         <div class="profile-display-row">
-                            <h2>${user.display_name || user.username || 'User'}</h2>
+                            <h2>${user.display_name || user.username || 'User'}${profileRoleBadge(user.role)}</h2>
                         </div>
                         <div class="profile-handle">@${user.username || 'user'}</div>
                         <p class="profile-bio">${(user.bio || 'No bio yet.').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]))}</p>
@@ -277,11 +286,11 @@
             }
 
             container.innerHTML = posts.length ? posts.map((post) => `
-                <article class="post-card glass-card pop-in g2-card">
+                <article class="post-card glass-card liquid-glass liquid-glass-interactive pop-in g2-card">
                     <div class="post-header">
                         <div class="post-author-identity">
                             <span class="post-avatar ${user.is_online ? 'is-online' : ''}"><img src="${avatar}" alt="@${(user.username || 'User').replace(/"/g, '&quot;')}" /></span>
-                            <span class="post-author">@${user.username || 'user'}</span>
+                            <span class="post-author">@${user.username || 'user'}${profileRoleBadge(user.role)}</span>
                             <time class="post-relative-time">${window.AeroFormatRelativeTime?.(post.created_at) || new Date(post.created_at || Date.now()).toLocaleDateString()}</time>
                         </div>
                     </div>
@@ -317,7 +326,7 @@
             const items = Array.isArray(payload.items) ? payload.items : [];
             const escape = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
             if (!items.length) {
-                container.innerHTML = `<div class="post-card glass-card text-center"><p>No ${contentType} yet.</p></div>`;
+                container.innerHTML = `<div class="post-card glass-card liquid-glass text-center"><p>No ${contentType} yet.</p></div>`;
                 return;
             }
             if (contentType === 'shorts') {
@@ -327,7 +336,7 @@
             container.innerHTML = items.map((item) => {
                 const content = contentType === 'replies' ? item.content : item.content;
                 const summary = contentType === 'replies' ? `<small class="profile-content-context">On @${escape(item.post?.username)}: ${escape(item.post?.content)}</small>` : '';
-                return `<article class="post-card glass-card pop-in g2-card"><div class="post-header"><div class="post-author-identity"><span class="post-avatar ${user.is_online ? 'is-online' : ''}"><img src="${escape(avatar)}" alt="@${escape(user.username)}"></span><span class="post-author">@${escape(user.username)}</span><time class="post-relative-time">${window.AeroFormatRelativeTime?.(item.created_at) || new Date(item.created_at || Date.now()).toLocaleDateString()}</time></div></div><div class="post-content">${escape(content)}</div>${summary}</article>`;
+                return `<article class="post-card glass-card liquid-glass liquid-glass-interactive pop-in g2-card"><div class="post-header"><div class="post-author-identity"><span class="post-avatar ${user.is_online ? 'is-online' : ''}"><img src="${escape(avatar)}" alt="@${escape(user.username)}"></span><span class="post-author">@${escape(user.username)}${profileRoleBadge(user.role)}</span><time class="post-relative-time">${window.AeroFormatRelativeTime?.(item.created_at) || new Date(item.created_at || Date.now()).toLocaleDateString()}</time></div></div><div class="post-content">${escape(content)}</div>${summary}</article>`;
             }).join('');
         } catch (error) {
             container.innerHTML = `<div class="post-card glass-card text-center"><p>${error.message}</p></div>`;

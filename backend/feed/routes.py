@@ -43,6 +43,7 @@ def post_payload(post, current_user_id=None):
         "id": post.id,
         "user_id": post.user_id,
         "username": post.author.username,
+        "role": post.author.role if post.author.role in {"admin", "moderator", "user"} else "user",
         "avatar_url": post.author.avatar_url or "",
         "is_online": is_user_online(post.author, current_user_id),
         "content": post.content,
@@ -173,7 +174,9 @@ def create_post(current_user):
 @token_required
 def delete_post(current_user, post_id):
     post = db.session.get(Post, post_id)
-    if not post or (post.user_id != current_user.id and not current_user.is_admin):
+    effective_role = "admin" if current_user.is_admin else current_user.role
+    can_moderate = effective_role in {"admin", "moderator"}
+    if not post or (post.user_id != current_user.id and not can_moderate):
         post = None
     if not post:
         return jsonify({"message": "You are not authorized to delete this post"}), 403

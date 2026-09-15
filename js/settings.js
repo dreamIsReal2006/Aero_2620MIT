@@ -150,7 +150,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await request("/users/me/profile");
             writeUser(data.user || {});
             const adminButton = byId("admin-dashboard-button");
-            if (adminButton && (data.user?.is_admin === true || data.user?.role === "admin")) {
+            if (adminButton && (data.user?.is_admin === true || ["admin", "moderator"].includes(data.user?.role))) {
                 adminButton.classList.remove("hidden");
                 adminButton.addEventListener("click", async () => {
                     adminButton.disabled = true;

@@ -106,7 +106,7 @@
     </div>
 
     <div id="delete-modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
-        <div class="delete-modal-content glass-card">
+        <div class="delete-modal-content glass-card liquid-glass">
             <div class="delete-modal-icon" aria-hidden="true">!</div>
             <h2 id="delete-modal-title">Delete Post?</h2>
             <p>Are you sure you want to delete this post? This action cannot be undone.</p>
@@ -118,7 +118,7 @@
     </div>
 
     <div id="forgot-password-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="forgot-password-title">
-        <div class="delete-modal-content glass-card aero-glass-panel forgot-password-card">
+        <div class="delete-modal-content glass-card aero-glass-panel liquid-glass forgot-password-card">
             <button type="button" id="close-forgot-password" class="modal-close-btn" aria-label="Close password reset">&times;</button>
             <h2 id="forgot-password-title">Reset your password</h2>
             <p id="forgot-feedback" class="field-error" role="alert"></p>
@@ -143,7 +143,8 @@
 
     <!-- Main app -->
     <div id="main-app" class="main-app hidden">
-        <header class="top-nav glass-nav aero-glass-panel">
+        <header class="top-nav glass-nav aero-glass-panel liquid-glass">
+            <button type="button" id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Open navigation" aria-expanded="false"><span></span><span></span><span></span></button>
             <div class="nav-left">
                 <div class="search-shell" id="search-shell">
                     <div class="search-bar glass-pill" id="search-bar" tabindex="0" aria-label="Search">
@@ -152,7 +153,7 @@
                         <button type="button" class="search-clear-btn" id="search-clear-btn" aria-label="Clear search">✕</button>
                     </div>
 
-                    <div class="search-dropdown glass-card aero-glass-panel" id="search-dropdown" role="dialog" aria-label="Search suggestions" aria-expanded="false">
+                    <div class="search-dropdown glass-card aero-glass-panel liquid-glass liquid-glass-interactive" id="search-dropdown" role="dialog" aria-label="Search suggestions" aria-expanded="false">
                         <div class="search-dropdown-inner" id="search-dropdown-inner"></div>
                     </div>
                 </div>
@@ -173,10 +174,12 @@
         </header>
 
         <div class="app-viewport">
-            <aside class="floating-dock dock-left glass-dock aero-glass-panel">
-                 <button class="dock-btn dock-item active" id="home-nav-btn" type="button" aria-label="Home" title="Home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"></path><path d="M9 21v-7h6v7"></path></svg></button>
-                <button class="dock-btn dock-item" id="video-dock-btn" aria-label="Short videos" title="Short videos"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m8 5 2-3m4 3 2-3m-8 9 4 2.5L8 14v-5Z"></path></svg></button>
-                <button class="dock-btn dock-item" id="chat-dock-btn" aria-label="Chat" title="Chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.5-.7L4 20l1.7-3.6A7.2 7.2 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z"></path></svg><span class="dock-badge hidden" aria-label="Unread messages"></span></button>
+            <aside class="floating-dock dock-left glass-dock aero-glass-panel liquid-glass">
+                <div class="dock-scroll-wrapper">
+                 <button class="dock-btn dock-item liquid-glass-interactive active" id="home-nav-btn" type="button" aria-label="Home" title="Home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"></path><path d="M9 21v-7h6v7"></path></svg></button>
+                <button class="dock-btn dock-item liquid-glass-interactive" id="video-dock-btn" aria-label="Short videos" title="Short videos"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m8 5 2-3m4 3 2-3m-8 9 4 2.5L8 14v-5Z"></path></svg></button>
+                <button class="dock-btn dock-item liquid-glass-interactive" id="chat-dock-btn" aria-label="Chat" title="Chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.5-.7L4 20l1.7-3.6A7.2 7.2 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z"></path></svg><span class="dock-badge hidden" aria-label="Unread messages"></span></button>
+                </div>
             </aside>
 
             <main class="feed-container view-container" id="view-main">
@@ -184,7 +187,7 @@
                     <button id="tab-for-you" type="button" class="feed-tab active" data-i18n="For You">For You</button>
                     <button id="tab-following" type="button" class="feed-tab" data-i18n="Following">Following</button>
                 </div>
-                <div class="compose-card glass-card g2-card compose-trigger" id="compose-trigger" role="button" tabindex="0" aria-label="Create a new post">
+                <div class="compose-card glass-card liquid-glass liquid-glass-interactive g2-card compose-trigger" id="compose-trigger" role="button" tabindex="0" aria-label="Create a new post">
                     <div class="compose-trigger-copy"><span id="quick-post-avatar" class="compose-trigger-avatar" aria-hidden="true">U</span><span>Share what's on your mind...</span></div>
                     <button type="button" class="compose-trigger-media" aria-label="Add media"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m4 17 4.5-4 3.5 3 2.5-2 5.5 5"></path></svg><span>Add media</span></button>
                 </div>
@@ -208,7 +211,7 @@
             </main>
 
             <section id="profile-view" class="view-section hidden" aria-label="Profile page">
-                <div class="profile-card profile-view-shell glass-card">
+                <div class="profile-card profile-view-shell glass-card liquid-glass">
                     <div id="profile-header" class="profile-header"></div>
                     <div class="profile-tabs-wrap">
                         <div class="search-results-tabs profile-tabs" role="tablist" aria-label="Profile tabs">
@@ -223,7 +226,7 @@
             </section>
 
             <div id="search-results-page" class="search-results-page hidden">
-                <div class="search-results-shell glass-card">
+                <div class="search-results-shell glass-card liquid-glass">
                     <div class="search-results-header">
                         <div class="search-results-tabs" aria-label="Search tabs">
                             <button class="search-tab active" type="button" data-tab="all">All</button>
@@ -235,14 +238,17 @@
                 </div>
             </div>
 
-            <aside class="floating-dock dock-right glass-dock aero-glass-panel">
+            <aside class="floating-dock dock-right glass-dock aero-glass-panel liquid-glass">
+                <div class="dock-scroll-wrapper">
                 <button class="dock-btn" id="notification-dock-btn" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4"></path></svg><span class="dock-badge hidden" aria-label="Unread notifications"></span></button>
                 <button class="dock-btn" id="bookmark-dock-btn" aria-label="Bookmarks" title="Bookmarks"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-3-6 3V4.5Z"></path></svg></button>
-                <button class="dock-btn" id="settings-nav-btn" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2.75 14.1 4.2l2.5-.35.95 2.35 2.25 1.15-.35 2.5L20.9 12l-1.45 2.1.35 2.5-2.25 1.15-.95 2.35-2.5-.35L12 21.25l-2.1-1.5-2.5.35-.95-2.35-2.25-1.15.35-2.5L3.1 12l1.45-2.15-.35-2.5 2.25-1.15.95-2.35 2.5.35L12 2.75Z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+                <button class="dock-btn liquid-glass-interactive" id="history-dock-btn" aria-label="View History" title="View History"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dock-icon"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></button>
+                <button class="dock-btn" id="settings-nav-btn" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2.75 14.1 4.2l2.5-.35.95 2.35 2.25 1.15-.35 2.5L20.9 12l-1.45 2.1.35 2.5-.95 2.35-2.5-.35L12 21.25l-2.1-1.5-.95 2.35-2.25-1.15.35-2.5L3.1 12l1.45-2.15-.35-2.5 2.25-1.15.95-2.35 2.5.35L12 2.75Z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+                </div>
             </aside>
         </div>
 
-        <aside id="bookmarks-drawer" class="bookmarks-drawer glass-card hidden" aria-label="Bookmarks Drawer">
+        <aside id="bookmarks-drawer" class="bookmarks-drawer glass-card liquid-glass liquid-glass-interactive hidden" aria-label="Bookmarks Drawer">
             <div class="bookmarks-drawer-header">
                 <div>
                     <span class="bookmarks-kicker">Saved</span>
@@ -253,18 +259,26 @@
             <div id="bookmarks-list" class="bookmarks-list" aria-live="polite"></div>
         </aside>
 
-        <aside id="notifications-drawer" class="notifications-drawer glass-card aero-glass-panel hidden" aria-label="Notifications Drawer">
+        <aside id="history-drawer" class="bookmarks-drawer history-drawer liquid-glass hidden" aria-label="View history">
+            <div class="bookmarks-drawer-header">
+                <div><span class="bookmarks-kicker">Recently viewed</span><h2>View history</h2></div>
+                <div class="history-drawer-actions"><button type="button" id="clear-history-btn" class="history-clear-btn">Clear</button><button type="button" class="drawer-close-btn" id="close-history-drawer" aria-label="Close history">&times;</button></div>
+            </div>
+            <div id="history-list" class="bookmarks-list" aria-live="polite"></div>
+        </aside>
+
+        <aside id="notifications-drawer" class="notifications-drawer glass-card aero-glass-panel liquid-glass liquid-glass-interactive hidden" aria-label="Notifications Drawer">
             <div class="notifications-drawer-header"><div><span class="bookmarks-kicker">Inbox</span><h2>Notifications</h2></div><button type="button" class="drawer-close-btn" id="close-notifications-drawer" aria-label="Close notifications">&times;</button></div>
             <div class="notification-tabs" role="tablist"><button type="button" class="notification-tab active" data-notification-tab="all">All</button><button type="button" class="notification-tab" data-notification-tab="mentions">Mentions</button><button type="button" class="notification-tab" data-notification-tab="likes">Likes</button></div>
             <div id="notifications-list" class="notifications-list" aria-live="polite"></div>
         </aside>
 
-        <main id="view-chat" class="chat-wrapper view-container glass-card aero-glass-panel hidden" aria-label="Chat">
+        <main id="view-chat" class="chat-wrapper view-container glass-card aero-glass-panel liquid-glass hidden" aria-label="Chat">
             <aside class="chat-sidebar"><div class="chat-sidebar-header"><strong id="chat-current-username">Messages</strong><button type="button" class="chat-compose-btn" aria-label="New message">✎</button></div><input id="chat-contact-search" class="chat-search" type="search" placeholder="Search contacts" aria-label="Search contacts"><div class="chat-notes"></div><div id="chat-contacts-list" class="chat-contacts-list"></div></aside>
-            <section class="chat-panel"><div id="chat-active-header" class="chat-active-header"><span id="chat-active-avatar" class="chat-active-avatar" aria-hidden="true">U</span><span id="chat-active-name">Select a contact</span></div><div id="chat-messages-list" class="chat-messages"></div><form id="chat-form" class="chat-form"><input id="chat-input" type="text" maxlength="2000" placeholder="Message..." aria-label="Message"><button type="button" id="chat-emoji-btn" aria-label="Add emoji">☺</button><button type="button" id="chat-gif-btn" aria-label="Add GIF">GIF</button><button type="submit" aria-label="Send message">➤</button></form></section>
+            <section class="chat-panel"><div id="chat-active-header" class="chat-active-header"><span id="chat-active-avatar" class="chat-active-avatar" aria-hidden="true">U</span><span id="chat-active-name">Select a contact</span><button type="button" id="chat-block-btn" class="chat-header-action hidden" aria-label="Block user">Block</button></div><div id="chat-inline-alert" class="chat-inline-alert hidden" role="status"></div><div id="chat-messages-list" class="chat-messages"></div><form id="chat-form" class="chat-form"><button type="button" id="chat-attach-btn" class="chat-attach-btn" aria-label="Add attachment" title="Add attachment">+</button><input id="chat-file-input" type="file" hidden accept="image/*,video/*,.pdf,.txt,.doc,.docx,.xls,.xlsx"><input id="chat-input" type="text" maxlength="2000" placeholder="Message..." aria-label="Message"><button type="button" id="chat-emoji-btn" aria-label="Add emoji">☺</button><button type="button" id="chat-gif-btn" aria-label="Add GIF">GIF</button><button type="submit" aria-label="Send message">➤</button><div id="chat-attachment-menu" class="chat-attachment-menu liquid-glass hidden"><button type="button" data-attachment-kind="media">Photo &amp; Video</button><button type="button" data-attachment-kind="document">Document</button><button type="button" data-attachment-kind="file">Camera/File</button></div></form></section>
         </aside>
 
-        <aside id="short-comments-drawer" class="short-comments-drawer glass-card hidden" aria-label="Short video comments">
+        <aside id="short-comments-drawer" class="short-comments-drawer glass-card liquid-glass hidden" aria-label="Short video comments">
             <div class="drawer-section-header"><h2>Comments</h2><button type="button" class="drawer-close-btn" id="close-short-comments" aria-label="Close comments">&times;</button></div>
             <div id="short-comments-list" class="short-comments-list"></div>
             <form id="short-comment-form" class="chat-form"><input id="short-comment-input" type="text" maxlength="1000" placeholder="Add a comment..." aria-label="Comment"><button type="submit" aria-label="Send comment">➤</button></form>
@@ -272,10 +286,28 @@
 
     </div>
 
+    <div id="mobile-nav-drawer" class="mobile-nav-drawer liquid-glass hidden" aria-label="Mobile navigation">
+        <button type="button" data-mobile-nav="home-nav-btn">Home</button>
+        <button type="button" data-mobile-nav="chat-dock-btn">Messages</button>
+        <button type="button" data-mobile-nav="notification-dock-btn">Notifications</button>
+        <button type="button" data-mobile-nav="bookmark-dock-btn">Bookmarks</button>
+        <button type="button" data-mobile-nav="history-dock-btn">History</button>
+        <button type="button" data-mobile-nav="settings-nav-btn">Settings</button>
+    </div>
+
     <button type="button" id="global-fab-btn" class="fab-new-post" aria-label="Create a new post"><span class="fab-plus">+</span><span class="fab-label">New Post</span></button>
+    <div id="chat-lightbox" class="chat-lightbox hidden" role="dialog" aria-modal="true"><button type="button" id="chat-lightbox-close" aria-label="Close media preview">&times;</button><img id="chat-lightbox-image" alt=""></div>
+
+    <div id="chat-block-confirm-modal" class="chat-confirm-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="chat-block-confirm-title">
+        <section class="chat-confirm-panel liquid-glass">
+            <h2 id="chat-block-confirm-title">Block User</h2>
+            <p id="chat-block-confirm-body"></p>
+            <div class="chat-confirm-actions"><button type="button" id="chat-block-cancel" class="chat-confirm-cancel">Cancel</button><button type="button" id="chat-block-confirm" class="chat-confirm-danger">Block</button></div>
+        </section>
+    </div>
 
     <div id="create-post-modal" class="create-post-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="create-post-title">
-        <form id="create-post-form" class="create-post-modal glass-card">
+        <form id="create-post-form" class="create-post-modal glass-card liquid-glass">
             <header class="create-post-header">
                 <div class="create-post-user"><span id="modal-user-avatar" class="user-avatar">U</span><div><h2 id="create-post-title">Create post</h2><span id="create-post-username">User</span></div></div>
                 <button type="button" id="close-create-post" class="modal-close-btn" aria-label="Close create post">&times;</button>
@@ -291,7 +323,7 @@
     </div>
 
     <div id="short-upload-modal" class="create-post-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="short-upload-title">
-        <form id="short-upload-form" class="create-post-modal glass-card aero-glass-panel">
+        <form id="short-upload-form" class="create-post-modal glass-card aero-glass-panel liquid-glass">
             <header class="create-post-header"><h2 id="short-upload-title">Upload Video</h2><button type="button" id="close-short-upload" class="modal-close-btn" aria-label="Close upload">&times;</button></header>
             <div id="video-dropzone" class="dropzone" role="button" tabindex="0" aria-controls="short-upload-file">
                 <span class="dropzone-icon" aria-hidden="true">&#8593;</span>
@@ -305,7 +337,7 @@
     </div>
 
     <div id="profile-edit-modal" class="profile-edit-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="profile-edit-title">
-        <form id="profile-edit-form" class="profile-edit-modal glass-card aero-glass-panel">
+        <form id="profile-edit-form" class="profile-edit-modal glass-card aero-glass-panel liquid-glass">
             <header class="profile-edit-header">
                 <div><span class="profile-edit-kicker">Profile</span><h2 id="profile-edit-title">Edit Profile</h2></div>
                 <button type="button" id="close-profile-edit" class="modal-close-btn" aria-label="Close profile editor">&times;</button>
@@ -328,6 +360,7 @@
 
     <script src="js/screen-time.js"></script>
     <script src="js/api-service.js"></script>
+    <script src="js/view-history.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/shorts.js"></script>
     <script src="js/app.js"></script>

@@ -5,7 +5,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const apiBase = window.location.protocol === 'file:'
         ? `http://127.0.0.1:5000/api/${adminRoute}`
         : `${window.location.origin}/api/${adminRoute}`;
-    if (!token || (user.is_admin !== true && user.role !== 'admin')) {
+    const apiRoot = apiBase.replace(/\/admin_[^/]+$/, '');
+    if (!token || (user.is_admin !== true && !['admin', 'moderator'].includes(user.role))) {
         window.location.href = 'index.html';
         return;
     }
@@ -15,6 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const usersList = document.getElementById('admin-users-list');
     const userSearch = document.getElementById('admin-user-search');
     const appealsList = document.getElementById('admin-appeals-list');
+    const isAdminViewer = user.is_admin === true || user.role === 'admin';
     const previewModal = document.getElementById('admin-post-preview-modal');
     const previewContent = document.getElementById('admin-post-preview-content');
     const showError = error => {
@@ -45,7 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const escapeHtml = value => String(value || '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
     const renderUsers = users => {
         if (!usersList) return;
-        usersList.innerHTML = users.length ? users.map(user => `<div class="admin-user-row" data-user-id="${user.id}"><strong>@${escapeHtml(user.username)}</strong><span class="admin-user-role">${escapeHtml(user.role || 'user')}</span><span class="admin-user-status">${user.is_banned ? 'Banned' : 'Active'}</span><button class="btn admin-action-btn ban-user-btn" type="button">${user.is_banned ? 'Unban' : 'Ban'}</button><button class="btn admin-action-btn permission-btn" type="button" data-role="${escapeHtml(user.role || 'user')}">${user.role === 'admin' ? 'Demote to User' : 'Promote to Admin'}</button></div>`).join('') : '<p class="admin-empty">No matching users.</p>';
+        usersList.innerHTML = users.length ? users.map(user => `<div class="admin-user-row" data-user-id="${user.id}" data-username="${escapeHtml(user.username)}" data-role="${escapeHtml(user.role || 'user')}"><strong>@${escapeHtml(user.username)}</strong><span class="admin-user-role">${escapeHtml(user.role || 'user')}</span><span class="admin-user-status">${user.is_banned ? 'Banned' : 'Active'}</span>${isAdminViewer ? `<button class="btn admin-action-btn ban-user-btn" type="button">${user.is_banned ? 'Unban' : 'Ban'}</button><div class="role-segmented" role="group" aria-label="Set role for @${escapeHtml(user.username)}"><button class="role-segment ${user.role === 'user' ? 'is-active' : ''}" type="button" data-role="user">User</button><button class="role-segment ${user.role === 'moderator' ? 'is-active' : ''}" type="button" data-role="moderator">Moderator</button><button class="role-segment ${user.role === 'admin' ? 'is-active' : ''}" type="button" data-role="admin">Admin</button></div>` : ''}</div>`).join('') : '<p class="admin-empty">No matching users.</p>';
     };
     const renderAppeals = appeals => {
         if (!appealsList) return;
@@ -152,7 +154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             dismissButton.dataset.reportIds = row.dataset.reportIds;
             actions.appendChild(dismissButton);
             const targetUserId = group.target_type === 'user' ? group.target_id : group.target?.user_id;
-            if (targetUserId) {
+            if (targetUserId && isAdminViewer) {
                 const banButton = document.createElement('button');
                 banButton.className = 'btn admin-action-btn';
                 banButton.type = 'button';
@@ -173,6 +175,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderAppeals(await request('/appeals'));
             await updateStats();
         } catch (error) { showError(error); }
+    };
+
+    const roleModal = document.getElementById('role-confirm-modal');
+    const roleModalTitle = document.getElementById('role-confirm-title');
+    const roleModalBody = document.getElementById('role-confirm-body');
+    const roleModalConfirm = document.getElementById('confirm-role-change');
+    let pendingRoleChange = null;
+    const closeRoleModal = () => {
+        roleModal?.classList.remove('is-open');
+        window.setTimeout(() => roleModal?.classList.add('hidden'), 200);
+        pendingRoleChange = null;
+    };
+    const openRoleModal = (row, role) => {
+        pendingRoleChange = { row, role };
+        if (roleModalTitle) roleModalTitle.textContent = 'Confirm Role Change';
+        if (roleModalBody) roleModalBody.textContent = `Are you sure you want to change @${row.dataset.username}'s role to ${role}?`;
+        roleModal?.classList.remove('hidden');
+        requestAnimationFrame(() => roleModal?.classList.add('is-open'));
+        roleModalConfirm?.focus();
     };
 
     reportsBody?.addEventListener('click', async event => {
@@ -219,24 +240,46 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 300);
     });
     usersList?.addEventListener('click', async event => {
-        const button = event.target.closest('.ban-user-btn, .permission-btn');
-        if (!button) return;
-        const row = button.closest('[data-user-id]');
-        button.disabled = true;
+        const button = event.target.closest('.ban-user-btn');
+        const roleButton = event.target.closest('.role-segment');
+        if (!button && !roleButton) return;
+        if (roleButton) {
+            const row = roleButton.closest('[data-user-id]');
+            if (row.dataset.role !== roleButton.dataset.role) openRoleModal(row, roleButton.dataset.role);
+            return;
+        }
+        const control = button;
+        const row = control.closest('[data-user-id]');
+        control.disabled = true;
         try {
-            if (button.classList.contains('ban-user-btn')) {
+            if (button) {
                 const result = await request(`/users/${row.dataset.userId}/toggle_ban`, { method: 'POST' });
                 row.querySelector('.admin-user-status').textContent = result.user.is_banned ? 'Banned' : 'Active';
                 button.textContent = result.user.is_banned ? 'Unban' : 'Ban';
-            } else {
-                const isAdmin = button.dataset.role === 'admin';
-                const result = await request(`/users/${row.dataset.userId}/${isAdmin ? 'demote' : 'promote'}`, { method: 'POST' });
-                const nextRole = result.user.role || 'user';
-                row.querySelector('.admin-user-role').textContent = nextRole;
-                button.dataset.role = nextRole;
-                button.textContent = nextRole === 'admin' ? 'Demote to User' : 'Promote to Admin';
             }
-        } catch (error) { showError(error); button.disabled = false; }
+        } catch (error) { showError(error); control.disabled = false; }
+    });
+    roleModal?.addEventListener('click', event => {
+        if (event.target === roleModal || event.target.closest('[data-role-modal-close]')) closeRoleModal();
+    });
+    roleModalConfirm?.addEventListener('click', async () => {
+        if (!pendingRoleChange) return;
+        const { row, role } = pendingRoleChange;
+        roleModalConfirm.disabled = true;
+        try {
+            const response = await fetch(`${apiRoot}/users/${row.dataset.userId}/role`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ role }) });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || 'Unable to update role');
+            row.dataset.role = role;
+            row.querySelector('.admin-user-role').textContent = role;
+            row.querySelectorAll('.role-segment').forEach(button => button.classList.toggle('is-active', button.dataset.role === role));
+            closeRoleModal();
+            window.showNotice?.(`@${row.dataset.username} is now a ${role}.`, 'success');
+        } catch (error) {
+            showError(error);
+        } finally {
+            roleModalConfirm.disabled = false;
+        }
     });
     appealsList?.addEventListener('click', async event => {
         const button = event.target.closest('.appeal-approve-btn, .appeal-reject-btn');

@@ -37,14 +37,24 @@ def login_required(function):
 
 
 def admin_required(function):
-    @wraps(function)
-    def decorated(*args, **kwargs):
-        current_user = getattr(g, "current_user", None) or _authenticated_user()
-        if not current_user or not current_user.is_authenticated:
-            abort(403)
-        if not (current_user.is_admin or current_user.role == "admin"):
-            abort(403)
-        g.current_user = current_user
-        return function(*args, **kwargs)
+    return require_role("admin")(function)
 
-    return decorated
+
+def require_role(roles):
+    allowed_roles = {str(role).strip().lower() for role in (roles if isinstance(roles, (list, tuple, set)) else [roles])}
+
+    def decorator(function):
+        @wraps(function)
+        def decorated(*args, **kwargs):
+            current_user = getattr(g, "current_user", None) or _authenticated_user()
+            if not current_user or not current_user.is_authenticated:
+                abort(403)
+            effective_role = "admin" if current_user.is_admin else current_user.role
+            if effective_role not in {"admin", "moderator", "user"} or effective_role not in allowed_roles:
+                abort(403)
+            g.current_user = current_user
+            return function(*args, **kwargs)
+
+        return decorated
+
+    return decorator

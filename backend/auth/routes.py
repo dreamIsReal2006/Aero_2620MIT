@@ -189,6 +189,7 @@ def verify_otp():
     return jsonify({"token": make_token(user), "user": {
         "id": user.id, "username": user.username, "display_name": user.display_name or user.username, "email": user.email,
         "bio": user.bio or "", "avatar_url": user.avatar_url or "",
+        "role": user.role if user.role in {"admin", "moderator", "user"} else "user",
         "is_admin": user.is_admin, "is_banned": user.is_banned,
         "is_private": user.is_private, "show_online_status": user.show_online_status,
     }}), 200

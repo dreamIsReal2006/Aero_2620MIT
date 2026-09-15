@@ -1,10 +1,12 @@
 from backend import db
+from sqlalchemy.orm import validates
 # introducing password hashing
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
 class User(db.Model):
     __tablename__ = "users"
+    VALID_ROLES = {"admin", "moderator", "user"}
 
     id = db.Column(
         db.Integer,
@@ -55,6 +57,13 @@ class User(db.Model):
     )
 
     role = db.Column(db.String(20), default="user", nullable=False)
+
+    @validates("role")
+    def validate_role(self, key, value):
+        normalized = str(value or "user").strip().lower()
+        if normalized not in self.VALID_ROLES:
+            raise ValueError("role must be admin, moderator, or user")
+        return normalized
 
     is_banned = db.Column(
         db.Boolean,

@@ -133,6 +133,10 @@ def create_app():
             }
             if "is_read" not in message_columns:
                 db.session.execute(text("ALTER TABLE messages ADD COLUMN is_read BOOLEAN NOT NULL DEFAULT 0"))
+            if "file_name" not in message_columns:
+                db.session.execute(text("ALTER TABLE messages ADD COLUMN file_name VARCHAR(255) NOT NULL DEFAULT ''"))
+            if "file_size" not in message_columns:
+                db.session.execute(text("ALTER TABLE messages ADD COLUMN file_size INTEGER NOT NULL DEFAULT 0"))
             columns = {
                 column[1]
                 for column in db.session.execute(text("PRAGMA table_info(users)"))
@@ -149,6 +153,12 @@ def create_app():
                 db.session.execute(text(
                     "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'"
                 ))
+            db.session.execute(text(
+                "UPDATE users SET role = 'admin' WHERE is_admin = 1"
+            ))
+            db.session.execute(text(
+                "UPDATE users SET role = 'user' WHERE role NOT IN ('admin', 'moderator', 'user') OR role IS NULL"
+            ))
             if "display_name" not in columns:
                 db.session.execute(text(
                     "ALTER TABLE users ADD COLUMN display_name VARCHAR(80) NOT NULL DEFAULT ''"
@@ -208,7 +218,7 @@ def create_app():
 
     from backend.admin import admin_bp
     from backend.admin import routes as admin_routes
-    from backend.admin.decorators import admin_required, login_required
+    from backend.admin.decorators import require_role, login_required
 
     app.register_blueprint(admin_bp)
 
@@ -217,13 +227,13 @@ def create_app():
 
     @app.get(admin_page_path)
     @login_required
-    @admin_required
+    @require_role(["admin", "moderator"])
     def admin_dashboard():
         return send_from_directory(base_dir, "admin.html")
 
     @app.get("/api/admin-entry")
     @login_required
-    @admin_required
+    @require_role(["admin", "moderator"])
     def admin_entry():
         return jsonify({"url": admin_page_path}), 200
 

@@ -17,12 +17,12 @@
 
 body.dark-mode {
     --background: var(--bg-primary, #000000);
-    --card: var(--bg-glass, rgba(28, 28, 30, 0.75));
-    --text: var(--text-primary, #f5f5f7);
-    --muted: var(--text-secondary, #86868b);
-    --border: var(--border-subtle, rgba(255, 255, 255, 0.1));
+    --card: var(--bg-card, #1C1C1E);
+    --text: var(--text-primary, #FFFFFF);
+    --muted: var(--text-secondary, #98989D);
+    --border: var(--border-subtle, rgba(255, 255, 255, 0.12));
     --hover: rgba(127, 127, 127, 0.18);
-    --primary: var(--text-primary, #f5f5f7);
+    --primary: var(--accent-primary, #0A84FF);
     --primary-text: var(--bg-primary, #000000);
     --danger: var(--color-danger, #ff3b30);
     --shadow: var(--shadow-floating, 0 12px 40px rgba(0, 0, 0, 0.5));
@@ -765,7 +765,7 @@ body.dark-mode select#theme-select option {
 
     justify-content: center;
 
-    background: rgba(15, 18, 25, 0.42);
+    background: rgba(0, 0, 0, 0.42);
 
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
