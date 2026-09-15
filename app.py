@@ -1,16 +1,20 @@
+import os
 from pathlib import Path
 
+from dotenv import load_dotenv
 from backend import create_app
 from flask import send_from_directory
 
+load_dotenv()
+
 app = create_app()
-app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
-app.config["MAIL_SERVER"] = "smtp.gmail.com"
-app.config["MAIL_PORT"] = 587
-app.config["MAIL_USE_TLS"] = True
-app.config["MAIL_USERNAME"] = "kaiyaowu3@gmail.com"
-app.config["MAIL_PASSWORD"] = "hxqr ryjl srdz wulv"
-app.config["MAIL_DEFAULT_SENDER"] = "kaiyaowu3@gmail.com"
+app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
+app.config["MAIL_SERVER"] = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+app.config["MAIL_PORT"] = int(os.getenv("MAIL_PORT", "587"))
+app.config["MAIL_USE_TLS"] = os.getenv("MAIL_USE_TLS", "True").lower() in ("true", "1", "t")
+app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")
+app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
+app.config["MAIL_DEFAULT_SENDER"] = os.getenv("MAIL_DEFAULT_SENDER", os.getenv("MAIL_USERNAME"))
 BASE_DIR = Path(__file__).resolve().parent
 
 

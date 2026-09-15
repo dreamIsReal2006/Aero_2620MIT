@@ -36,6 +36,11 @@ class Post(db.Model):
         index=True
     )
 
+    parent_id = db.Column(db.Integer, db.ForeignKey("posts.id"), nullable=True, index=True)
+    type = db.Column(db.String(12), nullable=False, default="original", index=True)
+
+    parent = db.relationship("Post", remote_side=[id], backref=db.backref("reposts", lazy=True))
+
     author = db.relationship(
         "User",
         backref=db.backref(
