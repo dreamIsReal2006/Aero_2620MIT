@@ -3951,20 +3951,8 @@ html.dark-mode body.light-mode {
     display: none;
 }
 
-.back-to-feed-btn {
-    position: fixed;
-    top: 88px;
-    left: 50%;
-    z-index: 1100;
-    padding: 10px 16px;
-    border-radius: 999px;
-    color: var(--text-primary);
-    cursor: pointer;
-    transform: translateX(-50%);
-}
-
-.back-to-feed-btn.hidden {
-    display: none !important;
+#view-main.is-post-focused .feed-tabs {
+    display: none;
 }
 
 .dock-btn { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease; }

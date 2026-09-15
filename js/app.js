@@ -356,6 +356,7 @@
     function switchView(view, options = {}) {
         if (!views[view]) return;
         if (activeView === 'shorts' && view !== 'shorts') cleanupShortsPlayback();
+        if (view === 'main') window.ViewHistory?.restoreFeed();
         activeView = view;
         const currentViewId = views[view];
         document.querySelectorAll('.view-container, .view-section, #search-results-page').forEach((element) => {

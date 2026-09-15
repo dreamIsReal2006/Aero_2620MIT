@@ -48,17 +48,6 @@
         feed.querySelectorAll('[data-post-id]').forEach((post) => post.classList.toggle('hidden', post !== target));
         main.querySelector('.compose-trigger')?.classList.add('hidden');
         main.classList.add('is-post-focused');
-        let backButton = document.getElementById('back-to-feed-btn');
-        if (!backButton) {
-            backButton = document.createElement('button');
-            backButton.id = 'back-to-feed-btn';
-            backButton.type = 'button';
-            backButton.className = 'back-to-feed-btn liquid-glass liquid-glass-interactive';
-            backButton.textContent = 'Back to feed';
-            backButton.addEventListener('click', restoreFeed);
-            feed.before(backButton);
-        }
-        backButton.classList.remove('hidden');
     }
 
     function restoreFeed() {
@@ -67,7 +56,6 @@
         feed?.querySelectorAll('[data-post-id]').forEach((post) => post.classList.remove('hidden'));
         main?.querySelector('.compose-trigger')?.classList.remove('hidden');
         main?.classList.remove('is-post-focused');
-        document.getElementById('back-to-feed-btn')?.classList.add('hidden');
     }
 
     function openHistoryPost(postId) {

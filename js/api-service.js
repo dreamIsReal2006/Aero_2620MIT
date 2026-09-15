@@ -1653,18 +1653,12 @@ const AeroAPI = {
             postEl.className = 'post-card glass-card liquid-glass liquid-glass-interactive pop-in g2-card';
             postEl.dataset.postId = String(post.id);
             const recordPostView = () => window.ViewHistory?.recordViewedPost(post);
-            postEl.addEventListener('click', (event) => {
-                if (!event.target.closest('button, a, input, textarea, video')) recordPostView();
-            });
-            if ('IntersectionObserver' in window) {
-                const observer = new IntersectionObserver((entries) => {
-                    if (entries.some((entry) => entry.isIntersecting)) {
-                        recordPostView();
-                        observer.disconnect();
-                    }
-                }, { threshold: 0.6 });
-                observer.observe(postEl);
-            }
+            const openFocusedPost = (event) => {
+                if (event.target.closest('button, a, input, textarea, video')) return;
+                window.ViewHistory?.showOnlyPost(post.id);
+                recordPostView();
+            };
+            postEl.addEventListener('click', openFocusedPost);
             const header = document.createElement('div');
             header.className = 'post-header';
             const authorIdentity = document.createElement('div');
