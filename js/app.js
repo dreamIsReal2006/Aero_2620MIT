@@ -294,7 +294,7 @@
                             <time class="post-relative-time">${window.AeroFormatRelativeTime?.(post.created_at) || new Date(post.created_at || Date.now()).toLocaleDateString()}</time>
                         </div>
                     </div>
-                    <div class="post-content">${(post.content || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]))}</div>
+                    <div class="post-content">${window.renderRichTextWithMentions ? window.renderRichTextWithMentions(post.content || '') : (post.content || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]))}</div>
                 </article>
             `).join('') : '<div class="post-card glass-card text-center"><p>No posts yet.</p></div>';
             bindProfileTabs(profileUserId, user, avatar);
@@ -336,7 +336,8 @@
             container.innerHTML = items.map((item) => {
                 const content = contentType === 'replies' ? item.content : item.content;
                 const summary = contentType === 'replies' ? `<small class="profile-content-context">On @${escape(item.post?.username)}: ${escape(item.post?.content)}</small>` : '';
-                return `<article class="post-card glass-card liquid-glass liquid-glass-interactive pop-in g2-card"><div class="post-header"><div class="post-author-identity"><span class="post-avatar ${user.is_online ? 'is-online' : ''}"><img src="${escape(avatar)}" alt="@${escape(user.username)}"></span><span class="post-author">@${escape(user.username)}${profileRoleBadge(user.role)}</span><time class="post-relative-time">${window.AeroFormatRelativeTime?.(item.created_at) || new Date(item.created_at || Date.now()).toLocaleDateString()}</time></div></div><div class="post-content">${escape(content)}</div>${summary}</article>`;
+                const richContent = window.renderRichTextWithMentions ? window.renderRichTextWithMentions(content) : escape(content);
+                return `<article class="post-card glass-card liquid-glass liquid-glass-interactive pop-in g2-card"><div class="post-header"><div class="post-author-identity"><span class="post-avatar ${user.is_online ? 'is-online' : ''}"><img src="${escape(avatar)}" alt="@${escape(user.username)}"></span><span class="post-author">@${escape(user.username)}${profileRoleBadge(user.role)}</span><time class="post-relative-time">${window.AeroFormatRelativeTime?.(item.created_at) || new Date(item.created_at || Date.now()).toLocaleDateString()}</time></div></div><div class="post-content">${richContent}</div>${summary}</article>`;
             }).join('');
         } catch (error) {
             container.innerHTML = `<div class="post-card glass-card text-center"><p>${error.message}</p></div>`;

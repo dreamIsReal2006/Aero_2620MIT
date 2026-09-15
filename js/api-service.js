@@ -20,6 +20,14 @@ function escapeHtml(value = '') {
         .replace(/'/g, '&#039;');
 }
 
+function renderRichTextWithMentions(text = '') {
+    const content = escapeHtml(String(text ?? ''));
+    return content.replace(/(^|[\s(])@([A-Za-z0-9_]{1,30})(?=$|[^\w])/g, (_, prefix, username) => {
+        const safeUsername = escapeHtml(username);
+        return `${prefix}<a href="#" class="mention-link" data-username="${safeUsername}">@${safeUsername}</a>`;
+    });
+}
+
 function highlightMatch(text, query) {
     const rawText = String(text ?? '');
     if (!query.trim()) return escapeHtml(rawText);
@@ -105,6 +113,26 @@ function syncCurrentUserAvatars(user = {}) {
 
 window.addEventListener('aero:user-updated', (event) => {
     syncCurrentUserAvatars(event.detail || JSON.parse(localStorage.getItem('aero_user') || '{}'));
+});
+
+document.addEventListener('click', async (event) => {
+    const mentionLink = event.target.closest('.mention-link');
+    if (!mentionLink) return;
+    event.preventDefault();
+    const username = String(mentionLink.dataset.username || '').trim();
+    if (!username) return;
+    try {
+        const response = await fetch(`${API_BASE}/search?q=${encodeURIComponent(username)}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.message || 'Unable to find user');
+        const match = (data.users || []).find((user) => String(user.username || '') === username);
+        if (!match || !Number(match.id)) throw new Error('User not found');
+        window.navigateToUserProfile?.(Number(match.id));
+    } catch (error) {
+        window.showNotice?.(`@${username} could not be opened right now.`, 'error');
+    }
 });
 
 async function updatePresence() {
@@ -765,7 +793,7 @@ function renderNotifications() {
     const items = notificationItems.filter((item) => notificationTab === 'all' || item.type === notificationTab || (notificationTab === 'mentions' && item.type === 'mention'));
     list.innerHTML = items.length ? items.map((item) => {
         const actor = item.actor || {};
-        const icon = item.type === 'like' ? '♥' : item.type === 'comment' ? '●' : item.type === 'follow' ? '●' : '↗';
+        const icon = item.type === 'like' ? '♥' : item.type === 'comment' ? '●' : item.type === 'follow' ? '●' : item.type === 'mention' ? '@' : '↗';
         const avatarUrl = actor.avatar_url ? (actor.avatar_url.startsWith('http') ? actor.avatar_url : `${API_ORIGIN}${actor.avatar_url}`) : '';
         const avatar = avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="" onerror="this.remove()">` : escapeHtml((actor.username || 'S').charAt(0).toUpperCase());
         return `<article class="notification-item" data-post-id="${item.post_id || ''}" tabindex="0"><span class="notification-avatar">${avatar}</span><div class="notification-copy"><strong>@${escapeHtml(actor.username || 'Someone')}</strong><span>${escapeHtml(item.message || `${item.type} your post`)}</span><time>${formatRelativeTime(item.created_at)}</time><p>${escapeHtml(item.post_content || '')}</p></div><span class="notification-type-icon">${icon}</span></article>`;
@@ -1756,7 +1784,7 @@ const AeroAPI = {
             header.append(moreButton, optionsMenu);
             const content = document.createElement('div');
             content.className = 'post-content';
-            content.textContent = post.content;
+            content.innerHTML = renderRichTextWithMentions(post.content || '');
             postEl.append(header, content);
             if (post.images && post.images.length) {
                 const media = document.createElement('div');
@@ -1953,7 +1981,7 @@ const AeroAPI = {
                 metaLine.append(meta, time, authorTag);
                 commentHeader.append(avatarWrap, metaLine);
                 const body = document.createElement('p');
-                body.textContent = comment.content;
+                body.innerHTML = renderRichTextWithMentions(comment.content || '');
                 if (comment.image_url) {
                     const gif = document.createElement('img');
                     gif.className = 'comment-gif';

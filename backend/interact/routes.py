@@ -2,6 +2,7 @@ from flask import jsonify, request
 
 from backend import db
 from backend.auth.routes import token_required
+from backend.feed.routes import create_mention_notifications
 from backend.interact import interact_bp
 from backend.models import Post, Like, Comment, CommentLike, Notification
 
@@ -164,6 +165,7 @@ def create_comment(current_user, post_id):
             type="comment",
             message=f"@{current_user.username} commented on your post",
         ))
+    create_mention_notifications(current_user, content, post_id=post.id, context="comment")
     db.session.commit()
 
     return jsonify({
@@ -228,6 +230,7 @@ def create_reply(current_user, comment_id):
     )
 
     db.session.add(reply)
+    create_mention_notifications(current_user, content, post_id=parent_comment.post_id, context="reply")
     db.session.commit()
 
     return jsonify({

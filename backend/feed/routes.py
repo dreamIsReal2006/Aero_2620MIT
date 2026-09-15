@@ -1,6 +1,7 @@
 import json
 import datetime as dt
 import math
+import re
 import uuid
 from pathlib import Path
 
@@ -70,6 +71,36 @@ def visible_posts_query(current_user):
             User.id.in_(author_ids),
         )
     )
+
+
+def extract_mentions(text):
+    matches = re.findall(r'(?<!\w)@([A-Za-z0-9_]{1,30})', str(text or ''))
+    unique = []
+    seen = set()
+    for username in matches:
+        normalized = username.strip()
+        if not normalized:
+            continue
+        if normalized not in seen:
+            seen.add(normalized)
+            unique.append(normalized)
+    return unique
+
+
+def create_mention_notifications(actor, text, post_id=None, context="post"):
+    if not text:
+        return
+    for username in extract_mentions(text):
+        user = User.query.filter(User.username == username).first()
+        if not user or user.id == actor.id or not user.active or user.is_banned:
+            continue
+        db.session.add(Notification(
+            recipient_id=user.id,
+            actor_id=actor.id,
+            post_id=post_id,
+            type="mention",
+            message=f"@{actor.username} mentioned you in a {context}",
+        ))
 
 
 @feed_bp.get("/search")
@@ -166,6 +197,8 @@ def create_post(current_user):
         type=post_type,
     )
     db.session.add(post)
+    db.session.commit()
+    create_mention_notifications(current_user, content, post_id=post.id, context="post")
     db.session.commit()
     return jsonify(post_payload(post, current_user.id)), 201
 
