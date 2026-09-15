@@ -1208,17 +1208,19 @@ async function loadBookmarksDrawer() {
 async function openBookmarkedPost(postId) {
     if (!Number.isInteger(postId) || postId <= 0) return;
     setBookmarkDrawerVisibility(false);
-    let postElement = document.querySelector(`#posts-feed [data-post-id="${postId}"]`);
+    window.AeroRouter?.navigate('main');
+    let postElement = document.querySelector(`#posts-feed [data-post-id="${CSS.escape(String(postId))}"]`);
     if (!postElement) {
         try {
             await AeroAPI.renderFeed();
-            postElement = document.querySelector(`#posts-feed [data-post-id="${postId}"]`);
+            postElement = document.querySelector(`#posts-feed [data-post-id="${CSS.escape(String(postId))}"]`);
         } catch (error) {
             showNotice(error.message || 'Unable to open bookmarked post.', 'error');
             return;
         }
     }
     if (postElement) {
+        window.ViewHistory?.showOnlyPost(postId);
         postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         postElement.classList.add('bookmark-focus');
         window.setTimeout(() => postElement.classList.remove('bookmark-focus'), 1200);
