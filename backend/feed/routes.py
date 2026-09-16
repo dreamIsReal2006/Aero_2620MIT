@@ -11,7 +11,7 @@ from werkzeug.utils import secure_filename
 from backend import db
 from backend.auth.routes import token_required
 from backend.feed import feed_bp
-from backend.models import Comment, Follow, Like, Notification, Post, User, UserInteraction
+from backend.models import Comment, Follow, Like, Message, Notification, Post, User, UserInteraction
 from backend.privacy import visible_author_ids as get_visible_author_ids
 from backend.presence import is_user_online
 
@@ -358,6 +358,14 @@ def send_post_to_user(current_user, post_id):
     recipient = User.query.filter(User.username.ilike(recipient_name)).first()
     if not post or not recipient:
         return jsonify({"message": "Post or recipient not found"}), 404
+    post_link = f"/#post-{post.id}"
+    db.session.add(Message(
+        sender_id=current_user.id,
+        recipient_id=recipient.id,
+        content=f"Shared post from @{current_user.username}: {post_link}",
+        type="shared_post",
+        media_url="",
+    ))
     db.session.add(Notification(
         recipient_id=recipient.id,
         actor_id=current_user.id,

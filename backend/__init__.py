@@ -106,6 +106,7 @@ def create_app():
         VideoLike,
         ModerationLog,
         AppealTicket,
+        Mute,
     )
 
     # Authentication

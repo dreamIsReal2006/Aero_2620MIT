@@ -934,7 +934,7 @@ async function loadChatContacts() {
         const avatar = avatarUrl
             ? `<img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy" onerror="this.remove()">`
             : escapeHtml(avatarText || 'U');
-        return `<button type="button" class="chat-contact ${contact.unread_count ? 'unread' : ''}" data-user-id="${contact.id}"><span class="chat-contact-avatar ${contact.is_online ? 'is-online' : ''}">${avatar}</span><span><strong>@${escapeHtml(contact.username)}</strong><small>${escapeHtml(contact.latest_message || 'Start a conversation')}</small></span></button>`;
+        return `<button type="button" class="chat-contact ${contact.unread_count ? 'unread' : ''}" data-user-id="${contact.id}"><span class="chat-contact-avatar ${contact.is_online ? 'is-online' : ''}">${avatar}</span><span><strong>@${escapeHtml(contact.username)}${contact.is_muted ? ' <span class="chat-muted-icon" title="Muted">🔕</span>' : ''}</strong><small>${escapeHtml(contact.latest_message || 'Start a conversation')}</small></span></button>`;
     }).join('') || '<div class="bookmarks-empty">No contacts yet.</div>';
     list.querySelectorAll('.chat-contact').forEach((item) => item.addEventListener('click', () => selectChatContact(contacts.find((contact) => String(contact.id) === item.dataset.userId))));
 }
@@ -977,6 +977,8 @@ async function selectChatContact(contact) {
     }
     await loadChatMessages();
     const blockButton = document.getElementById('chat-block-btn');
+    const muteButton = document.getElementById('chat-mute-btn');
+    const chatInput = document.getElementById('chat-input') || document.getElementById('chat-message-input');
     if (blockButton) {
         blockButton.classList.remove('hidden');
         blockButton.classList.remove('is-blocked');
@@ -987,6 +989,12 @@ async function selectChatContact(contact) {
         if (chatInput) chatInput.disabled = Boolean(blockData.blocked);
         chatAlert?.classList.toggle('hidden', !blockData.blocked);
         if (chatAlert && blockData.blocked) chatAlert.textContent = 'You have blocked this user.';
+    }
+    if (muteButton) {
+        muteButton.classList.remove('hidden');
+        muteButton.classList.toggle('is-muted', Boolean(contact.is_muted));
+        muteButton.textContent = contact.is_muted ? '🔕' : '🔔';
+        muteButton.title = contact.is_muted ? 'Unmute user' : 'Mute user';
     }
     await loadChatContacts();
     await loadUnreadChatCount();
@@ -1009,14 +1017,19 @@ async function loadChatMessages() {
     chatMessageSnapshots.set(snapshotKey, messageIds);
     const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
     const formatBytes = (value) => { const size = Number(value) || 0; if (size < 1024) return `${size} B`; if (size < 1048576) return `${Math.round(size / 1024)} KB`; return `${(size / 1048576).toFixed(1)} MB`; };
+    const renderMessageText = (value) => escapeHtml(value).replace(
+        /(https?:\/\/[^\s<]+|\/#post-\d+)/g,
+        '<a class="chat-message-link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
     const mediaMarkup = (message) => {
         const url = message.media_url ? (String(message.media_url).startsWith('http') ? message.media_url : `${API_ORIGIN}${message.media_url}`) : '';
         if (!url) return '';
         if (message.type === 'image' || message.type === 'gif') return `<button type="button" class="chat-media-preview" data-lightbox-src="${escapeHtml(url)}"><img src="${escapeHtml(url)}" alt="Attached image" loading="lazy"></button>`;
         if (message.type === 'video') return `<video class="chat-inline-video" src="${escapeHtml(url)}" controls preload="metadata"></video>`;
+        if (message.type === 'audio') return `<audio class="chat-inline-audio" src="${escapeHtml(url)}" controls></audio>`;
         return `<a class="chat-document-card" href="${escapeHtml(url)}" download><span class="chat-document-ext">${escapeHtml((message.file_name || 'FILE').split('.').pop().slice(0, 5).toUpperCase())}</span><span><strong>${escapeHtml(message.file_name || 'Attached document')}</strong><small>${formatBytes(message.file_size)}</small></span><span class="chat-document-download" aria-hidden="true">↓</span></a>`;
     };
-    box.innerHTML = (messages || []).map((message) => `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}"><div class="chat-bubble-content">${mediaMarkup(message)}${message.content ? escapeHtml(message.content) : ''}</div><div class="chat-message-meta"><time>${escapeHtml(message.created_at ? new Date(message.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '')}</time>${message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : ''}</div></div>`).join('');
+    box.innerHTML = (messages || []).map((message) => `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}"><div class="chat-bubble-content">${mediaMarkup(message)}${message.content ? renderMessageText(message.content) : ''}</div><div class="chat-message-meta"><time>${escapeHtml(message.created_at ? new Date(message.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '')}</time>${message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : ''}</div></div>`).join('');
     box.querySelectorAll('[data-lightbox-src]').forEach((item) => item.addEventListener('click', () => { const lightbox = document.getElementById('chat-lightbox'); const image = document.getElementById('chat-lightbox-image'); image.src = item.dataset.lightboxSrc; lightbox.classList.remove('hidden'); }));
     box.querySelectorAll('[data-delete-message]').forEach((button) => button.addEventListener('click', async () => { const response = await fetch(`${API_BASE}/chat/messages/${button.dataset.deleteMessage}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }); if (response.ok) button.closest('.chat-message')?.remove(); }));
     box.scrollTop = box.scrollHeight;
@@ -1044,6 +1057,7 @@ function setupMediaAndChat() {
     const attachmentMenu = document.getElementById('chat-attachment-menu');
     const inlineAlert = document.getElementById('chat-inline-alert');
     const blockButton = document.getElementById('chat-block-btn');
+    const muteButton = document.getElementById('chat-mute-btn');
     const setBlockedState = (blocked) => { blockButton?.classList.toggle('is-blocked', blocked); if (blockButton) blockButton.textContent = blocked ? 'Unblock' : 'Block'; const input = getChatInput(); if (input) input.disabled = blocked; inlineAlert?.classList.toggle('hidden', !blocked); if (inlineAlert) inlineAlert.textContent = blocked ? 'You have blocked this user.' : ''; };
     const blockModal = document.getElementById('chat-block-confirm-modal');
     const blockModalBody = document.getElementById('chat-block-confirm-body');
@@ -1060,8 +1074,24 @@ function setupMediaAndChat() {
     document.getElementById('chat-block-confirm')?.addEventListener('click', async () => { const pending = blockModalPending; if (!pending) return; const confirmButton = document.getElementById('chat-block-confirm'); confirmButton.disabled = true; try { await pending.onConfirm(); closeBlockModal(); } finally { confirmButton.disabled = false; } });
     const refreshBlockState = async (contact) => { const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }); const data = await response.json().catch(() => ({})); setBlockedState(response.ok && Boolean(data.blocked)); };
     blockButton?.addEventListener('click', async () => { const contact = activeChatUser || window.activeChatUser; if (!contact) return; const blocked = blockButton.classList.contains('is-blocked'); const toggle = async () => { const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, { method: blocked ? 'DELETE' : 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }); if (response.ok) { setBlockedState(!blocked); window.showNotice?.(blocked ? 'User unblocked.' : 'You have blocked this user.', 'success'); } }; if (blocked) await toggle(); else window.openChatBlockConfirmation?.(contact, toggle); });
+    muteButton?.addEventListener('click', async () => {
+        const contact = activeChatUser || window.activeChatUser;
+        if (!contact) return;
+        const muted = muteButton.classList.contains('is-muted');
+        const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/mute`, {
+            method: muted ? 'DELETE' : 'POST',
+            headers: { 'Authorization': `******'aero_token')}` }
+        });
+        if (!response.ok) return;
+        contact.is_muted = !muted;
+        muteButton.classList.toggle('is-muted', !muted);
+        muteButton.textContent = muted ? '🔔' : '🔕';
+        muteButton.title = muted ? 'Mute user' : 'Unmute user';
+        await loadChatContacts();
+        window.showNotice?.(muted ? 'User unmuted.' : 'User muted.', 'success');
+    });
     attachButton?.addEventListener('click', () => attachmentMenu?.classList.toggle('hidden'));
-    attachmentMenu?.addEventListener('click', (event) => { const button = event.target.closest('[data-attachment-kind]'); if (!button) return; fileInput.accept = button.dataset.attachmentKind === 'media' ? 'image/*,video/*' : button.dataset.attachmentKind === 'document' ? '.pdf,.txt,.doc,.docx,.xls,.xlsx' : 'image/*,video/*,.pdf,.txt,.doc,.docx,.xls,.xlsx'; attachmentMenu.classList.add('hidden'); fileInput.click(); });
+    attachmentMenu?.addEventListener('click', (event) => { const button = event.target.closest('[data-attachment-kind]'); if (!button) return; fileInput.accept = button.dataset.attachmentKind === 'media' ? 'image/*,video/*,audio/*' : button.dataset.attachmentKind === 'document' ? '.pdf,.txt,.doc,.docx,.xls,.xlsx' : 'image/*,video/*,audio/*,.pdf,.txt,.doc,.docx,.xls,.xlsx'; attachmentMenu.classList.add('hidden'); fileInput.click(); });
     fileInput?.addEventListener('change', () => fileInput.files[0] && window.selectChatAttachment?.(fileInput.files[0]));
     window.selectChatAttachment = async (file) => { const formData = new FormData(); formData.append('file', file); const response = await fetch(`${API_BASE}/chat/uploads`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: formData }); const data = await response.json().catch(() => ({})); if (!response.ok) { window.showNotice?.(data.message || 'Unable to upload attachment.', 'error'); return; } const input = getChatInput(); input.dataset.mediaUrl = data.url; input.dataset.messageType = data.type; input.dataset.fileName = data.file_name; input.dataset.fileSize = data.file_size; input.placeholder = data.file_name; input.focus(); };
     document.getElementById('chat-lightbox-close')?.addEventListener('click', () => document.getElementById('chat-lightbox')?.classList.add('hidden'));

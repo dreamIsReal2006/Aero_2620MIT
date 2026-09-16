@@ -1,6 +1,10 @@
 (() => {
     const apiBase = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000/api' : `${window.location.origin}/api`;
     const escapeText = (value) => String(value || '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));
+    const renderMessageText = (value) => escapeText(value).replace(
+        /(https?:\/\/[^\s<]+|\/#post-\d+)/g,
+        '<a class="chat-message-link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
     const gifUrlPattern = /https?:\/\/[^\s<>"']+(?:\.gif(?:\?[^\s<>"']*)?|(?:media|i)\.giphy\.com|tenor\.com[^\s<>"']*)/i;
     const extractGifUrl = (content) => String(content || '').match(gifUrlPattern)?.[0] || '';
     const parseGifContent = (content, mediaUrl = '', type = '') => {
@@ -30,6 +34,13 @@
         const blockButton = document.getElementById('chat-block-btn');
         blockButton?.classList.toggle('hidden', !contact?.id);
         if (blockButton) blockButton.textContent = 'Block';
+        const muteButton = document.getElementById('chat-mute-btn');
+        muteButton?.classList.toggle('hidden', !contact?.id);
+        if (muteButton) {
+            muteButton.classList.toggle('is-muted', Boolean(contact?.is_muted));
+            muteButton.textContent = contact?.is_muted ? '🔕' : '🔔';
+            muteButton.title = contact?.is_muted ? 'Unmute user' : 'Mute user';
+        }
         avatarElement.replaceChildren();
         avatarElement.classList.toggle('is-online', Boolean(contact?.is_online));
         const avatarUrl = contactAvatarUrl(contact);
@@ -110,13 +121,14 @@
             if (!url) return '';
             if (message.type === 'image' || message.type === 'gif') return `<button type="button" class="chat-media-preview" data-lightbox-src="${escapeText(url)}"><img src="${escapeText(url)}" alt="Attached image" loading="lazy"></button>`;
             if (message.type === 'video') return `<video class="chat-inline-video" src="${escapeText(url)}" controls preload="metadata"></video>`;
+            if (message.type === 'audio') return `<audio class="chat-inline-audio" src="${escapeText(url)}" controls></audio>`;
             return `<a class="chat-document-card" href="${escapeText(url)}" download><span class="chat-document-ext">${escapeText((message.file_name || 'FILE').split('.').pop().toUpperCase())}</span><span><strong>${escapeText(message.file_name || 'Attached document')}</strong><small>${escapeText(String(message.file_size || 0))} bytes</small></span><span class="chat-document-download">↓</span></a>`;
         };
         box.innerHTML = (messages || []).map((message) => {
             const gif = parseGifContent(message.content, message.media_url, message.type);
             const timestamp = message.created_at ? new Date(message.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
             const deleteButton = message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : '';
-            return `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}"><div class="chat-bubble-content">${message.type === 'text' ? '' : attachmentMarkup(message)}${gif.text ? escapeText(gif.text) : ''}</div><div class="chat-message-meta"><time>${escapeText(timestamp)}</time>${deleteButton}</div></div>`;
+            return `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}"><div class="chat-bubble-content">${message.type === 'text' || message.type === 'shared_post' ? '' : attachmentMarkup(message)}${gif.text ? renderMessageText(gif.text) : ''}</div><div class="chat-message-meta"><time>${escapeText(timestamp)}</time>${deleteButton}</div></div>`;
         }).join('');
         box.querySelectorAll('[data-lightbox-src]').forEach((item) => item.addEventListener('click', () => { const lightbox = document.getElementById('chat-lightbox'); const image = document.getElementById('chat-lightbox-image'); if (lightbox && image) { image.src = item.dataset.lightboxSrc; lightbox.classList.remove('hidden'); } }));
         box.querySelectorAll('[data-delete-message]').forEach((button) => button.addEventListener('click', async () => {

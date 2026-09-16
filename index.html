@@ -373,14 +373,15 @@
             <section class="chat-panel">
                 <div id="chat-active-header" class="chat-active-header"><span id="chat-active-avatar"
                         class="chat-active-avatar" aria-hidden="true">U</span><span id="chat-active-name">Select a
-                        contact</span><button type="button" id="chat-block-btn" class="chat-header-action hidden"
-                        aria-label="Block user">Block</button></div>
+                        contact</span><button type="button" id="chat-mute-btn" class="chat-header-action hidden"
+                        aria-label="Mute user" title="Mute user">🔔</button><button type="button" id="chat-block-btn"
+                        class="chat-header-action hidden" aria-label="Block user">Block</button></div>
                 <div id="chat-inline-alert" class="chat-inline-alert hidden" role="status"></div>
                 <div id="chat-messages-list" class="chat-messages"></div>
                 <form id="chat-form" class="chat-form"><button type="button" id="chat-attach-btn"
                         class="chat-attach-btn" aria-label="Add attachment" title="Add attachment">+</button><input
                         id="chat-file-input" type="file" hidden
-                        accept="image/*,video/*,.pdf,.txt,.doc,.docx,.xls,.xlsx"><input id="chat-input" type="text"
+                        accept="image/*,video/*,audio/*,.pdf,.txt,.doc,.docx,.xls,.xlsx"><input id="chat-input" type="text"
                         maxlength="2000" placeholder="Message..." aria-label="Message"><button type="button"
                         id="chat-emoji-btn" aria-label="Add emoji">☺</button><button type="button" id="chat-gif-btn"
                         aria-label="Add GIF">GIF</button><button type="submit" aria-label="Send message">➤</button>

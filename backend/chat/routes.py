@@ -7,11 +7,12 @@ from werkzeug.utils import secure_filename
 from backend import db
 from backend.auth.routes import token_required
 from backend.chat import chat_bp
-from backend.models import Block, Follow, Message, Note, User
+from backend.models import Block, Follow, Message, Mute, Note, User
 from backend.presence import is_user_online
 
 CHAT_UPLOAD_TYPES = {
     "image/": "image", "video/": "video",
+    "audio/": "audio",
     "application/pdf": "document", "text/plain": "document",
     "application/msword": "document", "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "document",
     "application/vnd.ms-excel": "document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "document",
@@ -19,7 +20,10 @@ CHAT_UPLOAD_TYPES = {
 
 
 def _user_payload(user, viewer_id=None):
-    return {"id": user.id, "username": user.username, "display_name": user.display_name or user.username, "avatar_url": user.avatar_url or "", "role": user.role if user.role in {"admin", "moderator", "user"} else "user", "is_online": is_user_online(user, viewer_id)}
+    muted = viewer_id is not None and Mute.query.filter_by(
+        muter_id=viewer_id, muted_id=user.id
+    ).first() is not None
+    return {"id": user.id, "username": user.username, "display_name": user.display_name or user.username, "avatar_url": user.avatar_url or "", "role": user.role if user.role in {"admin", "moderator", "user"} else "user", "is_online": is_user_online(user, viewer_id), "is_muted": muted}
 
 
 @chat_bp.get("/friends")
@@ -43,7 +47,7 @@ def get_contacts(current_user):
         ).order_by(Message.created_at.desc()).first()
         item = _user_payload(user, current_user.id)
         item["latest_message"] = latest.content if latest else ""
-        item["unread_count"] = Message.query.filter_by(
+        item["unread_count"] = 0 if item["is_muted"] else Message.query.filter_by(
             sender_id=user.id, recipient_id=current_user.id, is_read=False
         ).count()
         payload.append(item)
@@ -53,8 +57,13 @@ def get_contacts(current_user):
 @chat_bp.get("/chat/unread-count")
 @token_required
 def get_unread_count(current_user):
-    unread_count = Message.query.filter_by(
-        recipient_id=current_user.id, is_read=False
+    muted_ids = db.session.query(Mute.muted_id).filter_by(
+        muter_id=current_user.id
+    )
+    unread_count = Message.query.filter(
+        Message.recipient_id == current_user.id,
+        Message.is_read.is_(False),
+        ~Message.sender_id.in_(muted_ids),
     ).count()
     return jsonify({"unread_count": unread_count})
 
@@ -149,6 +158,38 @@ def unblock_contact(current_user, user_id):
     return jsonify({"blocked": False})
 
 
+@chat_bp.post("/chat/contacts/<int:user_id>/mute")
+@token_required
+def mute_contact(current_user, user_id):
+    if user_id == current_user.id or not db.session.get(User, user_id):
+        return jsonify({"message": "Invalid contact"}), 400
+    if not Mute.query.filter_by(muter_id=current_user.id, muted_id=user_id).first():
+        db.session.add(Mute(muter_id=current_user.id, muted_id=user_id))
+        db.session.commit()
+    return jsonify({"muted": True})
+
+
+@chat_bp.get("/chat/contacts/<int:user_id>/mute")
+@token_required
+def get_mute_status(current_user, user_id):
+    muted = Mute.query.filter_by(
+        muter_id=current_user.id, muted_id=user_id
+    ).first() is not None
+    return jsonify({"muted": muted})
+
+
+@chat_bp.delete("/chat/contacts/<int:user_id>/mute")
+@token_required
+def unmute_contact(current_user, user_id):
+    mute = Mute.query.filter_by(
+        muter_id=current_user.id, muted_id=user_id
+    ).first()
+    if mute:
+        db.session.delete(mute)
+        db.session.commit()
+    return jsonify({"muted": False})
+
+
 @chat_bp.delete("/chat/messages/<int:message_id>")
 @token_required
 def delete_message(current_user, message_id):
@@ -173,7 +214,7 @@ def send_message(current_user):
     media_url = str(data.get("media_url") or "").strip()
     message_type = "gif" if str(
         data.get("type") or "").lower() == "gif" and media_url else "text"
-    if str(data.get("type") or "").lower() in {"image", "video", "document"}:
+    if str(data.get("type") or "").lower() in {"image", "video", "audio", "document"}:
         message_type = str(data.get("type")).lower()
     file_name = str(data.get("file_name") or "").strip()[:255]
     try:
