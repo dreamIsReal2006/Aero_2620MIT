@@ -5,9 +5,13 @@ from flask import jsonify, request
 
 from backend import db
 from backend.auth.routes import token_required
+from backend.admin.decorators import require_role
 from backend.models import Comment, Follow, Notification, Post, Report, User, Video, VideoLike
+from backend.presence import is_user_online
 from backend.privacy import can_view_user_content
 from backend.social import social_bp
+
+VALID_ROLES = {"admin", "moderator", "user"}
 
 
 def serialize_post(post):
@@ -17,6 +21,41 @@ def serialize_post(post):
         "images": json.loads(post.images_json or "[]"),
         "created_at": post.created_at.isoformat(),
     }
+
+
+@social_bp.patch("/users/<int:user_id>/role")
+@token_required
+@require_role("admin")
+def update_user_role(current_user, user_id):
+    if current_user.id == user_id:
+        return jsonify({"message": "Administrators cannot change their own role"}), 400
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+    data = request.get_json(silent=True) or {}
+    role = str(data.get("role", "")).strip().lower()
+    if role not in VALID_ROLES:
+        return jsonify({"message": "Role must be admin, moderator, or user"}), 400
+    user.role = role
+    user.is_admin = role == "admin"
+    db.session.commit()
+    return jsonify({
+        "message": "User role updated",
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "role": role,
+            "is_admin": user.is_admin,
+        },
+    }), 200
+
+
+@social_bp.post("/users/me/presence")
+@token_required
+def update_presence(current_user):
+    current_user.last_seen_at = db.func.now()
+    db.session.commit()
+    return jsonify({"online": True}), 200
 
 
 @social_bp.post("/social/follow/<int:user_id>")
@@ -86,6 +125,8 @@ def get_profile(current_user, user_id):
             "email": user.email,
             "bio": user.bio or "",
             "avatar_url": user.avatar_url or "",
+            "role": user.role if user.role in {"admin", "moderator", "user"} else "user",
+            "is_online": is_user_online(user, current_user.id),
             "created_at": user.created_at.isoformat(),
         },
         "followers_count": followers_count,
@@ -118,6 +159,8 @@ def get_user_profile(current_user, user_id):
             "email": user.email,
             "bio": user.bio or "",
             "avatar_url": user.avatar_url or "",
+            "role": user.role if user.role in {"admin", "moderator", "user"} else "user",
+            "is_online": is_user_online(user, current_user.id),
             "created_at": user.created_at.isoformat(),
         },
         "is_following": is_following,
@@ -213,6 +256,7 @@ def update_my_profile(current_user):
             "email": current_user.email,
             "bio": current_user.bio,
             "avatar_url": current_user.avatar_url,
+            "role": current_user.role if current_user.role in {"admin", "moderator", "user"} else "user",
             "is_admin": current_user.is_admin,
             "is_banned": current_user.is_banned,
             "is_private": current_user.is_private,
@@ -236,6 +280,7 @@ def get_my_profile(current_user):
             "email": current_user.email,
             "bio": current_user.bio or "",
             "avatar_url": current_user.avatar_url or "",
+            "role": current_user.role if current_user.role in {"admin", "moderator", "user"} else "user",
             "is_admin": current_user.is_admin,
             "is_banned": current_user.is_banned,
             "is_private": current_user.is_private,

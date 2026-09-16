@@ -3,11 +3,7 @@
     const HISTORY_LIMIT = 20;
 
     const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (character) => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
     }[character]));
 
     function readHistory() {
@@ -27,18 +23,15 @@
         if (minutes < 60) return `${minutes}m ago`;
         const hours = Math.floor(minutes / 60);
         if (hours < 24) return `${hours}h ago`;
-        const days = Math.floor(hours / 24);
-        return `${days}d ago`;
+        return `${Math.floor(hours / 24)}d ago`;
     }
 
     function avatarMarkup(post) {
         const username = post.username || 'User';
         const avatarUrl = String(post.avatar_url || '');
-        if (avatarUrl) {
-            const normalizedUrl = avatarUrl.startsWith('http') ? avatarUrl : `${window.location.origin}${avatarUrl}`;
-            return `<img src="${escapeHtml(normalizedUrl)}" alt="@${escapeHtml(username)}" onerror="this.outerHTML='<span>${escapeHtml(username.charAt(0).toUpperCase())}</span>'">`;
-        }
-        return `<span>${escapeHtml(username.charAt(0).toUpperCase() || 'U')}</span>`;
+        if (!avatarUrl) return `<span>${escapeHtml(username.charAt(0).toUpperCase() || 'U')}</span>`;
+        const normalizedUrl = avatarUrl.startsWith('http') ? avatarUrl : `${window.location.origin}${avatarUrl}`;
+        return `<img src="${escapeHtml(normalizedUrl)}" alt="@${escapeHtml(username)}" loading="lazy"><span class="history-avatar-fallback">${escapeHtml(username.charAt(0).toUpperCase() || 'U')}</span>`;
     }
 
     function setDrawerOpen(isOpen) {
@@ -60,7 +53,7 @@
             backButton = document.createElement('button');
             backButton.id = 'back-to-feed-btn';
             backButton.type = 'button';
-            backButton.className = 'back-to-feed-btn';
+            backButton.className = 'back-to-feed-btn liquid-glass liquid-glass-interactive';
             backButton.textContent = 'Back to feed';
             backButton.addEventListener('click', restoreFeed);
             feed.before(backButton);
@@ -90,22 +83,23 @@
         window.AeroAPI?.renderFeed?.().then(() => {
             showOnlyPost(postId);
             scrollToPost();
-        }).catch(() => {});
+        }).catch(() => { });
     }
 
     function render() {
         const list = document.getElementById('history-list');
         if (!list) return;
         const history = readHistory();
+        const emptyIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
         list.innerHTML = history.length ? history.map((post) => `
-            <article class="history-item bookmark-item" data-history-id="${Number(post.id)}" tabindex="0" role="button" aria-label="Open post by @${escapeHtml(post.username || 'User')}">
+            <article class="history-item bookmark-item liquid-glass liquid-glass-interactive" data-history-id="${Number(post.id)}" tabindex="0" role="button" aria-label="Open post by @${escapeHtml(post.username || 'User')}">
                 <span class="bookmark-item-avatar" aria-hidden="true">${avatarMarkup(post)}</span>
                 <div class="bookmark-item-content">
                     <div class="bookmark-item-header"><span class="bookmark-item-author">@${escapeHtml(post.username || 'User')}</span><span class="bookmark-item-time">${relativeTime(post.viewed_at)}</span></div>
                     <p class="bookmark-item-text">${escapeHtml(post.content || 'Viewed post')}</p>
                 </div>
             </article>
-        `).join('') : '<div class="bookmarks-empty"><div class="bookmarks-empty-icon">H</div><div>No viewed posts yet.</div></div>';
+        `).join('') : `<div class="bookmarks-empty"><div class="bookmarks-empty-icon">${emptyIconSvg}</div><div>No viewed posts yet.</div></div>`;
 
         list.querySelectorAll('.history-item').forEach((item) => {
             const open = () => openHistoryPost(item.dataset.historyId);
@@ -135,8 +129,7 @@
     }
 
     function setup() {
-        const button = document.getElementById('history-dock-btn');
-        button?.addEventListener('click', () => {
+        document.getElementById('history-dock-btn')?.addEventListener('click', () => {
             const opening = document.getElementById('history-drawer')?.classList.contains('hidden');
             setDrawerOpen(Boolean(opening));
             if (opening) render();

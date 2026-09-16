@@ -4,7 +4,7 @@ from flask import g, jsonify, request
 
 from backend import db
 from backend.admin import admin_bp
-from backend.admin.decorators import admin_required, login_required
+from backend.admin.decorators import admin_required, login_required, require_role
 from backend.models import AppealTicket, Comment, Like, ModerationLog, Post, Report, User
 
 
@@ -26,7 +26,7 @@ def serialize_user(user):
         "username": user.username,
         "email": user.email,
         "is_banned": bool(user.is_banned),
-        "role": "admin" if user.is_admin or user.role == "admin" else "user",
+        "role": "admin" if user.is_admin or user.role == "admin" else (user.role if user.role == "moderator" else "user"),
     }
 
 
@@ -70,7 +70,7 @@ def serialize_report(report):
 
 @admin_bp.get("/stats")
 @login_required
-@admin_required
+@require_role(["admin", "moderator"])
 def get_stats():
     return success({
         "total_users": db.session.query(db.func.count(User.id)).scalar() or 0,
@@ -81,7 +81,7 @@ def get_stats():
 
 @admin_bp.get("/search_users")
 @login_required
-@admin_required
+@require_role(["admin", "moderator"])
 def search_users():
     query = str(request.args.get("q", "")).strip()
     if not query:
@@ -161,7 +161,7 @@ def demote_user(user_id):
 
 @admin_bp.get("/appeals")
 @login_required
-@admin_required
+@require_role(["admin", "moderator"])
 def get_appeals():
     appeals = AppealTicket.query.filter_by(status="pending").order_by(AppealTicket.created_at).all()
     return success([{
@@ -195,7 +195,7 @@ def create_appeal_from_admin():
 
 @admin_bp.patch("/appeals/<int:appeal_id>/<action>")
 @login_required
-@admin_required
+@require_role(["admin", "moderator"])
 def review_appeal(appeal_id, action):
     if action not in {"approve", "reject"}:
         return failure("Invalid appeal action", 400)
@@ -223,7 +223,7 @@ def review_appeal(appeal_id, action):
 
 @admin_bp.get("/reports")
 @login_required
-@admin_required
+@require_role(["admin", "moderator"])
 def get_pending_reports():
     reports = Report.query.filter_by(status="pending").order_by(Report.created_at.desc()).all()
     return success([serialize_report(report) for report in reports])
@@ -231,7 +231,7 @@ def get_pending_reports():
 
 @admin_bp.patch("/reports/<int:report_id>/dismiss")
 @login_required
-@admin_required
+@require_role(["admin", "moderator"])
 def dismiss_report(report_id):
     report = db.session.get(Report, report_id)
     if not report or report.status != "pending":
@@ -263,6 +263,6 @@ def _delete_post(post_id):
 
 @admin_bp.delete("/posts/<int:post_id>")
 @login_required
-@admin_required
+@require_role(["admin", "moderator"])
 def force_delete_post(post_id):
     return _delete_post(post_id)

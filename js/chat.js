@@ -27,7 +27,11 @@
         const avatarElement = document.getElementById('chat-active-avatar');
         if (!header || !avatarElement) return;
         if (nameElement) nameElement.textContent = `@${name}`;
+        const blockButton = document.getElementById('chat-block-btn');
+        blockButton?.classList.toggle('hidden', !contact?.id);
+        if (blockButton) blockButton.textContent = 'Block';
         avatarElement.replaceChildren();
+        avatarElement.classList.toggle('is-online', Boolean(contact?.is_online));
         const avatarUrl = contactAvatarUrl(contact);
         const letterAvatar = String(contact?.avatar_url || contact?.avatarUrl || contact?.avatar || '').startsWith('letter:')
             ? String(contact.avatar_url || contact.avatarUrl || contact.avatar).slice(7, 8).toUpperCase()
@@ -53,7 +57,7 @@
         const avatarValue = String(contact.avatar_url || contact.avatarUrl || contact.avatar || '');
         const avatarText = avatarValue.startsWith('letter:') ? avatarValue.slice(7, 8).toUpperCase() : String(contact.username || contact.name || 'U').charAt(0).toUpperCase();
         button.innerHTML = `
-            <span class="chat-contact-avatar">${avatarUrl ? `<img src="${avatarUrl}" alt="" loading="lazy">` : avatarText}</span>
+            <span class="chat-contact-avatar ${contact.is_online ? 'is-online' : ''}">${avatarUrl ? `<img src="${avatarUrl}" alt="" loading="lazy">` : avatarText}</span>
             <span><strong>@${escapeText(contact.username || contact.name || 'User')}</strong><small>${escapeText(contact.latest_message || 'Start a conversation')}</small></span>
         `;
         button.addEventListener('click', () => {
@@ -101,10 +105,36 @@
         const messages = await response.json().catch(() => []);
         const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
         if (!box) return;
+        const attachmentMarkup = (message) => {
+            const url = message.media_url ? (String(message.media_url).startsWith('http') ? message.media_url : `${window.location.origin}${message.media_url}`) : '';
+            if (!url) return '';
+            if (message.type === 'image' || message.type === 'gif') return `<button type="button" class="chat-media-preview" data-lightbox-src="${escapeText(url)}"><img src="${escapeText(url)}" alt="Attached image" loading="lazy"></button>`;
+            if (message.type === 'video') return `<video class="chat-inline-video" src="${escapeText(url)}" controls preload="metadata"></video>`;
+            return `<a class="chat-document-card" href="${escapeText(url)}" download><span class="chat-document-ext">${escapeText((message.file_name || 'FILE').split('.').pop().toUpperCase())}</span><span><strong>${escapeText(message.file_name || 'Attached document')}</strong><small>${escapeText(String(message.file_size || 0))} bytes</small></span><span class="chat-document-download">↓</span></a>`;
+        };
         box.innerHTML = (messages || []).map((message) => {
             const gif = parseGifContent(message.content, message.media_url, message.type);
-            return `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}"><div class="chat-bubble-content">${gif.url ? `<img src="${escapeText(gif.url)}" class="chat-gif-media" alt="GIF" loading="lazy">` : ''}${gif.text ? escapeText(gif.text) : ''}</div></div>`;
+            const timestamp = message.created_at ? new Date(message.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
+            const deleteButton = message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : '';
+            return `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}"><div class="chat-bubble-content">${message.type === 'text' ? '' : attachmentMarkup(message)}${gif.text ? escapeText(gif.text) : ''}</div><div class="chat-message-meta"><time>${escapeText(timestamp)}</time>${deleteButton}</div></div>`;
         }).join('');
+        box.querySelectorAll('[data-lightbox-src]').forEach((item) => item.addEventListener('click', () => { const lightbox = document.getElementById('chat-lightbox'); const image = document.getElementById('chat-lightbox-image'); if (lightbox && image) { image.src = item.dataset.lightboxSrc; lightbox.classList.remove('hidden'); } }));
+        box.querySelectorAll('[data-delete-message]').forEach((button) => button.addEventListener('click', async () => {
+            const response = await fetch(`${apiBase}/chat/messages/${button.dataset.deleteMessage}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+            if (response.ok) button.closest('.chat-message')?.remove();
+            else window.showNotice?.('Unable to delete message.', 'error');
+        }));
+        const blockButton = document.getElementById('chat-block-btn');
+        if (blockButton) blockButton.onclick = async () => {
+            if (!window.activeChatUser?.id) return;
+            const contact = window.activeChatUser;
+            const blocked = blockButton.classList.contains('is-blocked');
+            const toggle = async () => {
+                const response = await fetch(`${apiBase}/chat/contacts/${contact.id}/block`, { method: blocked ? 'DELETE' : 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+                if (response.ok) { blockButton.classList.toggle('is-blocked', !blocked); blockButton.textContent = blocked ? 'Block' : 'Unblock'; box.replaceChildren(); window.showNotice?.(blocked ? 'User unblocked.' : 'You have blocked this user.', 'success'); }
+            };
+            if (blocked) await toggle(); else window.openChatBlockConfirmation?.(contact, toggle);
+        };
         box.scrollTop = box.scrollHeight;
         document.getElementById('view-chat')?.classList.remove('hidden');
     };

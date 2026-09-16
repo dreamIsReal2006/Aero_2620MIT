@@ -17,12 +17,12 @@
 
 body.dark-mode {
     --background: var(--bg-primary, #000000);
-    --card: var(--bg-glass, rgba(28, 28, 30, 0.75));
-    --text: var(--text-primary, #f5f5f7);
-    --muted: var(--text-secondary, #86868b);
-    --border: var(--border-subtle, rgba(255, 255, 255, 0.1));
+    --card: var(--bg-card, #1C1C1E);
+    --text: var(--text-primary, #FFFFFF);
+    --muted: var(--text-secondary, #98989D);
+    --border: var(--border-subtle, rgba(255, 255, 255, 0.12));
     --hover: rgba(127, 127, 127, 0.18);
-    --primary: var(--text-primary, #f5f5f7);
+    --primary: var(--accent-primary, #0A84FF);
     --primary-text: var(--bg-primary, #000000);
     --danger: var(--color-danger, #ff3b30);
     --shadow: var(--shadow-floating, 0 12px 40px rgba(0, 0, 0, 0.5));
@@ -856,7 +856,7 @@ body.dark-mode select#theme-select option {
 
     justify-content: center;
 
-    background: rgba(15, 18, 25, 0.42);
+    background: rgba(0, 0, 0, 0.42);
 
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
@@ -996,6 +996,96 @@ body.dark-mode select#theme-select option {
 }
 
 .revoke-session { flex-shrink: 0; }
+
+.screen-time-card {
+    padding: 22px 25px 20px;
+}
+
+.screen-time-summary {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--border);
+}
+
+.screen-time-summary > div {
+    display: grid;
+    gap: 5px;
+}
+
+.screen-time-label {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.screen-time-summary strong {
+    font-size: 30px;
+}
+
+.screen-time-average {
+    text-align: right;
+}
+
+.screen-time-average strong {
+    font-size: 18px;
+}
+
+.screen-time-average small {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.screen-time-chart-wrap {
+    height: 155px;
+    display: flex;
+    align-items: flex-end;
+    padding: 24px 8px 0;
+}
+
+.screen-time-chart {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    gap: 12px;
+}
+
+.screen-time-bar {
+    width: min(34px, 12%);
+    min-height: 4px;
+    border-radius: 8px 8px 3px 3px;
+    background: var(--hover);
+    border: 1px solid var(--border);
+    transition: height 0.25s ease, background 0.2s ease;
+}
+
+.screen-time-bar.is-today {
+    background: var(--primary);
+    border-color: transparent;
+}
+
+.screen-time-days {
+    display: flex;
+    justify-content: space-around;
+    gap: 12px;
+    padding: 9px 8px 0;
+    color: var(--muted);
+    font-size: 11px;
+    text-align: center;
+}
+
+.screen-time-days span {
+    width: min(34px, 12%);
+}
+
+.screen-time-note {
+    margin: 22px 0 15px;
+    color: var(--muted);
+    font-size: 12px;
+}
 
 
 /* =================================

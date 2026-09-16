@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <script src="js/theme.js"></script>
+    <script src="js/i18n.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aero - Settings</title>
     <link rel="icon" type="image/png" sizes="16x16" href="./assets/img/logo.png">
@@ -50,10 +52,7 @@
 
             <aside class="settings-sidebar">
 
-                <button
-                    class="settings-tab active"
-                    data-section="account"
-                >
+                <button class="settings-tab active" data-section="account">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <circle cx="12" cy="8" r="3.5"></circle>
                         <path d="M5 20c.8-3.3 3.1-5 7-5s6.2 1.7 7 5"></path>
@@ -62,10 +61,7 @@
                 </button>
 
 
-                <button
-                    class="settings-tab"
-                    data-section="appearance"
-                >
+                <button class="settings-tab" data-section="appearance">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M12 3a9 9 0 1 0 9 9h-9V3Z"></path>
                         <path d="M12 3a9 9 0 0 1 9 9h-9V3Z"></path>
@@ -73,23 +69,29 @@
                     <span>Appearance</span>
                 </button>
 
-
-                <button
-                    class="settings-tab"
-                    data-section="languages"
-                >
+                <button class="settings-tab" data-section="languages">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <circle cx="12" cy="12" r="9"></circle>
-                        <path d="M3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9S14.5 18.5 12 21M12 3c-2.5 2.5-3.8 5.5-3.8 9S9.5 18.5 12 21"></path>
+                        <path
+                            d="M3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9S14.5 18.5 12 21M12 3c-2.5 2.5-3.8 5.5-3.8 9S9.5 18.5 12 21">
+                        </path>
                     </svg>
                     <span>Languages</span>
                 </button>
 
 
-                <button
-                    class="settings-tab"
-                    data-section="notifications"
-                >
+                <button class="settings-tab" data-section="languages">
+                    <svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <path
+                            d="M3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9S14.5 18.5 12 21M12 3c-2.5 2.5-3.8 5.5-3.8 9S9.5 18.5 12 21">
+                        </path>
+                    </svg>
+                    <span>Languages</span>
+                </button>
+
+
+                <button class="settings-tab" data-section="notifications">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"></path>
                         <path d="M10 21h4"></path>
@@ -97,11 +99,16 @@
                     <span>Notifications</span>
                 </button>
 
+                <button class="settings-tab" data-section="screen-time">
+                    <svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="8.5"></circle>
+                        <path d="M12 7v5l3 2"></path>
+                    </svg>
+                    <span>Screen Time</span>
+                </button>
 
-                <button
-                    class="settings-tab"
-                    data-section="privacy"
-                >
+
+                <button class="settings-tab" data-section="privacy">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <rect x="5" y="10" width="14" height="10" rx="2"></rect>
                         <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
@@ -110,10 +117,7 @@
                 </button>
 
 
-                <button
-                    class="settings-tab"
-                    data-section="security"
-                >
+                <button class="settings-tab" data-section="security">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M12 3 19 6v5c0 4.5-2.8 7.8-7 10-4.2-2.2-7-5.5-7-10V6l7-3Z"></path>
                         <path d="m9 12 2 2 4-4"></path>
@@ -121,10 +125,7 @@
                     <span>Security</span>
                 </button>
 
-                <button
-                    class="settings-tab"
-                    data-section="screen-time"
-                >
+                <button class="settings-tab" data-section="screen-time">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <circle cx="12" cy="12" r="8.5"></circle>
                         <path d="M12 7v5l3 2"></path>
@@ -147,10 +148,7 @@
                      ACCOUNT
                 ====================== -->
 
-                <div
-                    class="settings-section active"
-                    id="section-account"
-                >
+                <div class="settings-section active" id="section-account">
 
                     <div class="section-heading">
 
@@ -159,14 +157,11 @@
                     </div>
 
 
-                    <div class="settings-card">
+                    <div class="settings-card liquid-glass">
 
                         <div class="profile-preview">
 
-                            <div
-                                class="avatar"
-                                id="account-avatar"
-                            >
+                            <div class="avatar" id="account-avatar">
                                 U
                             </div>
 
@@ -191,11 +186,7 @@
                                 Username
                             </label>
 
-                            <input
-                                type="text"
-                                id="username"
-                                placeholder="Enter username"
-                            >
+                            <input type="text" id="username" placeholder="Enter username">
 
                         </div>
 
@@ -206,11 +197,7 @@
                                 Email
                             </label>
 
-                            <input
-                                type="email"
-                                id="email"
-                                placeholder="Enter email"
-                            >
+                            <input type="email" id="email" placeholder="Enter email">
 
                         </div>
 
@@ -221,34 +208,20 @@
                                 Bio
                             </label>
 
-                            <textarea
-                                id="bio"
-                                maxlength="150"
-                                placeholder="Tell people about yourself..."
-                            ></textarea>
+                            <textarea id="bio" maxlength="150" placeholder="Tell people about yourself..."></textarea>
 
-                            <span
-                                class="character-count"
-                                id="bio-count"
-                            >
+                            <span class="character-count" id="bio-count">
                                 0 / 150
                             </span>
 
                         </div>
 
 
-                        <button
-                            class="primary-button"
-                            id="save-account-button"
-                        >
+                        <button class="primary-button" id="save-account-button">
                             Save Changes
                         </button>
 
-                        <button
-                            class="secondary-button hidden"
-                            id="admin-dashboard-button"
-                            type="button"
-                        >
+                        <button class="secondary-button hidden" id="admin-dashboard-button" type="button">
                             Open Admin Dashboard
                         </button>
 
@@ -262,10 +235,7 @@
                      APPEARANCE
                 ====================== -->
 
-                <div
-                    class="settings-section"
-                    id="section-appearance"
-                >
+                <div class="settings-section" id="section-appearance">
 
                     <div class="section-heading">
 
@@ -274,7 +244,7 @@
                     </div>
 
 
-                    <div class="settings-card">
+                    <div class="settings-card liquid-glass">
 
                         <div class="setting-row">
 
@@ -314,14 +284,32 @@
 
 
 
+                <div class="settings-section" id="section-languages">
+                    <div class="section-heading">
+                        <h2>Languages</h2>
+                        <p>Choose the language you prefer to use in Aero.</p>
+                    </div>
+                    <div class="settings-card liquid-glass">
+                        <div class="setting-row">
+                            <div>
+                                <h3>App Language</h3>
+                                <p>Choose between English and Chinese.</p>
+                            </div>
+                            <select data-language-select id="language-select" aria-label="App language">
+                                <option value="en">English</option>
+                                <option value="zh">中文</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+
+
                 <!-- =====================
                      LANGUAGES
                 ====================== -->
 
-                <div
-                    class="settings-section"
-                    id="section-languages"
-                >
+                <div class="settings-section" id="section-languages">
 
                     <div class="section-heading">
 
@@ -365,10 +353,7 @@
                      NOTIFICATIONS
                 ====================== -->
 
-                <div
-                    class="settings-section"
-                    id="section-notifications"
-                >
+                <div class="settings-section" id="section-notifications">
 
                     <div class="section-heading">
 
@@ -377,7 +362,7 @@
                     </div>
 
 
-                    <div class="settings-card">
+                    <div class="settings-card liquid-glass">
 
                         <div class="setting-row">
 
@@ -443,10 +428,7 @@
 
                             <label class="switch">
 
-                                <input
-                                    type="checkbox"
-                                    id="toggle-notify-comments"
-                                >
+                                <input type="checkbox" id="toggle-notify-comments">
 
                                 <span class="slider"></span>
 
@@ -464,10 +446,7 @@
                      PRIVACY
                 ====================== -->
 
-                <div
-                    class="settings-section"
-                    id="section-privacy"
-                >
+                <div class="settings-section" id="section-privacy">
 
                     <div class="section-heading">
 
@@ -479,7 +458,7 @@
                     </div>
 
 
-                    <div class="settings-card">
+                    <div class="settings-card liquid-glass">
 
                         <div class="setting-row">
 
@@ -497,10 +476,7 @@
 
                             <label class="switch">
 
-                                <input
-                                    type="checkbox"
-                                    id="toggle-online-status"
-                                >
+                                <input type="checkbox" id="toggle-private-account">
 
                                 <span class="slider"></span>
 
@@ -525,10 +501,7 @@
 
                             <label class="switch">
 
-                                <input
-                                    type="checkbox"
-                                    disabled
-                                >
+                                <input type="checkbox" id="toggle-online-status">
 
                                 <span class="slider"></span>
 
@@ -547,10 +520,7 @@
                      SECURITY
                 ====================== -->
 
-                <div
-                    class="settings-section"
-                    id="section-security"
-                >
+                <div class="settings-section" id="section-security">
 
                     <div class="section-heading">
 
@@ -562,7 +532,7 @@
                     </div>
 
 
-                    <div class="settings-card">
+                    <div class="settings-card liquid-glass">
 
 
                         <!-- CHANGE PASSWORD -->
@@ -580,10 +550,7 @@
                             </div>
 
 
-                            <button
-                                class="secondary-button"
-                                id="change-password-button"
-                            >
+                            <button class="secondary-button" id="change-password-button">
                                 Change Password
                             </button>
 
@@ -607,10 +574,7 @@
                             </div>
 
 
-                            <button
-                                class="secondary-button"
-                                id="sessions-button"
-                            >
+                            <button class="secondary-button" id="sessions-button">
                                 View Sessions
                             </button>
 
@@ -634,10 +598,7 @@
                             </div>
 
 
-                            <button
-                                class="danger-button"
-                                id="delete-account-button"
-                            >
+                            <button class="danger-button" id="delete-account-button">
                                 Delete Account
                             </button>
 
@@ -647,16 +608,13 @@
 
                 </div>
 
-                <div
-                    class="settings-section"
-                    id="section-screen-time"
-                >
+                <div class="settings-section" id="section-screen-time">
                     <div class="section-heading">
                         <h2>Screen Time</h2>
                         <p>See how much time you spend actively using Aero.</p>
                     </div>
 
-                    <div class="settings-card screen-time-card">
+                    <div class="settings-card screen-time-card liquid-glass">
                         <div class="screen-time-summary">
                             <div>
                                 <span class="screen-time-label">Today</span>
@@ -668,9 +626,9 @@
                                 <small>last 7 days</small>
                             </div>
                         </div>
-
                         <div class="screen-time-chart-wrap">
-                            <div class="screen-time-chart" id="screen-time-chart" aria-label="Screen time for the last seven days"></div>
+                            <div class="screen-time-chart" id="screen-time-chart"
+                                aria-label="Screen time for the last seven days"></div>
                         </div>
                         <div class="screen-time-days" id="screen-time-days"></div>
                         <p class="screen-time-note">Only time while Aero is open and visible is counted.</p>
@@ -690,10 +648,7 @@
          TOAST
     ========================== -->
 
-    <div
-        class="toast"
-        id="toast"
-    >
+    <div class="toast" id="toast">
         <span id="toast-message"></span>
     </div>
 
@@ -703,17 +658,11 @@
          SIGN OUT CONFIRMATION
     ========================== -->
 
-    <div
-        class="modal-overlay hidden"
-        id="sign-out-modal"
-    >
+    <div class="modal-overlay hidden" id="sign-out-modal">
 
-        <div class="modal">
+        <div class="modal liquid-glass">
 
-            <button
-                class="modal-close"
-                id="close-sign-out"
-            >
+            <button class="modal-close" id="close-sign-out">
                 ×
             </button>
 
@@ -727,18 +676,12 @@
 
             <div class="modal-actions">
 
-                <button
-                    class="secondary-button"
-                    id="cancel-sign-out"
-                >
+                <button class="secondary-button" id="cancel-sign-out">
                     Cancel
                 </button>
 
 
-                <button
-                    class="danger-button"
-                    id="confirm-sign-out"
-                >
+                <button class="danger-button" id="confirm-sign-out">
                     Sign Out
                 </button>
 
@@ -754,24 +697,18 @@
          CHANGE PASSWORD
     ========================== -->
 
-    <div
-        class="modal-overlay hidden"
-        id="password-modal"
-    >
+    <div class="modal-overlay hidden" id="password-modal">
 
-        <div class="modal">
+        <div class="modal liquid-glass">
 
-            <button
-                class="modal-close"
-                id="close-password"
-            >
+            <button class="modal-close" id="close-password">
                 ×
             </button>
 
             <h2>Change Password</h2>
 
-                <p>
-                    Verify your current password and choose a strong new one.
+            <p>
+                Verify your current password and choose a strong new one.
             </p>
 
 
@@ -781,11 +718,7 @@
                     Current Password
                 </label>
 
-                <input
-                    type="password"
-                    id="current-password"
-                    placeholder="Current password"
-                >
+                <input type="password" id="current-password" placeholder="Current password">
 
             </div>
 
@@ -796,11 +729,7 @@
                     New Password
                 </label>
 
-                <input
-                    type="password"
-                    id="new-password"
-                    placeholder="Minimum 8 characters"
-                >
+                <input type="password" id="new-password" placeholder="Minimum 8 characters">
 
             </div>
 
@@ -811,19 +740,12 @@
                     Confirm Password
                 </label>
 
-                <input
-                    type="password"
-                    id="confirm-password"
-                    placeholder="Confirm password"
-                >
+                <input type="password" id="confirm-password" placeholder="Confirm password">
 
             </div>
 
 
-            <button
-                class="primary-button full-width"
-                id="save-password-button"
-            >
+            <button class="primary-button full-width" id="save-password-button">
                 Update Password
             </button>
 
@@ -837,17 +759,11 @@
          DELETE ACCOUNT
     ========================== -->
 
-    <div
-        class="modal-overlay hidden"
-        id="delete-modal"
-    >
+    <div class="modal-overlay hidden" id="delete-modal">
 
-        <div class="modal">
+        <div class="modal liquid-glass">
 
-            <button
-                class="modal-close"
-                id="close-delete"
-            >
+            <button class="modal-close" id="close-delete">
                 ×
             </button>
 
@@ -862,18 +778,12 @@
 
             <div class="modal-actions">
 
-                <button
-                    class="secondary-button"
-                    id="cancel-delete"
-                >
+                <button class="secondary-button" id="cancel-delete">
                     Cancel
                 </button>
 
 
-                <button
-                    class="danger-button"
-                    id="confirm-delete"
-                >
+                <button class="danger-button" id="confirm-delete">
                     Delete Account
                 </button>
 
@@ -883,8 +793,9 @@
 
     </div>
 
-    <div class="modal-overlay hidden" id="sessions-modal" role="dialog" aria-modal="true" aria-labelledby="sessions-title">
-        <div class="modal sessions-modal-content">
+    <div class="modal-overlay hidden" id="sessions-modal" role="dialog" aria-modal="true"
+        aria-labelledby="sessions-title">
+        <div class="modal sessions-modal-content liquid-glass">
             <button class="modal-close" id="close-sessions" type="button" aria-label="Close sessions">×</button>
             <h2 id="sessions-title">Active Sessions</h2>
             <p>Review devices signed into your Aero account.</p>
@@ -897,4 +808,5 @@
     <script src="js/settings.js"></script>
 
 </body>
+
 </html>

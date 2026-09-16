@@ -182,6 +182,7 @@ def create_comment(current_user, post_id):
             "id": comment.id,
             "user_id": comment.user_id,
             "username": current_user.username,
+            "role": current_user.role if current_user.role in {"admin", "moderator", "user"} else "user",
             "post_id": comment.post_id,
             "content": comment.content,
             "image_url": comment.image_url or "",
@@ -245,6 +246,7 @@ def create_reply(current_user, comment_id):
             "id": reply.id,
             "user_id": reply.user_id,
             "username": current_user.username,
+            "role": current_user.role if current_user.role in {"admin", "moderator", "user"} else "user",
             "post_id": reply.post_id,
             "content": reply.content,
             "image_url": reply.image_url or "",
@@ -286,6 +288,7 @@ def get_comments(current_user, post_id):
             "id": comment.id,
             "user_id": comment.user_id,
             "username": comment.author.username,
+            "role": comment.author.role if comment.author.role in {"admin", "moderator", "user"} else "user",
             "avatar_url": comment.author.avatar_url or "",
             "post_id": comment.post_id,
             "content": comment.content,
@@ -366,3 +369,26 @@ def toggle_comment_like(current_user, comment_id):
             comment_id=comment_id
         ).count(),
     }), 200
+
+
+@interact_bp.delete("/comments/<int:comment_id>")
+@token_required
+def delete_comment(current_user, comment_id):
+    comment = db.session.get(Comment, comment_id)
+    if not comment:
+        return jsonify({"message": "Comment not found"}), 404
+    effective_role = "admin" if current_user.is_admin else current_user.role
+    if comment.user_id != current_user.id and effective_role not in {"admin", "moderator"}:
+        return jsonify({"message": "You are not authorized to delete this comment"}), 403
+    CommentLike.query.filter(
+        CommentLike.comment_id.in_(
+            db.session.query(Comment.id).filter(
+                (Comment.id == comment_id) | (Comment.parent_id == comment_id)
+            )
+        )
+    ).delete(synchronize_session=False)
+    Comment.query.filter(
+        (Comment.id == comment_id) | (Comment.parent_id == comment_id)
+    ).delete(synchronize_session=False)
+    db.session.commit()
+    return jsonify({"message": "Comment deleted", "comment_id": comment_id}), 200

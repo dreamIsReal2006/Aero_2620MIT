@@ -1,55 +1,69 @@
-(function () {
-    const STORAGE_KEY = "aero_screen_time";
-    const TICK_INTERVAL = 15000;
+(() => {
+    const STORAGE_KEY = 'aero_screen_time';
+    const TICK_MS = 1000;
+    let usage = readUsage();
+    let lastTick = Date.now();
+    let isActive = document.visibilityState === 'visible' && document.hasFocus();
 
-    function dayKey(date) {
+    function dayKey(date = new Date()) {
         const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, "0");
-        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     }
 
     function readUsage() {
         try {
-            const usage = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-            return usage && typeof usage === "object" ? usage : {};
-        } catch (error) {
+            const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            return value && typeof value === 'object' ? value : {};
+        } catch {
             return {};
         }
     }
 
-    function addActiveTime(milliseconds) {
-        if (milliseconds <= 0 || document.hidden) return;
-        const usage = readUsage();
-        const key = dayKey(new Date());
-        usage[key] = Math.max(0, Number(usage[key]) || 0) + milliseconds;
+    function writeUsage() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(usage));
     }
 
-    let lastActiveAt = Date.now();
-    function recordElapsedTime() {
+    function recordElapsed() {
         const now = Date.now();
-        if (!document.hidden) addActiveTime(Math.min(now - lastActiveAt, TICK_INTERVAL * 2));
-        lastActiveAt = now;
+        if (isActive) {
+            const elapsed = Math.min(now - lastTick, TICK_MS * 2);
+            const key = dayKey();
+            usage[key] = (Number(usage[key]) || 0) + elapsed;
+            writeUsage();
+        }
+        lastTick = now;
     }
 
-    document.addEventListener("visibilitychange", () => {
-        recordElapsedTime();
-        lastActiveAt = Date.now();
-    });
-    window.addEventListener("pagehide", recordElapsedTime);
-    window.setInterval(recordElapsedTime, TICK_INTERVAL);
+    function setActive(active) {
+        recordElapsed();
+        isActive = active;
+        lastTick = Date.now();
+    }
 
-    window.AeroScreenTime = {
-        getUsage: readUsage,
-        reset: function () {
-            localStorage.removeItem(STORAGE_KEY);
-        },
-        formatDuration: function (milliseconds) {
-            const minutes = Math.floor((Number(milliseconds) || 0) / 60000);
-            if (minutes < 60) return `${minutes}m`;
-            return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-        },
-        dayKey
-    };
+    function formatDuration(milliseconds) {
+        const totalMinutes = Math.floor((Number(milliseconds) || 0) / 60000);
+        if (totalMinutes < 1) return '<1m';
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        return hours ? `${hours}h ${minutes}m` : `${minutes}m`;
+    }
+
+    function getUsage() {
+        recordElapsed();
+        return { ...usage };
+    }
+
+    function reset() {
+        usage = {};
+        writeUsage();
+    }
+
+    document.addEventListener('visibilitychange', () => setActive(document.visibilityState === 'visible' && document.hasFocus()));
+    window.addEventListener('focus', () => setActive(true));
+    window.addEventListener('blur', () => setActive(false));
+    window.setInterval(recordElapsed, TICK_MS);
+    window.AeroScreenTime = { dayKey, formatDuration, getUsage, reset };
+    window.AeroScreenTime = { dayKey, formatDuration, getUsage, reset };
 })();

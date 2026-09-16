@@ -3,18 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="js/i18n.js"></script>
     <title>Account Suspended</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="light-mode">
-    <main class="auth-card glass-card" style="max-width:520px;margin:10vh auto;padding:32px">
+<body class="light-mode appeal-page">
+    <main class="auth-card glass-card liquid-glass appeal-card">
         <h1>Account suspended</h1>
-        <p>Submit an appeal for review.</p>
+        <div class="appeal-warning" role="alert">Your account is currently suspended. Submit a clear explanation and our moderation team will review it.</div>
         <form id="appeal-form">
-            <input id="appeal-username" placeholder="Username" required>
+            <label for="appeal-username">Username</label>
+            <input id="appeal-username" placeholder="Username" autocomplete="username" required>
+            <label for="appeal-content">Why should the suspension be reviewed?</label>
             <textarea id="appeal-content" placeholder="Explain your appeal" maxlength="2000" required></textarea>
-            <button class="btn btn-primary" type="submit">Submit Appeal</button>
-            <p id="appeal-feedback"></p>
+            <button id="appeal-submit" class="btn btn-primary" type="submit">Submit Appeal</button>
+            <p id="appeal-feedback" class="appeal-feedback" aria-live="polite"></p>
         </form>
     </main>
     <script>
@@ -23,9 +26,25 @@
         if (username) document.getElementById('appeal-username').value = username;
         document.getElementById('appeal-form').addEventListener('submit', async event => {
             event.preventDefault();
-            const response = await fetch(`${base}/auth/appeals`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ username: document.getElementById('appeal-username').value, content: document.getElementById('appeal-content').value }) });
-            const data = await response.json();
-            document.getElementById('appeal-feedback').textContent = data.message || 'Request failed';
+            const button = document.getElementById('appeal-submit');
+            const feedback = document.getElementById('appeal-feedback');
+            button.disabled = true;
+            button.textContent = 'Submitting...';
+            feedback.className = 'appeal-feedback';
+            try {
+                const response = await fetch(`${base}/auth/appeals`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ username: document.getElementById('appeal-username').value.trim(), content: document.getElementById('appeal-content').value.trim() }) });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(data.message || 'Unable to submit appeal');
+                feedback.textContent = data.message || 'Appeal submitted successfully.';
+                feedback.classList.add('success');
+                document.getElementById('appeal-content').value = '';
+            } catch (error) {
+                feedback.textContent = error.message;
+                feedback.classList.add('error');
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Submit Appeal';
+            }
         });
     </script>
 </body>

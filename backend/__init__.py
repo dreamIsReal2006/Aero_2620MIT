@@ -194,16 +194,21 @@ def create_app():
                 )
 
             if "type" not in post_columns:
+                db.session.execute(text(
+                    "ALTER TABLE posts ADD COLUMN type VARCHAR(12) NOT NULL DEFAULT 'original'"))
+            message_columns = {
+                column[1]
+                for column in db.session.execute(text("PRAGMA table_info(messages)"))
+            }
+            if "is_read" not in message_columns:
                 db.session.execute(
-                    text(
-                        "ALTER TABLE posts ADD COLUMN "
-                        "type VARCHAR(12) NOT NULL DEFAULT 'original'"
-                    )
-                )
-
-            # -------------------------
-            # Users
-            # -------------------------
+                    text("ALTER TABLE messages ADD COLUMN is_read BOOLEAN NOT NULL DEFAULT 0"))
+            if "file_name" not in message_columns:
+                db.session.execute(text(
+                    "ALTER TABLE messages ADD COLUMN file_name VARCHAR(255) NOT NULL DEFAULT ''"))
+            if "file_size" not in message_columns:
+                db.session.execute(
+                    text("ALTER TABLE messages ADD COLUMN file_size INTEGER NOT NULL DEFAULT 0"))
             columns = {
                 column[1]
                 for column in db.session.execute(
@@ -228,13 +233,15 @@ def create_app():
                 )
 
             if "role" not in columns:
-                db.session.execute(
-                    text(
-                        "ALTER TABLE users ADD COLUMN "
-                        "role VARCHAR(20) NOT NULL DEFAULT 'user'"
-                    )
-                )
-
+                db.session.execute(text(
+                    "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'"
+                ))
+            db.session.execute(text(
+                "UPDATE users SET role = 'admin' WHERE is_admin = 1"
+            ))
+            db.session.execute(text(
+                "UPDATE users SET role = 'user' WHERE role NOT IN ('admin', 'moderator', 'user') OR role IS NULL"
+            ))
             if "display_name" not in columns:
                 db.session.execute(
                     text(
@@ -299,16 +306,34 @@ def create_app():
             }
 
             if "status" not in follow_columns:
-                db.session.execute(
-                    text(
-                        "ALTER TABLE follows ADD COLUMN "
-                        "status VARCHAR(20) NOT NULL DEFAULT 'approved'"
-                    )
-                )
-
-            # -------------------------
-            # Comments
-            # -------------------------
+                db.session.execute(text(
+                    "ALTER TABLE follows ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'approved'"
+                ))
+            if "bio" not in columns:
+                db.session.execute(text(
+                    "ALTER TABLE users ADD COLUMN bio VARCHAR(150) NOT NULL DEFAULT ''"
+                ))
+            if "avatar_url" not in columns:
+                db.session.execute(text(
+                    "ALTER TABLE users ADD COLUMN avatar_url VARCHAR(500) NOT NULL DEFAULT ''"
+                ))
+            if "is_private" not in columns:
+                db.session.execute(text(
+                    "ALTER TABLE users ADD COLUMN is_private BOOLEAN NOT NULL DEFAULT 0"
+                ))
+            if "show_online_status" not in columns:
+                db.session.execute(text(
+                    "ALTER TABLE users ADD COLUMN show_online_status BOOLEAN NOT NULL DEFAULT 1"
+                ))
+            if "last_seen_at" not in columns:
+                db.session.execute(text(
+                    "ALTER TABLE users ADD COLUMN last_seen_at DATETIME"
+                ))
+            for column_name in ("push_notifications", "notify_likes", "notify_comments"):
+                if column_name not in columns:
+                    db.session.execute(text(
+                        f"ALTER TABLE users ADD COLUMN {column_name} BOOLEAN NOT NULL DEFAULT 1"
+                    ))
             comment_columns = {
                 column[1]
                 for column in db.session.execute(
@@ -383,7 +408,7 @@ def create_app():
     # -------------------------
     from backend.admin import admin_bp
     from backend.admin import routes as admin_routes
-    from backend.admin.decorators import admin_required, login_required
+    from backend.admin.decorators import require_role, login_required
 
     app.register_blueprint(admin_bp)
 
@@ -399,7 +424,7 @@ def create_app():
 
     @app.get(admin_page_path)
     @login_required
-    @admin_required
+    @require_role(["admin", "moderator"])
     def admin_dashboard():
         return send_from_directory(
             base_dir,
@@ -408,7 +433,7 @@ def create_app():
 
     @app.get("/api/admin-entry")
     @login_required
-    @admin_required
+    @require_role(["admin", "moderator"])
     def admin_entry():
         return jsonify({
             "url": admin_page_path
