@@ -13,6 +13,16 @@
     };
     window.parseGifContent = parseGifContent;
 
+    const setMuteButtonState = (button, muted) => {
+        if (!button) return;
+        button.classList.toggle('is-muted', muted);
+        button.setAttribute('aria-label', muted ? 'Unmute user' : 'Mute user');
+        button.title = muted ? 'Unmute user' : 'Mute user';
+        button.innerHTML = muted
+            ? '<svg class="chat-header-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"></path><path d="M10 21h4"></path><path d="m4 4 16 16"></path></svg>'
+            : '<svg class="chat-header-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"></path><path d="M10 21h4"></path></svg>';
+    };
+
     function getChatContactList() {
         return document.getElementById('chat-contacts-list') || document.getElementById('chat-contact-list');
     }
@@ -37,9 +47,7 @@
         const muteButton = document.getElementById('chat-mute-btn');
         muteButton?.classList.toggle('hidden', !contact?.id);
         if (muteButton) {
-            muteButton.classList.toggle('is-muted', Boolean(contact?.is_muted));
-            muteButton.textContent = contact?.is_muted ? '🔕' : '🔔';
-            muteButton.title = contact?.is_muted ? 'Unmute user' : 'Mute user';
+            setMuteButtonState(muteButton, Boolean(contact?.is_muted));
         }
         avatarElement.replaceChildren();
         avatarElement.classList.toggle('is-online', Boolean(contact?.is_online));
@@ -104,6 +112,7 @@
     window.selectChatContact = async function selectChatContact(contact) {
         if (!contact) return;
         window.activeChatUser = contact;
+        document.getElementById('view-chat')?.classList.add('chat-contact-open');
         renderChatHeader(contact);
         const list = getChatContactList();
         if (list) {
@@ -124,11 +133,12 @@
             if (message.type === 'audio') return `<audio class="chat-inline-audio" src="${escapeText(url)}" controls></audio>`;
             return `<a class="chat-document-card" href="${escapeText(url)}" download><span class="chat-document-ext">${escapeText((message.file_name || 'FILE').split('.').pop().toUpperCase())}</span><span><strong>${escapeText(message.file_name || 'Attached document')}</strong><small>${escapeText(String(message.file_size || 0))} bytes</small></span><span class="chat-document-download">↓</span></a>`;
         };
+        const sharedPostMarkup = (post) => post ? `<a class="chat-shared-post" href="/#post-${post.id}"><span class="chat-shared-post-author"><span class="chat-shared-post-avatar">${post.avatar_url ? `<img src="${escapeText(post.avatar_url)}" alt="">` : escapeText((post.username || 'U').charAt(0).toUpperCase())}</span><strong>@${escapeText(post.username || 'User')}</strong></span><span class="chat-shared-post-text">${escapeText(post.content || 'Shared post')}</span></a>` : '';
         box.innerHTML = (messages || []).map((message) => {
             const gif = parseGifContent(message.content, message.media_url, message.type);
-            const timestamp = message.created_at ? new Date(message.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
+            const timestamp = window.AeroI18n?.formatChatTimestamp?.(message.created_at) || '';
             const deleteButton = message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : '';
-            return `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}"><div class="chat-bubble-content">${message.type === 'text' || message.type === 'shared_post' ? '' : attachmentMarkup(message)}${gif.text ? renderMessageText(gif.text) : ''}</div><div class="chat-message-meta"><time>${escapeText(timestamp)}</time>${deleteButton}</div></div>`;
+            return `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}"><div class="chat-bubble-content">${message.shared_post ? sharedPostMarkup(message.shared_post) : (message.type === 'text' || message.type === 'shared_post' || message.type === 'post_share' ? '' : attachmentMarkup(message))}${message.type === 'post_share' ? '' : (gif.text ? renderMessageText(gif.text) : '')}</div><div class="chat-message-meta"><time>${escapeText(timestamp)}</time>${deleteButton}</div></div>`;
         }).join('');
         box.querySelectorAll('[data-lightbox-src]').forEach((item) => item.addEventListener('click', () => { const lightbox = document.getElementById('chat-lightbox'); const image = document.getElementById('chat-lightbox-image'); if (lightbox && image) { image.src = item.dataset.lightboxSrc; lightbox.classList.remove('hidden'); } }));
         box.querySelectorAll('[data-delete-message]').forEach((button) => button.addEventListener('click', async () => {

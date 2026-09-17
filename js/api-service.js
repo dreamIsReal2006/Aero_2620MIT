@@ -112,7 +112,7 @@ async function updatePresence() {
     await fetch(`${API_BASE}/users/me/presence`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
-    }).catch(() => { });
+    }).catch(() => {});
 }
 
 function setupPresenceHeartbeat() {
@@ -725,7 +725,7 @@ function playNotificationSound() {
         return;
     }
     notificationSound.currentTime = 0;
-    notificationSound.play().catch(() => { });
+    notificationSound.play().catch(() => {});
 }
 
 function setupNotificationSoundUnlock() {
@@ -745,10 +745,16 @@ function setupNotificationSoundUnlock() {
 
 function updateDockBadge(buttonId, count) {
     const badge = document.querySelector(`#${buttonId} .dock-badge`);
-    if (!badge) return;
     const unreadCount = Number(count) || 0;
-    badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
-    badge.classList.toggle('hidden', unreadCount < 1);
+    if (badge) {
+        badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+        badge.classList.toggle('hidden', unreadCount < 1);
+    }
+    if (buttonId === 'chat-dock-btn') {
+        const mobileBadge = document.querySelector('.mobile-bottom-badge');
+        mobileBadge?.classList.toggle('hidden', unreadCount < 1);
+        if (mobileBadge) mobileBadge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+    }
 }
 
 function setNotificationDrawerVisibility(isOpen) {
@@ -822,83 +828,6 @@ function setupNotificationDrawer() {
 
 let activeChatUser = null;
 let chatPollTimer = null;
-let unreadChatPollTimer = null;
-let unreadChatCount = null;
-let unreadMessageAudioContext = null;
-let unreadMessageSoundPending = false;
-
-function getUnreadMessageAudioContext() {
-    if (unreadMessageAudioContext) return unreadMessageAudioContext;
-    const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextConstructor) return null;
-    unreadMessageAudioContext = new AudioContextConstructor();
-    return unreadMessageAudioContext;
-}
-
-function playUnreadMessageSound() {
-    const audioContext = getUnreadMessageAudioContext();
-    if (!audioContext || audioContext.state !== 'running') {
-        unreadMessageSoundPending = true;
-        return;
-    }
-
-    const tones = [
-        { frequency: 1046.5, start: 0, duration: 0.12 },
-        { frequency: 1318.5, start: 0.14, duration: 0.12 },
-        { frequency: 1568, start: 0.28, duration: 0.18 }
-    ];
-    const now = audioContext.currentTime;
-    tones.forEach(({ frequency, start, duration }) => {
-        const oscillator = audioContext.createOscillator();
-        const gain = audioContext.createGain();
-        oscillator.type = 'sine';
-        oscillator.frequency.value = frequency;
-        gain.gain.setValueAtTime(0.0001, now + start);
-        gain.gain.exponentialRampToValueAtTime(0.16, now + start + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + start + duration);
-        oscillator.connect(gain);
-        gain.connect(audioContext.destination);
-        oscillator.start(now + start);
-        oscillator.stop(now + start + duration);
-    });
-}
-
-function setupUnreadMessageSoundUnlock() {
-    const unlock = () => {
-        const audioContext = getUnreadMessageAudioContext();
-        if (!audioContext) return;
-        if (audioContext.state === 'running') {
-            document.removeEventListener('pointerdown', unlock);
-            document.removeEventListener('keydown', unlock);
-            return;
-        }
-        audioContext.resume().then(() => {
-            document.removeEventListener('pointerdown', unlock);
-            document.removeEventListener('keydown', unlock);
-            if (unreadMessageSoundPending) {
-                unreadMessageSoundPending = false;
-                playUnreadMessageSound();
-            }
-        }).catch(() => { });
-    };
-    document.addEventListener('pointerdown', unlock);
-    document.addEventListener('keydown', unlock);
-}
-
-async function loadUnreadChatCount() {
-    const badge = document.getElementById('chat-unread-badge');
-    if (!badge || !localStorage.getItem('aero_token')) return;
-    const response = await fetch(`${API_BASE}/chat/unread-count`, { headers: { 'Authorization': `******'aero_token')}` } });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.message || 'Unable to load unread message count');
-    const unreadCount = Number(payload.unread_count || 0);
-    if (unreadChatCount !== null && unreadCount > unreadChatCount) {
-        playUnreadMessageSound();
-    }
-    unreadChatCount = unreadCount;
-    badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
-    badge.classList.toggle('hidden', unreadCount === 0);
-}
 
 async function loadShortVideos() {
     const feed = document.getElementById('video-feed');
@@ -910,7 +839,7 @@ async function loadShortVideos() {
         feed.innerHTML = videos.length ? videos.map((video) => `<article class="short-video-card"><video src="${escapeHtml(video.video_url)}" playsinline loop preload="metadata"></video><div class="short-video-overlay"><button type="button" class="video-action" aria-label="Like video">♥</button><button type="button" class="video-action" aria-label="Comment on video">●</button><button type="button" class="video-action" aria-label="Share video">↗</button></div><div class="short-video-meta"><span class="video-author-avatar">${escapeHtml((video.author?.username || 'U').charAt(0).toUpperCase())}</span><div><strong>@${escapeHtml(video.author?.username || 'User')}</strong><p>${escapeHtml(video.caption || '')}</p><small>♫ ${escapeHtml(video.track_name || 'Original audio')}</small></div><button type="button" class="video-mute-btn" aria-label="Mute video">🔊</button></div></article>`).join('') : '<div class="bookmarks-empty">No short videos yet.</div>';
         feed.querySelectorAll('video').forEach((video) => {
             video.muted = true;
-            video.play().catch(() => { });
+            video.play().catch(() => {});
             const muteButton = video.closest('.short-video-card').querySelector('.video-mute-btn');
             muteButton.addEventListener('click', () => { video.muted = !video.muted; muteButton.textContent = video.muted ? '🔇' : '🔊'; });
         });
@@ -934,7 +863,7 @@ async function loadChatContacts() {
         const avatar = avatarUrl
             ? `<img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy" onerror="this.remove()">`
             : escapeHtml(avatarText || 'U');
-        return `<button type="button" class="chat-contact ${contact.unread_count ? 'unread' : ''}" data-user-id="${contact.id}"><span class="chat-contact-avatar ${contact.is_online ? 'is-online' : ''}">${avatar}</span><span><strong>@${escapeHtml(contact.username)}${contact.is_muted ? ' <span class="chat-muted-icon" title="Muted">🔕</span>' : ''}</strong><small>${escapeHtml(contact.latest_message || 'Start a conversation')}</small></span></button>`;
+        return `<button type="button" class="chat-contact ${contact.unread_count ? 'unread' : ''}" data-user-id="${contact.id}"><span class="chat-contact-avatar ${contact.is_online ? 'is-online' : ''}">${avatar}</span><span><strong>@${escapeHtml(contact.username)}</strong><small>${escapeHtml(contact.latest_message || 'Start a conversation')}</small></span></button>`;
     }).join('') || '<div class="bookmarks-empty">No contacts yet.</div>';
     list.querySelectorAll('.chat-contact').forEach((item) => item.addEventListener('click', () => selectChatContact(contacts.find((contact) => String(contact.id) === item.dataset.userId))));
 }
@@ -950,10 +879,34 @@ async function loadUnreadChatCount() {
     updateDockBadge('chat-dock-btn', unreadCount);
 }
 
+function setMuteButtonState(button, muted, animate = true) {
+    if (!button) return;
+    button.classList.toggle('is-muted', muted);
+    button.setAttribute('aria-label', muted ? 'Unmute user' : 'Mute user');
+    button.title = muted ? 'Unmute user' : 'Mute user';
+    button.innerHTML = muted
+        ? '<svg class="chat-header-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"></path><path d="M10 21h4"></path><path d="m4 4 16 16"></path></svg>'
+        : '<svg class="chat-header-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"></path><path d="M10 21h4"></path></svg>';
+    if (animate) {
+        button.classList.remove('is-toggling');
+        void button.offsetWidth;
+        button.classList.add('is-toggling');
+    }
+}
+
+function setChatContactState(isOpen) {
+    const isMobile = window.innerWidth <= 768;
+    const view = document.getElementById('view-chat');
+    const backButton = document.getElementById('chat-back-btn') || document.getElementById('chat-back-button');
+    view?.classList.toggle('chat-contact-open', Boolean(isOpen && isMobile));
+    backButton?.classList.toggle('is-visible', Boolean(isOpen && isMobile));
+}
+
 async function selectChatContact(contact) {
     if (!contact) return;
     activeChatUser = contact;
     window.activeChatUser = contact;
+    setChatContactState(true);
     const activeAvatar = document.getElementById('chat-active-avatar');
     const activeName = document.getElementById('chat-active-name');
     if (activeName) activeName.textContent = `@${contact.username}`;
@@ -978,13 +931,15 @@ async function selectChatContact(contact) {
     await loadChatMessages();
     const blockButton = document.getElementById('chat-block-btn');
     const muteButton = document.getElementById('chat-mute-btn');
-    const chatInput = document.getElementById('chat-input') || document.getElementById('chat-message-input');
     if (blockButton) {
         blockButton.classList.remove('hidden');
         blockButton.classList.remove('is-blocked');
         blockButton.textContent = 'Block';
         const blockResponse = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
         const blockData = await blockResponse.json().catch(() => ({}));
+        blockButton.classList.toggle('is-blocked', Boolean(blockData.blocked));
+        blockButton.textContent = blockData.blocked ? 'Unblock' : 'Block';
+        const chatInput = document.getElementById('chat-input');
         const chatAlert = document.getElementById('chat-inline-alert');
         if (chatInput) chatInput.disabled = Boolean(blockData.blocked);
         chatAlert?.classList.toggle('hidden', !blockData.blocked);
@@ -992,9 +947,7 @@ async function selectChatContact(contact) {
     }
     if (muteButton) {
         muteButton.classList.remove('hidden');
-        muteButton.classList.toggle('is-muted', Boolean(contact.is_muted));
-        muteButton.textContent = contact.is_muted ? '🔕' : '🔔';
-        muteButton.title = contact.is_muted ? 'Unmute user' : 'Mute user';
+        setMuteButtonState(muteButton, Boolean(contact.is_muted), false);
     }
     await loadChatContacts();
     await loadUnreadChatCount();
@@ -1007,6 +960,7 @@ async function loadChatMessages() {
     if (!contact) return;
     const response = await fetch(`${API_BASE}/chat/messages?contact_id=${contact.id}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
     const messages = await response.json();
+    const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
     const snapshotKey = String(contact.id);
     const previousIds = chatMessageSnapshots.get(snapshotKey);
     const messageIds = new Set((messages || []).map((message) => String(message.id)));
@@ -1017,10 +971,6 @@ async function loadChatMessages() {
     chatMessageSnapshots.set(snapshotKey, messageIds);
     const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
     const formatBytes = (value) => { const size = Number(value) || 0; if (size < 1024) return `${size} B`; if (size < 1048576) return `${Math.round(size / 1024)} KB`; return `${(size / 1048576).toFixed(1)} MB`; };
-    const renderMessageText = (value) => escapeHtml(value).replace(
-        /(https?:\/\/[^\s<]+|\/#post-\d+)/g,
-        '<a class="chat-message-link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
-    );
     const mediaMarkup = (message) => {
         const url = message.media_url ? (String(message.media_url).startsWith('http') ? message.media_url : `${API_ORIGIN}${message.media_url}`) : '';
         if (!url) return '';
@@ -1029,28 +979,37 @@ async function loadChatMessages() {
         if (message.type === 'audio') return `<audio class="chat-inline-audio" src="${escapeHtml(url)}" controls></audio>`;
         return `<a class="chat-document-card" href="${escapeHtml(url)}" download><span class="chat-document-ext">${escapeHtml((message.file_name || 'FILE').split('.').pop().slice(0, 5).toUpperCase())}</span><span><strong>${escapeHtml(message.file_name || 'Attached document')}</strong><small>${formatBytes(message.file_size)}</small></span><span class="chat-document-download" aria-hidden="true">↓</span></a>`;
     };
-    box.innerHTML = (messages || []).map((message) => `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}"><div class="chat-bubble-content">${mediaMarkup(message)}${message.content ? renderMessageText(message.content) : ''}</div><div class="chat-message-meta"><time>${escapeHtml(message.created_at ? new Date(message.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '')}</time>${message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : ''}</div></div>`).join('');
+    const sharedPostMarkup = (post) => {
+        if (!post) return '';
+        const image = Array.isArray(post.images) && post.images[0]
+            ? `<img src="${escapeHtml(String(post.images[0]).startsWith('http') ? post.images[0] : `${API_ORIGIN}${post.images[0]}`)}" alt="Shared post image" loading="lazy">`
+            : '';
+        return `<a class="chat-shared-post" href="/#post-${post.id}"><span class="chat-shared-post-author"><span class="chat-shared-post-avatar">${post.avatar_url ? `<img src="${escapeHtml(String(post.avatar_url).startsWith('http') ? post.avatar_url : `${API_ORIGIN}${post.avatar_url}`)}" alt="">` : escapeHtml((post.username || 'U').charAt(0).toUpperCase())}</span><strong>@${escapeHtml(post.username || 'User')}</strong></span>${image}<span class="chat-shared-post-text">${escapeHtml(post.content || 'Shared post')}</span></a>`;
+    };
+    const renderMessageText = (value) => escapeHtml(value).replace(/(https?:\/\/[^\s<]+|\/#post-\d+)/g, '<a class="chat-message-link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+    box.innerHTML = (messages || []).map((message) => `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}"><div class="chat-bubble-content">${message.shared_post ? sharedPostMarkup(message.shared_post) : mediaMarkup(message)}${message.type === 'post_share' ? '' : (message.content ? renderMessageText(message.content) : '')}</div><div class="chat-message-meta"><time>${escapeHtml(window.AeroI18n?.formatChatTimestamp?.(message.created_at) || '')}</time>${message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : ''}</div></div>`).join('');
     box.querySelectorAll('[data-lightbox-src]').forEach((item) => item.addEventListener('click', () => { const lightbox = document.getElementById('chat-lightbox'); const image = document.getElementById('chat-lightbox-image'); image.src = item.dataset.lightboxSrc; lightbox.classList.remove('hidden'); }));
     box.querySelectorAll('[data-delete-message]').forEach((button) => button.addEventListener('click', async () => { const response = await fetch(`${API_BASE}/chat/messages/${button.dataset.deleteMessage}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }); if (response.ok) button.closest('.chat-message')?.remove(); }));
     box.scrollTop = box.scrollHeight;
 }
 
 function setupMediaAndChat() {
-    setupUnreadMessageSoundUnlock();
-    document.getElementById('chat-dock-btn')?.addEventListener('click', () => { window.AeroRouter?.navigate('chat'); loadChatContacts(); });
+    document.getElementById('chat-dock-btn')?.addEventListener('click', () => { setChatContactState(false); window.AeroRouter?.navigate('chat'); loadChatContacts(); });
+    document.getElementById('chat-back-btn')?.addEventListener('click', () => {
+        setChatContactState(false);
+    });
+    document.getElementById('chat-back-button')?.addEventListener('click', () => setChatContactState(false));
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 768) setChatContactState(false);
+    }, { passive: true });
     if (localStorage.getItem('aero_token')) {
         loadChatContacts();
-        loadUnreadChatCount().catch(() => { });
+        loadUnreadChatCount().catch(() => {});
         chatContactsPollTimer = window.setInterval(loadChatContacts, 5000);
-        window.setInterval(() => loadUnreadChatCount().catch(() => { }), 5000);
+        window.setInterval(() => loadUnreadChatCount().catch(() => {}), 5000);
     }
     document.getElementById('close-chat-drawer')?.addEventListener('click', () => { document.getElementById('view-chat').classList.add('hidden'); window.clearInterval(chatPollTimer); });
     document.getElementById('chat-contact-search')?.addEventListener('input', (event) => document.querySelectorAll('.chat-contact').forEach((item) => item.classList.toggle('hidden', !item.textContent.toLowerCase().includes(event.target.value.toLowerCase()))));
-    if (localStorage.getItem('aero_token')) {
-        loadChatContacts();
-        loadUnreadChatCount().catch(() => { });
-        unreadChatPollTimer = window.setInterval(() => loadUnreadChatCount().catch(() => { }), 10000);
-    }
     const getChatInput = () => document.getElementById('chat-input') || document.getElementById('chat-message-input');
     const attachButton = document.getElementById('chat-attach-btn');
     const fileInput = document.getElementById('chat-file-input');
@@ -1080,18 +1039,15 @@ function setupMediaAndChat() {
         const muted = muteButton.classList.contains('is-muted');
         const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/mute`, {
             method: muted ? 'DELETE' : 'POST',
-            headers: { 'Authorization': `******'aero_token')}` }
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
         });
         if (!response.ok) return;
         contact.is_muted = !muted;
-        muteButton.classList.toggle('is-muted', !muted);
-        muteButton.textContent = muted ? '🔔' : '🔕';
-        muteButton.title = muted ? 'Mute user' : 'Unmute user';
+        setMuteButtonState(muteButton, !muted);
         await loadChatContacts();
-        window.showNotice?.(muted ? 'User unmuted.' : 'User muted.', 'success');
     });
     attachButton?.addEventListener('click', () => attachmentMenu?.classList.toggle('hidden'));
-    attachmentMenu?.addEventListener('click', (event) => { const button = event.target.closest('[data-attachment-kind]'); if (!button) return; fileInput.accept = button.dataset.attachmentKind === 'media' ? 'image/*,video/*,audio/*' : button.dataset.attachmentKind === 'document' ? '.pdf,.txt,.doc,.docx,.xls,.xlsx' : 'image/*,video/*,audio/*,.pdf,.txt,.doc,.docx,.xls,.xlsx'; attachmentMenu.classList.add('hidden'); fileInput.click(); });
+    attachmentMenu?.addEventListener('click', (event) => { const button = event.target.closest('[data-attachment-kind]'); if (!button) return; fileInput.accept = button.dataset.attachmentKind === 'media' ? 'image/*,video/*' : button.dataset.attachmentKind === 'document' ? '.pdf,.txt,.doc,.docx,.xls,.xlsx' : 'image/*,video/*,.pdf,.txt,.doc,.docx,.xls,.xlsx'; attachmentMenu.classList.add('hidden'); fileInput.click(); });
     fileInput?.addEventListener('change', () => fileInput.files[0] && window.selectChatAttachment?.(fileInput.files[0]));
     window.selectChatAttachment = async (file) => { const formData = new FormData(); formData.append('file', file); const response = await fetch(`${API_BASE}/chat/uploads`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: formData }); const data = await response.json().catch(() => ({})); if (!response.ok) { window.showNotice?.(data.message || 'Unable to upload attachment.', 'error'); return; } const input = getChatInput(); input.dataset.mediaUrl = data.url; input.dataset.messageType = data.type; input.dataset.fileName = data.file_name; input.dataset.fileSize = data.file_size; input.placeholder = data.file_name; input.focus(); };
     document.getElementById('chat-lightbox-close')?.addEventListener('click', () => document.getElementById('chat-lightbox')?.classList.add('hidden'));
@@ -1132,7 +1088,7 @@ function setupMediaAndChat() {
             box.scrollTop = box.scrollHeight;
         }
         const response = await fetch(`${API_BASE}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: JSON.stringify({ user_id: contact.id, recipient_id: contact.id, content, media_url: mediaUrl, type: messageType, file_name: input.dataset.fileName || '', file_size: input.dataset.fileSize || 0 }) });
-        if (response.ok) { input.value = '';['mediaUrl', 'messageType', 'fileName', 'fileSize'].forEach((key) => delete input.dataset[key]); input.placeholder = 'Message...'; await loadChatMessages(); }
+        if (response.ok) { input.value = ''; ['mediaUrl', 'messageType', 'fileName', 'fileSize'].forEach((key) => delete input.dataset[key]); input.placeholder = 'Message...'; await loadChatMessages(); }
     });
     document.getElementById('chat-form')?.addEventListener('dragover', (event) => event.preventDefault());
     document.getElementById('chat-form')?.addEventListener('drop', (event) => { event.preventDefault(); const file = event.dataTransfer.files?.[0]; if (file) window.selectChatAttachment(file); });
@@ -1653,11 +1609,11 @@ const AeroAPI = {
         return data;
     },
 
-    async sendPostToUser(postId, username) {
+    async sendPostToUser(postId, recipientId, username = '') {
         const res = await fetch(`${API_BASE}/posts/${postId}/share`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` },
-            body: JSON.stringify({ username })
+            body: JSON.stringify({ recipient_id: Number(recipientId), username, type: 'post_share', post_id: Number(postId), content: '' })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Unable to share with user');
@@ -2237,14 +2193,63 @@ const AeroAPI = {
         rightDock?.addEventListener('mouseleave', () => scrollDockTo(0));
         const mobileMenuButton = document.getElementById('mobile-menu-btn');
         const mobileDrawer = document.getElementById('mobile-nav-drawer');
-        const closeMobileMenu = () => { mobileDrawer?.classList.add('hidden'); mobileMenuButton?.classList.remove('is-open'); mobileMenuButton?.setAttribute('aria-expanded', 'false'); };
-        mobileMenuButton?.addEventListener('click', () => { const opening = mobileDrawer?.classList.contains('hidden'); mobileDrawer?.classList.toggle('hidden', !opening); mobileMenuButton.classList.toggle('is-open', opening); mobileMenuButton.setAttribute('aria-expanded', String(Boolean(opening))); });
-        mobileDrawer?.addEventListener('click', (event) => { const button = event.target.closest('[data-mobile-nav]'); if (!button) return; document.getElementById(button.dataset.mobileNav)?.click(); closeMobileMenu(); });
+        const mobileBackdrop = document.getElementById('mobile-nav-backdrop');
+        const closeMobileMenu = () => {
+            mobileDrawer?.classList.add('hidden');
+            mobileBackdrop?.classList.add('hidden');
+            mobileDrawer?.setAttribute('aria-hidden', 'true');
+            mobileMenuButton?.classList.remove('is-open');
+            mobileMenuButton?.setAttribute('aria-expanded', 'false');
+        };
+        const openMobileMenu = () => {
+            mobileDrawer?.classList.remove('hidden');
+            mobileBackdrop?.classList.remove('hidden');
+            mobileDrawer?.setAttribute('aria-hidden', 'false');
+            mobileMenuButton?.classList.add('is-open');
+            mobileMenuButton?.setAttribute('aria-expanded', 'true');
+        };
+        mobileMenuButton?.addEventListener('click', () => {
+            if (mobileDrawer?.classList.contains('hidden')) openMobileMenu();
+            else closeMobileMenu();
+        });
+        document.getElementById('close-mobile-menu')?.addEventListener('click', closeMobileMenu);
+        mobileBackdrop?.addEventListener('click', closeMobileMenu);
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !mobileDrawer?.classList.contains('hidden')) closeMobileMenu();
+        });
+        mobileDrawer?.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-mobile-nav]');
+            if (!button) return;
+            document.getElementById(button.dataset.mobileNav)?.click();
+            closeMobileMenu();
+        });
+        document.querySelectorAll('[data-mobile-action]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const action = button.dataset.mobileAction;
+                if (action === 'home') document.getElementById('home-nav-btn')?.click();
+                if (action === 'messages') document.getElementById('chat-dock-btn')?.click();
+                if (action === 'profile') document.getElementById('user-avatar-btn')?.click();
+                if (action === 'compose') document.getElementById('global-fab-btn')?.click();
+                if (action === 'search') {
+                    document.getElementById('home-nav-btn')?.click();
+                    document.getElementById('global-search')?.focus();
+                }
+            });
+        });
+        window.addEventListener('aero:view-change', (event) => {
+            const action = event.detail?.view === 'chat' ? 'messages' : event.detail?.view === 'profile' ? 'profile' : event.detail?.view === 'main' ? 'home' : '';
+            document.querySelectorAll('[data-mobile-action]').forEach((button) => {
+                const active = action && button.dataset.mobileAction === action;
+                button.classList.toggle('is-active', active);
+                if (active) button.setAttribute('aria-current', 'page');
+                else button.removeAttribute('aria-current');
+            });
+        });
         const token = localStorage.getItem('aero_token');
         const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
         const adminLink = document.getElementById('admin-dashboard-link');
         if (adminLink) adminLink.classList.toggle('hidden', user.is_admin !== true && !['admin', 'moderator'].includes(user.role));
-
+        
         const authOverlay = document.getElementById('auth-overlay');
         const mainApp = document.getElementById('main-app');
 
@@ -2294,7 +2299,8 @@ window.AeroAPI = AeroAPI;
 window.apiService = AeroAPI;
 window.addEventListener('aero:language-change', () => {
     const feed = document.getElementById('posts-feed');
-    if (feed && localStorage.getItem('aero_token')) AeroAPI.renderFeed().catch(() => { });
+    if (feed && localStorage.getItem('aero_token')) AeroAPI.renderFeed().catch(() => {});
+    if (activeChatUser && localStorage.getItem('aero_token')) loadChatMessages().catch(() => {});
 });
 window.toggleFollowUser = async (userId, userMeta = {}) => {
     const api = window.apiService || window.api;
@@ -2332,7 +2338,7 @@ function openShareModal(post) {
         overlay = document.createElement('div');
         overlay.id = 'share-modal-overlay';
         overlay.className = 'share-modal-overlay';
-        overlay.innerHTML = `<div class="share-modal glass-card" role="dialog" aria-modal="true" aria-labelledby="share-modal-title"><header class="share-modal-header"><div><span class="share-modal-kicker">Aero share</span><h2 id="share-modal-title">Share this post</h2></div><button type="button" class="modal-close-btn share-modal-close" aria-label="Close share dialog">&times;</button></header><p class="share-modal-preview"></p><div class="share-shortcuts"><button type="button" data-share-action="copy"><span class="share-shortcut-icon">⌁</span><strong>Copy Link</strong><small>Copy the post URL</small></button><button type="button" data-share-action="export"><span class="share-shortcut-icon">▧</span><strong>Export as Card</strong><small>Download an image</small></button><button type="button" data-share-action="send"><span class="share-shortcut-icon">➤</span><strong>Send to User</strong><small>Share privately</small></button></div><div class="share-send-form hidden"><input type="text" placeholder="Username" aria-label="Recipient username"><button type="button" class="btn btn-primary g2-btn">Send</button></div></div>`;
+        overlay.innerHTML = `<div class="share-modal glass-card" role="dialog" aria-modal="true" aria-labelledby="share-modal-title"><header class="share-modal-header"><div><span class="share-modal-kicker">Aero share</span><h2 id="share-modal-title">Share this post</h2></div><button type="button" class="modal-close-btn share-modal-close" aria-label="Close share dialog">&times;</button></header><p class="share-modal-preview"></p><div class="share-shortcuts"><button type="button" data-share-action="copy"><span class="share-shortcut-icon">⌁</span><strong>Copy Link</strong><small>Copy the post URL</small></button><button type="button" data-share-action="export"><span class="share-shortcut-icon">▧</span><strong>Export as Card</strong><small>Download an image</small></button><button type="button" data-share-action="send"><span class="share-shortcut-icon">➤</span><strong>Send to User</strong><small>Share privately</small></button></div><div class="share-send-form hidden"><label class="share-user-search-label" for="share-user-search">Choose a user</label><input id="share-user-search" type="search" placeholder="Search contacts" aria-label="Search contacts"><div class="share-user-list" role="listbox" aria-label="Users to share with"></div><button type="button" class="btn btn-primary g2-btn" disabled>Send</button></div></div>`;
         document.body.appendChild(overlay);
         const close = () => overlay.classList.remove('is-open');
         overlay.querySelector('.share-modal-close').addEventListener('click', close);
@@ -2340,15 +2346,58 @@ function openShareModal(post) {
         overlay.querySelector('[data-share-action="copy"]').addEventListener('click', () => copyPostLink(overlay.dataset.postId));
         overlay.querySelector('[data-share-action="export"]').addEventListener('click', () => {
             exportPostCard(overlay.dataset.postId, overlay.dataset.content, overlay.dataset.username);
-            AeroAPI.recordShareStats(overlay.dataset.postId, 'share').catch(() => { });
+            AeroAPI.recordShareStats(overlay.dataset.postId, 'share').catch(() => {});
         });
-        overlay.querySelector('[data-share-action="send"]').addEventListener('click', () => overlay.querySelector('.share-send-form').classList.toggle('hidden'));
-        overlay.querySelector('.share-send-form button').addEventListener('click', () => {
-            const recipient = overlay.querySelector('.share-send-form input').value.trim();
-            if (recipient) {
-                AeroAPI.sendPostToUser(overlay.dataset.postId, recipient)
+        const sendForm = overlay.querySelector('.share-send-form');
+        const userSearch = overlay.querySelector('#share-user-search');
+        const userList = overlay.querySelector('.share-user-list');
+        const sendButton = sendForm.querySelector('button');
+        let shareUsers = [];
+        let selectedShareUserId = 0;
+        let selectedShareUsername = '';
+        const renderShareUsers = () => {
+            const query = userSearch.value.trim().toLowerCase();
+            const users = shareUsers.filter(user => String(user.username || '').toLowerCase().includes(query));
+            userList.innerHTML = users.length ? users.map(user => `<button type="button" class="share-user-option ${selectedShareUserId === Number(user.id) ? 'is-selected' : ''}" data-user-id="${user.id}" data-username="${escapeHtml(user.username)}" role="option" aria-selected="${selectedShareUserId === Number(user.id)}"><span class="share-user-avatar">${user.avatar_url ? `<img src="${escapeHtml(user.avatar_url)}" alt="">` : escapeHtml((user.username || 'U').charAt(0).toUpperCase())}</span><span class="share-user-name">@${escapeHtml(user.username)}</span><span class="share-user-check" aria-hidden="true">✓</span></button>`).join('') : '<div class="share-user-empty">No contacts found.</div>';
+            sendButton.disabled = !selectedShareUserId;
+            userList.querySelectorAll('.share-user-option').forEach(option => option.addEventListener('click', () => {
+                selectedShareUserId = Number(option.dataset.userId) || 0;
+                selectedShareUsername = option.dataset.username || '';
+                renderShareUsers();
+            }));
+        };
+        const loadShareUsers = async () => {
+            userList.innerHTML = '<div class="share-user-empty">Loading contacts...</div>';
+            try {
+                const response = await fetch(`${API_BASE}/chat/contacts`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+                const users = await response.json().catch(() => []);
+                if (!response.ok) throw new Error('Unable to load contacts');
+                shareUsers = Array.isArray(users) ? users : [];
+                renderShareUsers();
+            } catch (error) {
+                userList.innerHTML = `<div class="share-user-empty">${escapeHtml(error.message)}</div>`;
+                sendButton.disabled = true;
+            }
+        };
+        overlay.querySelector('[data-share-action="send"]').addEventListener('click', () => {
+            const opening = sendForm.classList.contains('hidden');
+            sendForm.classList.toggle('hidden', !opening);
+            if (opening) {
+                selectedShareUserId = 0;
+                selectedShareUsername = '';
+                userSearch.value = '';
+                sendButton.disabled = true;
+                loadShareUsers();
+            }
+        });
+        userSearch.addEventListener('input', renderShareUsers);
+        sendButton.addEventListener('click', () => {
+            const recipient = selectedShareUsername;
+            if (selectedShareUserId) {
+                sendButton.disabled = true;
+                AeroAPI.sendPostToUser(overlay.dataset.postId, selectedShareUserId, recipient)
                     .then(() => { close(); showNotice(`Post shared with @${recipient}.`, 'success'); })
-                    .catch(error => showNotice(error.message, 'error'));
+                    .catch(error => { sendButton.disabled = false; showNotice(error.message, 'error'); });
             }
         });
     }

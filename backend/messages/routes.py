@@ -1,9 +1,9 @@
-from flask import request, jsonify
+from flask import jsonify, request
 
 from backend import db
-from backend.models.message import Message
 from backend.auth.routes import token_required
 from backend.messages import messages_bp
+from backend.models.message import Message
 
 
 @messages_bp.route("/", methods=["POST"])
@@ -30,7 +30,7 @@ def send_message(current_user):
         sender_id=current_user.id,
         recipient_id=recipient_id,
         content=content.strip(),
-        is_read=False
+        is_read=False,
     )
 
     db.session.add(message)
@@ -44,6 +44,6 @@ def send_message(current_user):
             "recipient_id": message.recipient_id,
             "content": message.content,
             "is_read": message.is_read,
-            "created_at": message.created_at.isoformat()
-        }
+            "created_at": message.created_at.isoformat(),
+        },
     }), 201

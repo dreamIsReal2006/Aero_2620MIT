@@ -1,3 +1,4 @@
+import json
 import uuid
 from pathlib import Path
 
@@ -7,7 +8,7 @@ from werkzeug.utils import secure_filename
 from backend import db
 from backend.auth.routes import token_required
 from backend.chat import chat_bp
-from backend.models import Block, Follow, Message, Mute, Note, User
+from backend.models import Block, Follow, Message, Mute, Note, Post, User
 from backend.presence import is_user_online
 
 CHAT_UPLOAD_TYPES = {
@@ -20,10 +21,10 @@ CHAT_UPLOAD_TYPES = {
 
 
 def _user_payload(user, viewer_id=None):
-    muted = viewer_id is not None and Mute.query.filter_by(
+    is_muted = viewer_id is not None and Mute.query.filter_by(
         muter_id=viewer_id, muted_id=user.id
     ).first() is not None
-    return {"id": user.id, "username": user.username, "display_name": user.display_name or user.username, "avatar_url": user.avatar_url or "", "role": user.role if user.role in {"admin", "moderator", "user"} else "user", "is_online": is_user_online(user, viewer_id), "is_muted": muted}
+    return {"id": user.id, "username": user.username, "display_name": user.display_name or user.username, "avatar_url": user.avatar_url or "", "role": user.role if user.role in {"admin", "moderator", "user"} else "user", "is_online": is_user_online(user, viewer_id), "is_muted": is_muted}
 
 
 @chat_bp.get("/friends")
@@ -31,23 +32,19 @@ def _user_payload(user, viewer_id=None):
 @chat_bp.get("/chat/contacts")
 @token_required
 def get_contacts(current_user):
-    followed_ids = [row.following_id for row in Follow.query.filter_by(
-        follower_id=current_user.id, status="approved").all()]
-    follower_ids = [row.follower_id for row in Follow.query.filter_by(
-        following_id=current_user.id, status="approved").all()]
+    followed_ids = [row.following_id for row in Follow.query.filter_by(follower_id=current_user.id, status="approved").all()]
+    follower_ids = [row.follower_id for row in Follow.query.filter_by(following_id=current_user.id, status="approved").all()]
     ids = set(followed_ids + follower_ids)
-    contacts = User.query.filter(User.id.in_(ids)).order_by(
-        User.username.asc()).all() if ids else []
+    contacts = User.query.filter(User.id.in_(ids)).order_by(User.username.asc()).all() if ids else []
     payload = []
     for user in contacts:
         latest = Message.query.filter(
             ((Message.sender_id == current_user.id) & (Message.recipient_id == user.id)) |
-            ((Message.sender_id == user.id) &
-             (Message.recipient_id == current_user.id))
+            ((Message.sender_id == user.id) & (Message.recipient_id == current_user.id))
         ).order_by(Message.created_at.desc()).first()
         item = _user_payload(user, current_user.id)
         item["latest_message"] = latest.content if latest else ""
-        item["unread_count"] = 0 if item["is_muted"] else Message.query.filter_by(
+        item["unread_count"] = Message.query.filter_by(
             sender_id=user.id, recipient_id=current_user.id, is_read=False
         ).count()
         payload.append(item)
@@ -57,13 +54,8 @@ def get_contacts(current_user):
 @chat_bp.get("/chat/unread-count")
 @token_required
 def get_unread_count(current_user):
-    muted_ids = db.session.query(Mute.muted_id).filter_by(
-        muter_id=current_user.id
-    )
-    unread_count = Message.query.filter(
-        Message.recipient_id == current_user.id,
-        Message.is_read.is_(False),
-        ~Message.sender_id.in_(muted_ids),
+    unread_count = Message.query.filter_by(
+        recipient_id=current_user.id, is_read=False
     ).count()
     return jsonify({"unread_count": unread_count})
 
@@ -71,10 +63,8 @@ def get_unread_count(current_user):
 @chat_bp.get("/notes")
 @token_required
 def get_notes(current_user):
-    followed_ids = [row.following_id for row in Follow.query.filter_by(
-        follower_id=current_user.id, status="approved").all()]
-    notes = Note.query.filter(Note.user_id.in_(followed_ids)).order_by(
-        Note.created_at.desc()).limit(30).all() if followed_ids else []
+    followed_ids = [row.following_id for row in Follow.query.filter_by(follower_id=current_user.id, status="approved").all()]
+    notes = Note.query.filter(Note.user_id.in_(followed_ids)).order_by(Note.created_at.desc()).limit(30).all() if followed_ids else []
     return jsonify([{"id": note.id, "content": note.content, "created_at": f"{note.created_at.isoformat()}Z", "author": _user_payload(note.author, current_user.id)} for note in notes])
 
 
@@ -82,8 +72,7 @@ def get_notes(current_user):
 @token_required
 def get_messages(current_user):
     try:
-        user_id = int(request.args.get(
-            "contact_id", request.args.get("user_id", "0")))
+        user_id = int(request.args.get("contact_id", request.args.get("user_id", "0")))
     except ValueError:
         user_id = 0
     if not db.session.get(User, user_id):
@@ -96,8 +85,26 @@ def get_messages(current_user):
         {Message.is_read: True}, synchronize_session=False
     )
     db.session.commit()
-    return jsonify([{
+    payload = []
+    for message in messages:
+        shared_post = None
+        if message.type in {"post_share", "shared_post"} and message.post_id:
+            post = db.session.get(Post, message.post_id)
+            if post:
+                try:
+                    images = json.loads(post.images_json or "[]")
+                except (TypeError, ValueError):
+                    images = []
+                shared_post = {
+                    "id": post.id,
+                    "content": post.content or "",
+                    "images": images,
+                    "username": post.author.username if post.author else "User",
+                    "avatar_url": post.author.avatar_url if post.author else "",
+                }
+        payload.append({
         "id": message.id,
+        "post_id": message.post_id,
         "content": message.content,
         "media_url": message.media_url or "",
         "type": message.type or "text",
@@ -106,7 +113,9 @@ def get_messages(current_user):
         "can_delete": message.sender_id == current_user.id,
         "file_name": message.file_name or "",
         "file_size": message.file_size or 0,
-    } for message in messages])
+        "shared_post": shared_post,
+    })
+    return jsonify(payload)
 
 
 @chat_bp.post("/chat/uploads")
@@ -116,8 +125,7 @@ def upload_chat_attachment(current_user):
     if not file or not file.filename:
         return jsonify({"message": "A file is required"}), 400
     mime = file.mimetype or "application/octet-stream"
-    attachment_type = next((kind for prefix, kind in CHAT_UPLOAD_TYPES.items(
-    ) if mime == prefix or mime.startswith(prefix)), None)
+    attachment_type = next((kind for prefix, kind in CHAT_UPLOAD_TYPES.items() if mime == prefix or mime.startswith(prefix)), None)
     if not attachment_type:
         return jsonify({"message": "This file type is not supported"}), 400
     if request.content_length and request.content_length > 50 * 1024 * 1024:
@@ -142,16 +150,14 @@ def block_contact(current_user, user_id):
 @chat_bp.get("/chat/contacts/<int:user_id>/block")
 @token_required
 def get_block_status(current_user, user_id):
-    blocked = Block.query.filter_by(
-        blocker_id=current_user.id, blocked_id=user_id).first() is not None
+    blocked = Block.query.filter_by(blocker_id=current_user.id, blocked_id=user_id).first() is not None
     return jsonify({"blocked": blocked})
 
 
 @chat_bp.delete("/chat/contacts/<int:user_id>/block")
 @token_required
 def unblock_contact(current_user, user_id):
-    block = Block.query.filter_by(
-        blocker_id=current_user.id, blocked_id=user_id).first()
+    block = Block.query.filter_by(blocker_id=current_user.id, blocked_id=user_id).first()
     if block:
         db.session.delete(block)
         db.session.commit()
@@ -163,7 +169,9 @@ def unblock_contact(current_user, user_id):
 def mute_contact(current_user, user_id):
     if user_id == current_user.id or not db.session.get(User, user_id):
         return jsonify({"message": "Invalid contact"}), 400
-    if not Mute.query.filter_by(muter_id=current_user.id, muted_id=user_id).first():
+    if not Mute.query.filter_by(
+        muter_id=current_user.id, muted_id=user_id
+    ).first():
         db.session.add(Mute(muter_id=current_user.id, muted_id=user_id))
         db.session.commit()
     return jsonify({"muted": True})
@@ -212,9 +220,8 @@ def send_message(current_user):
         recipient_id = 0
     content = str(data.get("content") or "").strip()
     media_url = str(data.get("media_url") or "").strip()
-    message_type = "gif" if str(
-        data.get("type") or "").lower() == "gif" and media_url else "text"
-    if str(data.get("type") or "").lower() in {"image", "video", "audio", "document"}:
+    message_type = "gif" if str(data.get("type") or "").lower() == "gif" and media_url else "text"
+    if str(data.get("type") or "").lower() in {"image", "video", "document"}:
         message_type = str(data.get("type")).lower()
     file_name = str(data.get("file_name") or "").strip()[:255]
     try:
@@ -225,8 +232,7 @@ def send_message(current_user):
         return jsonify({"message": "A valid recipient and message are required"}), 400
     if Block.query.filter_by(blocker_id=recipient_id, blocked_id=current_user.id).first() or Block.query.filter_by(blocker_id=current_user.id, blocked_id=recipient_id).first():
         return jsonify({"message": "Messaging is unavailable for this contact"}), 403
-    message = Message(sender_id=current_user.id, recipient_id=recipient_id, content=content,
-                      media_url=media_url, type=message_type, file_name=file_name, file_size=file_size)
+    message = Message(sender_id=current_user.id, recipient_id=recipient_id, content=content, media_url=media_url, type=message_type, file_name=file_name, file_size=file_size)
     db.session.add(message)
     db.session.commit()
     return jsonify({"id": message.id, "content": message.content, "media_url": message.media_url, "type": message.type, "file_name": message.file_name, "file_size": message.file_size, "sender_id": message.sender_id, "created_at": f"{message.created_at.isoformat()}Z"}), 201

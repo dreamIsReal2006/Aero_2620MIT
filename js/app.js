@@ -162,6 +162,11 @@
     function updateFab(view) {
         const fab = document.getElementById('global-fab-btn');
         if (!fab) return;
+        if (window.innerWidth <= 768) {
+            fab.classList.add('hidden');
+            fab.style.setProperty('display', 'none', 'important');
+            return;
+        }
         if (!isAuthenticated) {
             fab.classList.add('hidden');
             fab.style.setProperty('display', 'none', 'important');
@@ -180,6 +185,10 @@
             ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg><span class="fab-label">Video</span>'
             : '<i class="lucide-plus" aria-hidden="true"></i><span class="fab-label">New Post</span>';
         fab.setAttribute('aria-label', view === 'shorts' ? 'Upload Short Video' : 'Create a new post');
+    }
+
+    function syncFabForViewport() {
+        updateFab(activeView);
     }
 
     function setActiveFeedTab(type = 'for_you') {
@@ -455,6 +464,7 @@
         navigate('main');
         setActiveFeedTab('for_you');
         setFabAuthState(Boolean(localStorage.getItem('aero_token')));
+        window.addEventListener('resize', syncFabForViewport, { passive: true });
     });
 
     window.setFabAuthState = setFabAuthState;

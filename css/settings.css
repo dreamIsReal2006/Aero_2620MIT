@@ -284,6 +284,14 @@ body {
     font-size: 14px;
 }
 
+.languages-settings-section .section-heading {
+    margin-bottom: 14px;
+}
+
+.languages-settings-section .settings-card {
+    padding-block: 20px;
+}
+
 
 /* =================================
    CARD
@@ -550,7 +558,7 @@ body.dark-mode select#theme-select option {
 
     gap: 20px;
 
-    padding: 18px 0;
+    padding: 16px 0;
 
     border-bottom: 1px solid var(--border);
 }
@@ -568,7 +576,7 @@ body.dark-mode select#theme-select option {
 .setting-row h3,
 .security-row h3,
 .danger-zone h3 {
-    margin: 0 0 5px;
+    margin: 0;
 
     font-size: 14px;
 }
@@ -685,97 +693,6 @@ body.dark-mode select#theme-select option {
     margin-top: 5px;
 
     border-top: 1px solid var(--border);
-}
-
-.screen-time-card {
-    padding: 22px 25px 20px;
-}
-
-.screen-time-summary {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 20px;
-    padding-bottom: 22px;
-    border-bottom: 1px solid var(--border);
-}
-
-.screen-time-summary > div {
-    display: grid;
-    gap: 5px;
-}
-
-.screen-time-label {
-    color: var(--muted);
-    font-size: 12px;
-}
-
-.screen-time-summary strong {
-    font-size: 30px;
-    letter-spacing: -0.03em;
-}
-
-.screen-time-average {
-    text-align: right;
-}
-
-.screen-time-average strong {
-    font-size: 18px;
-}
-
-.screen-time-average small {
-    color: var(--muted);
-    font-size: 11px;
-}
-
-.screen-time-chart-wrap {
-    height: 155px;
-    display: flex;
-    align-items: flex-end;
-    padding: 24px 8px 0;
-}
-
-.screen-time-chart {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-around;
-    gap: 12px;
-}
-
-.screen-time-bar {
-    width: min(34px, 12%);
-    min-height: 4px;
-    border-radius: 8px 8px 3px 3px;
-    background: var(--hover);
-    border: 1px solid var(--border);
-    transition: height 0.25s ease, background 0.2s ease;
-}
-
-.screen-time-bar.is-today {
-    background: var(--primary);
-    border-color: transparent;
-}
-
-.screen-time-days {
-    display: flex;
-    justify-content: space-around;
-    gap: 12px;
-    padding: 9px 8px 0;
-    color: var(--muted);
-    font-size: 11px;
-    text-align: center;
-}
-
-.screen-time-days span {
-    width: min(34px, 12%);
-}
-
-.screen-time-note {
-    margin: 22px 0 15px;
-    color: var(--muted);
-    font-size: 12px;
 }
 
 
@@ -1135,17 +1052,23 @@ body.dark-mode select#theme-select option {
     .danger-zone {
         gap: 15px;
     }
+}
 
-    .screen-time-summary {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .screen-time-average {
-        text-align: left;
-    }
-
-    .screen-time-chart {
-        gap: 6px;
-    }
+@media (max-width: 768px) {
+    .settings-container { width: calc(100% - 24px); max-width: none; margin: 24px auto 56px; }
+    .settings-layout { display: block; }
+    .settings-content { min-width: 0; }
+    .settings-card { width: 100%; max-width: 100%; padding: 18px 14px; overflow: hidden; }
+    .setting-row,
+    .security-row,
+    .danger-zone { width: 100%; min-width: 0; align-items: center; flex-direction: row; gap: 12px; padding: 16px 0; }
+    .setting-row > div,
+    .security-row > div,
+    .danger-zone > div { min-width: 0; overflow-wrap: anywhere; }
+    .setting-row h3,
+    .security-row h3,
+    .danger-zone h3 { overflow-wrap: anywhere; }
+    .setting-row select { flex: 0 0 132px; width: 132px; max-width: 42%; }
+    .secondary-button,
+    .danger-button { flex: 0 0 auto; max-width: 48%; white-space: normal; }
 }
