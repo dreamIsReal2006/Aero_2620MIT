@@ -284,6 +284,14 @@ body {
     font-size: 14px;
 }
 
+.languages-settings-section .section-heading {
+    margin-bottom: 14px;
+}
+
+.languages-settings-section .settings-card {
+    padding-block: 20px;
+}
+
 
 /* =================================
    CARD
@@ -550,7 +558,7 @@ body.dark-mode select#theme-select option {
 
     gap: 20px;
 
-    padding: 18px 0;
+    padding: 16px 0;
 
     border-bottom: 1px solid var(--border);
 }
@@ -568,7 +576,7 @@ body.dark-mode select#theme-select option {
 .setting-row h3,
 .security-row h3,
 .danger-zone h3 {
-    margin: 0 0 5px;
+    margin: 0;
 
     font-size: 14px;
 }
@@ -1044,4 +1052,23 @@ body.dark-mode select#theme-select option {
     .danger-zone {
         gap: 15px;
     }
+}
+
+@media (max-width: 768px) {
+    .settings-container { width: calc(100% - 24px); max-width: none; margin: 24px auto 56px; }
+    .settings-layout { display: block; }
+    .settings-content { min-width: 0; }
+    .settings-card { width: 100%; max-width: 100%; padding: 18px 14px; overflow: hidden; }
+    .setting-row,
+    .security-row,
+    .danger-zone { width: 100%; min-width: 0; align-items: center; flex-direction: row; gap: 12px; padding: 16px 0; }
+    .setting-row > div,
+    .security-row > div,
+    .danger-zone > div { min-width: 0; overflow-wrap: anywhere; }
+    .setting-row h3,
+    .security-row h3,
+    .danger-zone h3 { overflow-wrap: anywhere; }
+    .setting-row select { flex: 0 0 132px; width: 132px; max-width: 42%; }
+    .secondary-button,
+    .danger-button { flex: 0 0 auto; max-width: 48%; white-space: normal; }
 }

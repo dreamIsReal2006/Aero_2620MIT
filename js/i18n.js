@@ -44,6 +44,27 @@
         return language === 'zh' ? translations.zh[value] || value : value;
     }
 
+    function formatChatTimestamp(timestamp) {
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        if (Number.isNaN(date.getTime())) return '';
+        const language = getLanguage();
+        if (language === 'zh') {
+            const parts = new Intl.DateTimeFormat('zh-CN', {
+                year: 'numeric', month: 'numeric', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', hour12: false
+            }).formatToParts(date).reduce((values, part) => {
+                values[part.type] = part.value;
+                return values;
+            }, {});
+            return `${parts.year}年${parts.month}月${parts.day}日 ${parts.hour}:${parts.minute}`;
+        }
+        return new Intl.DateTimeFormat('en-US', {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: 'numeric', minute: '2-digit', hour12: true
+        }).format(date);
+    }
+
     function translateNode(node) {
         if (node.nodeType === Node.TEXT_NODE) {
             if (!originalText.has(node)) originalText.set(node, node.nodeValue);
@@ -86,7 +107,7 @@
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    window.AeroI18n = { getLanguage, applyLanguage, translateValue };
+    window.AeroI18n = { getLanguage, applyLanguage, translateValue, formatChatTimestamp };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup);
     else setup();
 })();

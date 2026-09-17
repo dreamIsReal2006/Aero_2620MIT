@@ -745,10 +745,16 @@ function setupNotificationSoundUnlock() {
 
 function updateDockBadge(buttonId, count) {
     const badge = document.querySelector(`#${buttonId} .dock-badge`);
-    if (!badge) return;
     const unreadCount = Number(count) || 0;
-    badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
-    badge.classList.toggle('hidden', unreadCount < 1);
+    if (badge) {
+        badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+        badge.classList.toggle('hidden', unreadCount < 1);
+    }
+    if (buttonId === 'chat-dock-btn') {
+        const mobileBadge = document.querySelector('.mobile-bottom-badge');
+        mobileBadge?.classList.toggle('hidden', unreadCount < 1);
+        if (mobileBadge) mobileBadge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+    }
 }
 
 function setNotificationDrawerVisibility(isOpen) {
@@ -873,10 +879,34 @@ async function loadUnreadChatCount() {
     updateDockBadge('chat-dock-btn', unreadCount);
 }
 
+function setMuteButtonState(button, muted, animate = true) {
+    if (!button) return;
+    button.classList.toggle('is-muted', muted);
+    button.setAttribute('aria-label', muted ? 'Unmute user' : 'Mute user');
+    button.title = muted ? 'Unmute user' : 'Mute user';
+    button.innerHTML = muted
+        ? '<svg class="chat-header-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"></path><path d="M10 21h4"></path><path d="m4 4 16 16"></path></svg>'
+        : '<svg class="chat-header-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"></path><path d="M10 21h4"></path></svg>';
+    if (animate) {
+        button.classList.remove('is-toggling');
+        void button.offsetWidth;
+        button.classList.add('is-toggling');
+    }
+}
+
+function setChatContactState(isOpen) {
+    const isMobile = window.innerWidth <= 768;
+    const view = document.getElementById('view-chat');
+    const backButton = document.getElementById('chat-back-btn') || document.getElementById('chat-back-button');
+    view?.classList.toggle('chat-contact-open', Boolean(isOpen && isMobile));
+    backButton?.classList.toggle('is-visible', Boolean(isOpen && isMobile));
+}
+
 async function selectChatContact(contact) {
     if (!contact) return;
     activeChatUser = contact;
     window.activeChatUser = contact;
+    setChatContactState(true);
     const activeAvatar = document.getElementById('chat-active-avatar');
     const activeName = document.getElementById('chat-active-name');
     if (activeName) activeName.textContent = `@${contact.username}`;
@@ -900,6 +930,7 @@ async function selectChatContact(contact) {
     }
     await loadChatMessages();
     const blockButton = document.getElementById('chat-block-btn');
+    const muteButton = document.getElementById('chat-mute-btn');
     if (blockButton) {
         blockButton.classList.remove('hidden');
         blockButton.classList.remove('is-blocked');
@@ -913,6 +944,10 @@ async function selectChatContact(contact) {
         if (chatInput) chatInput.disabled = Boolean(blockData.blocked);
         chatAlert?.classList.toggle('hidden', !blockData.blocked);
         if (chatAlert && blockData.blocked) chatAlert.textContent = 'You have blocked this user.';
+    }
+    if (muteButton) {
+        muteButton.classList.remove('hidden');
+        setMuteButtonState(muteButton, Boolean(contact.is_muted), false);
     }
     await loadChatContacts();
     await loadUnreadChatCount();
@@ -941,16 +976,32 @@ async function loadChatMessages() {
         if (!url) return '';
         if (message.type === 'image' || message.type === 'gif') return `<button type="button" class="chat-media-preview" data-lightbox-src="${escapeHtml(url)}"><img src="${escapeHtml(url)}" alt="Attached image" loading="lazy"></button>`;
         if (message.type === 'video') return `<video class="chat-inline-video" src="${escapeHtml(url)}" controls preload="metadata"></video>`;
+        if (message.type === 'audio') return `<audio class="chat-inline-audio" src="${escapeHtml(url)}" controls></audio>`;
         return `<a class="chat-document-card" href="${escapeHtml(url)}" download><span class="chat-document-ext">${escapeHtml((message.file_name || 'FILE').split('.').pop().slice(0, 5).toUpperCase())}</span><span><strong>${escapeHtml(message.file_name || 'Attached document')}</strong><small>${formatBytes(message.file_size)}</small></span><span class="chat-document-download" aria-hidden="true">↓</span></a>`;
     };
-    box.innerHTML = (messages || []).map((message) => `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}"><div class="chat-bubble-content">${mediaMarkup(message)}${message.content ? escapeHtml(message.content) : ''}</div><div class="chat-message-meta"><time>${escapeHtml(message.created_at ? new Date(message.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '')}</time>${message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : ''}</div></div>`).join('');
+    const sharedPostMarkup = (post) => {
+        if (!post) return '';
+        const image = Array.isArray(post.images) && post.images[0]
+            ? `<img src="${escapeHtml(String(post.images[0]).startsWith('http') ? post.images[0] : `${API_ORIGIN}${post.images[0]}`)}" alt="Shared post image" loading="lazy">`
+            : '';
+        return `<a class="chat-shared-post" href="/#post-${post.id}"><span class="chat-shared-post-author"><span class="chat-shared-post-avatar">${post.avatar_url ? `<img src="${escapeHtml(String(post.avatar_url).startsWith('http') ? post.avatar_url : `${API_ORIGIN}${post.avatar_url}`)}" alt="">` : escapeHtml((post.username || 'U').charAt(0).toUpperCase())}</span><strong>@${escapeHtml(post.username || 'User')}</strong></span>${image}<span class="chat-shared-post-text">${escapeHtml(post.content || 'Shared post')}</span></a>`;
+    };
+    const renderMessageText = (value) => escapeHtml(value).replace(/(https?:\/\/[^\s<]+|\/#post-\d+)/g, '<a class="chat-message-link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+    box.innerHTML = (messages || []).map((message) => `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}"><div class="chat-bubble-content">${message.shared_post ? sharedPostMarkup(message.shared_post) : mediaMarkup(message)}${message.type === 'post_share' ? '' : (message.content ? renderMessageText(message.content) : '')}</div><div class="chat-message-meta"><time>${escapeHtml(window.AeroI18n?.formatChatTimestamp?.(message.created_at) || '')}</time>${message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : ''}</div></div>`).join('');
     box.querySelectorAll('[data-lightbox-src]').forEach((item) => item.addEventListener('click', () => { const lightbox = document.getElementById('chat-lightbox'); const image = document.getElementById('chat-lightbox-image'); image.src = item.dataset.lightboxSrc; lightbox.classList.remove('hidden'); }));
     box.querySelectorAll('[data-delete-message]').forEach((button) => button.addEventListener('click', async () => { const response = await fetch(`${API_BASE}/chat/messages/${button.dataset.deleteMessage}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }); if (response.ok) button.closest('.chat-message')?.remove(); }));
     box.scrollTop = box.scrollHeight;
 }
 
 function setupMediaAndChat() {
-    document.getElementById('chat-dock-btn')?.addEventListener('click', () => { window.AeroRouter?.navigate('chat'); loadChatContacts(); });
+    document.getElementById('chat-dock-btn')?.addEventListener('click', () => { setChatContactState(false); window.AeroRouter?.navigate('chat'); loadChatContacts(); });
+    document.getElementById('chat-back-btn')?.addEventListener('click', () => {
+        setChatContactState(false);
+    });
+    document.getElementById('chat-back-button')?.addEventListener('click', () => setChatContactState(false));
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 768) setChatContactState(false);
+    }, { passive: true });
     if (localStorage.getItem('aero_token')) {
         loadChatContacts();
         loadUnreadChatCount().catch(() => {});
@@ -965,6 +1016,7 @@ function setupMediaAndChat() {
     const attachmentMenu = document.getElementById('chat-attachment-menu');
     const inlineAlert = document.getElementById('chat-inline-alert');
     const blockButton = document.getElementById('chat-block-btn');
+    const muteButton = document.getElementById('chat-mute-btn');
     const setBlockedState = (blocked) => { blockButton?.classList.toggle('is-blocked', blocked); if (blockButton) blockButton.textContent = blocked ? 'Unblock' : 'Block'; const input = getChatInput(); if (input) input.disabled = blocked; inlineAlert?.classList.toggle('hidden', !blocked); if (inlineAlert) inlineAlert.textContent = blocked ? 'You have blocked this user.' : ''; };
     const blockModal = document.getElementById('chat-block-confirm-modal');
     const blockModalBody = document.getElementById('chat-block-confirm-body');
@@ -981,6 +1033,19 @@ function setupMediaAndChat() {
     document.getElementById('chat-block-confirm')?.addEventListener('click', async () => { const pending = blockModalPending; if (!pending) return; const confirmButton = document.getElementById('chat-block-confirm'); confirmButton.disabled = true; try { await pending.onConfirm(); closeBlockModal(); } finally { confirmButton.disabled = false; } });
     const refreshBlockState = async (contact) => { const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }); const data = await response.json().catch(() => ({})); setBlockedState(response.ok && Boolean(data.blocked)); };
     blockButton?.addEventListener('click', async () => { const contact = activeChatUser || window.activeChatUser; if (!contact) return; const blocked = blockButton.classList.contains('is-blocked'); const toggle = async () => { const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, { method: blocked ? 'DELETE' : 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }); if (response.ok) { setBlockedState(!blocked); window.showNotice?.(blocked ? 'User unblocked.' : 'You have blocked this user.', 'success'); } }; if (blocked) await toggle(); else window.openChatBlockConfirmation?.(contact, toggle); });
+    muteButton?.addEventListener('click', async () => {
+        const contact = activeChatUser || window.activeChatUser;
+        if (!contact) return;
+        const muted = muteButton.classList.contains('is-muted');
+        const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/mute`, {
+            method: muted ? 'DELETE' : 'POST',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+        });
+        if (!response.ok) return;
+        contact.is_muted = !muted;
+        setMuteButtonState(muteButton, !muted);
+        await loadChatContacts();
+    });
     attachButton?.addEventListener('click', () => attachmentMenu?.classList.toggle('hidden'));
     attachmentMenu?.addEventListener('click', (event) => { const button = event.target.closest('[data-attachment-kind]'); if (!button) return; fileInput.accept = button.dataset.attachmentKind === 'media' ? 'image/*,video/*' : button.dataset.attachmentKind === 'document' ? '.pdf,.txt,.doc,.docx,.xls,.xlsx' : 'image/*,video/*,.pdf,.txt,.doc,.docx,.xls,.xlsx'; attachmentMenu.classList.add('hidden'); fileInput.click(); });
     fileInput?.addEventListener('change', () => fileInput.files[0] && window.selectChatAttachment?.(fileInput.files[0]));
@@ -1544,11 +1609,11 @@ const AeroAPI = {
         return data;
     },
 
-    async sendPostToUser(postId, username) {
+    async sendPostToUser(postId, recipientId, username = '') {
         const res = await fetch(`${API_BASE}/posts/${postId}/share`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` },
-            body: JSON.stringify({ username })
+            body: JSON.stringify({ recipient_id: Number(recipientId), username, type: 'post_share', post_id: Number(postId), content: '' })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Unable to share with user');
@@ -2128,9 +2193,58 @@ const AeroAPI = {
         rightDock?.addEventListener('mouseleave', () => scrollDockTo(0));
         const mobileMenuButton = document.getElementById('mobile-menu-btn');
         const mobileDrawer = document.getElementById('mobile-nav-drawer');
-        const closeMobileMenu = () => { mobileDrawer?.classList.add('hidden'); mobileMenuButton?.classList.remove('is-open'); mobileMenuButton?.setAttribute('aria-expanded', 'false'); };
-        mobileMenuButton?.addEventListener('click', () => { const opening = mobileDrawer?.classList.contains('hidden'); mobileDrawer?.classList.toggle('hidden', !opening); mobileMenuButton.classList.toggle('is-open', opening); mobileMenuButton.setAttribute('aria-expanded', String(Boolean(opening))); });
-        mobileDrawer?.addEventListener('click', (event) => { const button = event.target.closest('[data-mobile-nav]'); if (!button) return; document.getElementById(button.dataset.mobileNav)?.click(); closeMobileMenu(); });
+        const mobileBackdrop = document.getElementById('mobile-nav-backdrop');
+        const closeMobileMenu = () => {
+            mobileDrawer?.classList.add('hidden');
+            mobileBackdrop?.classList.add('hidden');
+            mobileDrawer?.setAttribute('aria-hidden', 'true');
+            mobileMenuButton?.classList.remove('is-open');
+            mobileMenuButton?.setAttribute('aria-expanded', 'false');
+        };
+        const openMobileMenu = () => {
+            mobileDrawer?.classList.remove('hidden');
+            mobileBackdrop?.classList.remove('hidden');
+            mobileDrawer?.setAttribute('aria-hidden', 'false');
+            mobileMenuButton?.classList.add('is-open');
+            mobileMenuButton?.setAttribute('aria-expanded', 'true');
+        };
+        mobileMenuButton?.addEventListener('click', () => {
+            if (mobileDrawer?.classList.contains('hidden')) openMobileMenu();
+            else closeMobileMenu();
+        });
+        document.getElementById('close-mobile-menu')?.addEventListener('click', closeMobileMenu);
+        mobileBackdrop?.addEventListener('click', closeMobileMenu);
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !mobileDrawer?.classList.contains('hidden')) closeMobileMenu();
+        });
+        mobileDrawer?.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-mobile-nav]');
+            if (!button) return;
+            document.getElementById(button.dataset.mobileNav)?.click();
+            closeMobileMenu();
+        });
+        document.querySelectorAll('[data-mobile-action]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const action = button.dataset.mobileAction;
+                if (action === 'home') document.getElementById('home-nav-btn')?.click();
+                if (action === 'messages') document.getElementById('chat-dock-btn')?.click();
+                if (action === 'profile') document.getElementById('user-avatar-btn')?.click();
+                if (action === 'compose') document.getElementById('global-fab-btn')?.click();
+                if (action === 'search') {
+                    document.getElementById('home-nav-btn')?.click();
+                    document.getElementById('global-search')?.focus();
+                }
+            });
+        });
+        window.addEventListener('aero:view-change', (event) => {
+            const action = event.detail?.view === 'chat' ? 'messages' : event.detail?.view === 'profile' ? 'profile' : event.detail?.view === 'main' ? 'home' : '';
+            document.querySelectorAll('[data-mobile-action]').forEach((button) => {
+                const active = action && button.dataset.mobileAction === action;
+                button.classList.toggle('is-active', active);
+                if (active) button.setAttribute('aria-current', 'page');
+                else button.removeAttribute('aria-current');
+            });
+        });
         const token = localStorage.getItem('aero_token');
         const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
         const adminLink = document.getElementById('admin-dashboard-link');
@@ -2186,6 +2300,7 @@ window.apiService = AeroAPI;
 window.addEventListener('aero:language-change', () => {
     const feed = document.getElementById('posts-feed');
     if (feed && localStorage.getItem('aero_token')) AeroAPI.renderFeed().catch(() => {});
+    if (activeChatUser && localStorage.getItem('aero_token')) loadChatMessages().catch(() => {});
 });
 window.toggleFollowUser = async (userId, userMeta = {}) => {
     const api = window.apiService || window.api;
@@ -2223,7 +2338,7 @@ function openShareModal(post) {
         overlay = document.createElement('div');
         overlay.id = 'share-modal-overlay';
         overlay.className = 'share-modal-overlay';
-        overlay.innerHTML = `<div class="share-modal glass-card" role="dialog" aria-modal="true" aria-labelledby="share-modal-title"><header class="share-modal-header"><div><span class="share-modal-kicker">Aero share</span><h2 id="share-modal-title">Share this post</h2></div><button type="button" class="modal-close-btn share-modal-close" aria-label="Close share dialog">&times;</button></header><p class="share-modal-preview"></p><div class="share-shortcuts"><button type="button" data-share-action="copy"><span class="share-shortcut-icon">⌁</span><strong>Copy Link</strong><small>Copy the post URL</small></button><button type="button" data-share-action="export"><span class="share-shortcut-icon">▧</span><strong>Export as Card</strong><small>Download an image</small></button><button type="button" data-share-action="send"><span class="share-shortcut-icon">➤</span><strong>Send to User</strong><small>Share privately</small></button></div><div class="share-send-form hidden"><input type="text" placeholder="Username" aria-label="Recipient username"><button type="button" class="btn btn-primary g2-btn">Send</button></div></div>`;
+        overlay.innerHTML = `<div class="share-modal glass-card" role="dialog" aria-modal="true" aria-labelledby="share-modal-title"><header class="share-modal-header"><div><span class="share-modal-kicker">Aero share</span><h2 id="share-modal-title">Share this post</h2></div><button type="button" class="modal-close-btn share-modal-close" aria-label="Close share dialog">&times;</button></header><p class="share-modal-preview"></p><div class="share-shortcuts"><button type="button" data-share-action="copy"><span class="share-shortcut-icon">⌁</span><strong>Copy Link</strong><small>Copy the post URL</small></button><button type="button" data-share-action="export"><span class="share-shortcut-icon">▧</span><strong>Export as Card</strong><small>Download an image</small></button><button type="button" data-share-action="send"><span class="share-shortcut-icon">➤</span><strong>Send to User</strong><small>Share privately</small></button></div><div class="share-send-form hidden"><label class="share-user-search-label" for="share-user-search">Choose a user</label><input id="share-user-search" type="search" placeholder="Search contacts" aria-label="Search contacts"><div class="share-user-list" role="listbox" aria-label="Users to share with"></div><button type="button" class="btn btn-primary g2-btn" disabled>Send</button></div></div>`;
         document.body.appendChild(overlay);
         const close = () => overlay.classList.remove('is-open');
         overlay.querySelector('.share-modal-close').addEventListener('click', close);
@@ -2233,13 +2348,56 @@ function openShareModal(post) {
             exportPostCard(overlay.dataset.postId, overlay.dataset.content, overlay.dataset.username);
             AeroAPI.recordShareStats(overlay.dataset.postId, 'share').catch(() => {});
         });
-        overlay.querySelector('[data-share-action="send"]').addEventListener('click', () => overlay.querySelector('.share-send-form').classList.toggle('hidden'));
-        overlay.querySelector('.share-send-form button').addEventListener('click', () => {
-            const recipient = overlay.querySelector('.share-send-form input').value.trim();
-            if (recipient) {
-                AeroAPI.sendPostToUser(overlay.dataset.postId, recipient)
+        const sendForm = overlay.querySelector('.share-send-form');
+        const userSearch = overlay.querySelector('#share-user-search');
+        const userList = overlay.querySelector('.share-user-list');
+        const sendButton = sendForm.querySelector('button');
+        let shareUsers = [];
+        let selectedShareUserId = 0;
+        let selectedShareUsername = '';
+        const renderShareUsers = () => {
+            const query = userSearch.value.trim().toLowerCase();
+            const users = shareUsers.filter(user => String(user.username || '').toLowerCase().includes(query));
+            userList.innerHTML = users.length ? users.map(user => `<button type="button" class="share-user-option ${selectedShareUserId === Number(user.id) ? 'is-selected' : ''}" data-user-id="${user.id}" data-username="${escapeHtml(user.username)}" role="option" aria-selected="${selectedShareUserId === Number(user.id)}"><span class="share-user-avatar">${user.avatar_url ? `<img src="${escapeHtml(user.avatar_url)}" alt="">` : escapeHtml((user.username || 'U').charAt(0).toUpperCase())}</span><span class="share-user-name">@${escapeHtml(user.username)}</span><span class="share-user-check" aria-hidden="true">✓</span></button>`).join('') : '<div class="share-user-empty">No contacts found.</div>';
+            sendButton.disabled = !selectedShareUserId;
+            userList.querySelectorAll('.share-user-option').forEach(option => option.addEventListener('click', () => {
+                selectedShareUserId = Number(option.dataset.userId) || 0;
+                selectedShareUsername = option.dataset.username || '';
+                renderShareUsers();
+            }));
+        };
+        const loadShareUsers = async () => {
+            userList.innerHTML = '<div class="share-user-empty">Loading contacts...</div>';
+            try {
+                const response = await fetch(`${API_BASE}/chat/contacts`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+                const users = await response.json().catch(() => []);
+                if (!response.ok) throw new Error('Unable to load contacts');
+                shareUsers = Array.isArray(users) ? users : [];
+                renderShareUsers();
+            } catch (error) {
+                userList.innerHTML = `<div class="share-user-empty">${escapeHtml(error.message)}</div>`;
+                sendButton.disabled = true;
+            }
+        };
+        overlay.querySelector('[data-share-action="send"]').addEventListener('click', () => {
+            const opening = sendForm.classList.contains('hidden');
+            sendForm.classList.toggle('hidden', !opening);
+            if (opening) {
+                selectedShareUserId = 0;
+                selectedShareUsername = '';
+                userSearch.value = '';
+                sendButton.disabled = true;
+                loadShareUsers();
+            }
+        });
+        userSearch.addEventListener('input', renderShareUsers);
+        sendButton.addEventListener('click', () => {
+            const recipient = selectedShareUsername;
+            if (selectedShareUserId) {
+                sendButton.disabled = true;
+                AeroAPI.sendPostToUser(overlay.dataset.postId, selectedShareUserId, recipient)
                     .then(() => { close(); showNotice(`Post shared with @${recipient}.`, 'success'); })
-                    .catch(error => showNotice(error.message, 'error'));
+                    .catch(error => { sendButton.disabled = false; showNotice(error.message, 'error'); });
             }
         });
     }

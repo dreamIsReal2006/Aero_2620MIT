@@ -275,7 +275,7 @@
 
         <main id="view-chat" class="chat-wrapper view-container glass-card aero-glass-panel liquid-glass hidden" aria-label="Chat">
             <aside class="chat-sidebar"><div class="chat-sidebar-header"><strong id="chat-current-username">Messages</strong><button type="button" class="chat-compose-btn" aria-label="New message">✎</button></div><input id="chat-contact-search" class="chat-search" type="search" placeholder="Search contacts" aria-label="Search contacts"><div class="chat-notes"></div><div id="chat-contacts-list" class="chat-contacts-list"></div></aside>
-            <section class="chat-panel"><div id="chat-active-header" class="chat-active-header"><span id="chat-active-avatar" class="chat-active-avatar" aria-hidden="true">U</span><span id="chat-active-name">Select a contact</span><button type="button" id="chat-block-btn" class="chat-header-action hidden" aria-label="Block user">Block</button></div><div id="chat-inline-alert" class="chat-inline-alert hidden" role="status"></div><div id="chat-messages-list" class="chat-messages"></div><form id="chat-form" class="chat-form"><button type="button" id="chat-attach-btn" class="chat-attach-btn" aria-label="Add attachment" title="Add attachment">+</button><input id="chat-file-input" type="file" hidden accept="image/*,video/*,.pdf,.txt,.doc,.docx,.xls,.xlsx"><input id="chat-input" type="text" maxlength="2000" placeholder="Message..." aria-label="Message"><button type="button" id="chat-emoji-btn" aria-label="Add emoji">☺</button><button type="button" id="chat-gif-btn" aria-label="Add GIF">GIF</button><button type="submit" aria-label="Send message">➤</button><div id="chat-attachment-menu" class="chat-attachment-menu liquid-glass hidden"><button type="button" data-attachment-kind="media">Photo &amp; Video</button><button type="button" data-attachment-kind="document">Document</button><button type="button" data-attachment-kind="file">Camera/File</button></div></form></section>
+            <section class="chat-panel"><div id="chat-active-header" class="chat-active-header"><button type="button" id="chat-back-btn" class="chat-back-btn" aria-label="Back to contacts">Back</button><span id="chat-active-avatar" class="chat-active-avatar" aria-hidden="true">U</span><span id="chat-active-name">Select a contact</span><span class="chat-header-actions"><button type="button" id="chat-mute-btn" class="chat-header-action chat-mute-button hidden" aria-label="Mute user" title="Mute user"><svg class="chat-header-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"></path><path d="M10 21h4"></path></svg></button><button type="button" id="chat-block-btn" class="chat-header-action hidden" aria-label="Block user">Block</button></span></div><div id="chat-inline-alert" class="chat-inline-alert hidden" role="status"></div><div id="chat-messages-list" class="chat-messages"></div><form id="chat-form" class="chat-form"><button type="button" id="chat-attach-btn" class="chat-attach-btn" aria-label="Add attachment" title="Add attachment">+</button><input id="chat-file-input" type="file" hidden accept="image/*,video/*,audio/*,.pdf,.txt,.doc,.docx,.xls,.xlsx"><input id="chat-input" type="text" maxlength="2000" placeholder="Message..." aria-label="Message"><button type="button" id="chat-emoji-btn" aria-label="Add emoji">☺</button><button type="button" id="chat-gif-btn" aria-label="Add GIF">GIF</button><button type="submit" aria-label="Send message">➤</button><div id="chat-attachment-menu" class="chat-attachment-menu liquid-glass hidden"><button type="button" data-attachment-kind="media">Photo &amp; Video</button><button type="button" data-attachment-kind="document">Document</button><button type="button" data-attachment-kind="file">Camera/File</button></div></form></section>
         </aside>
 
         <aside id="short-comments-drawer" class="short-comments-drawer glass-card liquid-glass hidden" aria-label="Short video comments">
@@ -286,14 +286,36 @@
 
     </div>
 
-    <div id="mobile-nav-drawer" class="mobile-nav-drawer liquid-glass hidden" aria-label="Mobile navigation">
+    <div id="mobile-nav-backdrop" class="mobile-nav-backdrop hidden"></div>
+    <div id="mobile-nav-drawer" class="mobile-nav-drawer liquid-glass hidden" aria-label="Mobile navigation" aria-hidden="true">
+        <div class="mobile-sheet-handle" aria-hidden="true"></div>
+        <div class="mobile-sheet-header"><strong>Menu</strong><button type="button" id="close-mobile-menu" aria-label="Close navigation">&times;</button></div>
         <button type="button" data-mobile-nav="home-nav-btn">Home</button>
+        <button type="button" data-mobile-nav="video-dock-btn">Shorts</button>
         <button type="button" data-mobile-nav="chat-dock-btn">Messages</button>
         <button type="button" data-mobile-nav="notification-dock-btn">Notifications</button>
         <button type="button" data-mobile-nav="bookmark-dock-btn">Bookmarks</button>
         <button type="button" data-mobile-nav="history-dock-btn">History</button>
         <button type="button" data-mobile-nav="settings-nav-btn">Settings</button>
     </div>
+
+    <nav id="mobile-bottom-nav" class="mobile-bottom-nav" aria-label="Mobile primary navigation">
+        <button type="button" class="mobile-bottom-nav-item is-active" data-mobile-action="home" aria-label="Home" aria-current="page">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"></path><path d="M9 21v-7h6v7"></path></svg><span>Home</span>
+        </button>
+        <button type="button" class="mobile-bottom-nav-item" data-mobile-action="search" aria-label="Search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.5 4.5"></path></svg><span>Search</span>
+        </button>
+        <button type="button" class="mobile-bottom-nav-item mobile-compose-nav-item" data-mobile-action="compose" aria-label="Create a new post">
+            <span class="mobile-compose-icon" aria-hidden="true">+</span><span>Post</span>
+        </button>
+        <button type="button" class="mobile-bottom-nav-item" data-mobile-action="messages" aria-label="Messages">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 8.7 8.7 0 0 1-3.5-.7L4 20l1.7-3.6A7.2 7.2 0 0 1 4 11.5 7.5 7.5 0 0 1 12 4a7.5 7.5 0 0 1 8 7.5Z"></path></svg><span>Messages</span><span class="mobile-bottom-badge hidden" aria-label="Unread messages"></span>
+        </button>
+        <button type="button" class="mobile-bottom-nav-item" data-mobile-action="profile" aria-label="Profile">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"></circle><path d="M5 20c.8-3.3 3.1-5 7-5s6.2 1.7 7 5"></path></svg><span>Profile</span>
+        </button>
+    </nav>
 
     <button type="button" id="global-fab-btn" class="fab-new-post" aria-label="Create a new post"><span class="fab-plus">+</span><span class="fab-label">New Post</span></button>
     <div id="chat-lightbox" class="chat-lightbox hidden" role="dialog" aria-modal="true"><button type="button" id="chat-lightbox-close" aria-label="Close media preview">&times;</button><img id="chat-lightbox-image" alt=""></div>

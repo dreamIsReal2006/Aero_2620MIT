@@ -1,3 +1,4 @@
+import json
 import uuid
 from pathlib import Path
 
@@ -7,11 +8,12 @@ from werkzeug.utils import secure_filename
 from backend import db
 from backend.auth.routes import token_required
 from backend.chat import chat_bp
-from backend.models import Block, Follow, Message, Note, User
+from backend.models import Block, Follow, Message, Mute, Note, Post, User
 from backend.presence import is_user_online
 
 CHAT_UPLOAD_TYPES = {
     "image/": "image", "video/": "video",
+    "audio/": "audio",
     "application/pdf": "document", "text/plain": "document",
     "application/msword": "document", "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "document",
     "application/vnd.ms-excel": "document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "document",
@@ -19,7 +21,10 @@ CHAT_UPLOAD_TYPES = {
 
 
 def _user_payload(user, viewer_id=None):
-    return {"id": user.id, "username": user.username, "display_name": user.display_name or user.username, "avatar_url": user.avatar_url or "", "role": user.role if user.role in {"admin", "moderator", "user"} else "user", "is_online": is_user_online(user, viewer_id)}
+    is_muted = viewer_id is not None and Mute.query.filter_by(
+        muter_id=viewer_id, muted_id=user.id
+    ).first() is not None
+    return {"id": user.id, "username": user.username, "display_name": user.display_name or user.username, "avatar_url": user.avatar_url or "", "role": user.role if user.role in {"admin", "moderator", "user"} else "user", "is_online": is_user_online(user, viewer_id), "is_muted": is_muted}
 
 
 @chat_bp.get("/friends")
@@ -80,8 +85,26 @@ def get_messages(current_user):
         {Message.is_read: True}, synchronize_session=False
     )
     db.session.commit()
-    return jsonify([{
+    payload = []
+    for message in messages:
+        shared_post = None
+        if message.type in {"post_share", "shared_post"} and message.post_id:
+            post = db.session.get(Post, message.post_id)
+            if post:
+                try:
+                    images = json.loads(post.images_json or "[]")
+                except (TypeError, ValueError):
+                    images = []
+                shared_post = {
+                    "id": post.id,
+                    "content": post.content or "",
+                    "images": images,
+                    "username": post.author.username if post.author else "User",
+                    "avatar_url": post.author.avatar_url if post.author else "",
+                }
+        payload.append({
         "id": message.id,
+        "post_id": message.post_id,
         "content": message.content,
         "media_url": message.media_url or "",
         "type": message.type or "text",
@@ -90,7 +113,9 @@ def get_messages(current_user):
         "can_delete": message.sender_id == current_user.id,
         "file_name": message.file_name or "",
         "file_size": message.file_size or 0,
-    } for message in messages])
+        "shared_post": shared_post,
+    })
+    return jsonify(payload)
 
 
 @chat_bp.post("/chat/uploads")
@@ -137,6 +162,40 @@ def unblock_contact(current_user, user_id):
         db.session.delete(block)
         db.session.commit()
     return jsonify({"blocked": False})
+
+
+@chat_bp.post("/chat/contacts/<int:user_id>/mute")
+@token_required
+def mute_contact(current_user, user_id):
+    if user_id == current_user.id or not db.session.get(User, user_id):
+        return jsonify({"message": "Invalid contact"}), 400
+    if not Mute.query.filter_by(
+        muter_id=current_user.id, muted_id=user_id
+    ).first():
+        db.session.add(Mute(muter_id=current_user.id, muted_id=user_id))
+        db.session.commit()
+    return jsonify({"muted": True})
+
+
+@chat_bp.get("/chat/contacts/<int:user_id>/mute")
+@token_required
+def get_mute_status(current_user, user_id):
+    muted = Mute.query.filter_by(
+        muter_id=current_user.id, muted_id=user_id
+    ).first() is not None
+    return jsonify({"muted": muted})
+
+
+@chat_bp.delete("/chat/contacts/<int:user_id>/mute")
+@token_required
+def unmute_contact(current_user, user_id):
+    mute = Mute.query.filter_by(
+        muter_id=current_user.id, muted_id=user_id
+    ).first()
+    if mute:
+        db.session.delete(mute)
+        db.session.commit()
+    return jsonify({"muted": False})
 
 
 @chat_bp.delete("/chat/messages/<int:message_id>")

@@ -11,7 +11,7 @@ from werkzeug.utils import secure_filename
 from backend import db
 from backend.auth.routes import token_required
 from backend.feed import feed_bp
-from backend.models import Comment, Follow, Like, Notification, Post, User, UserInteraction
+from backend.models import Comment, Follow, Like, Message, Notification, Post, User, UserInteraction
 from backend.privacy import visible_author_ids as get_visible_author_ids
 from backend.presence import is_user_online
 
@@ -262,6 +262,25 @@ def bookmark_post(current_user, post_id):
     return jsonify({"bookmarked": bookmarked, "post_id": post_id}), 200
 
 
+@feed_bp.get("/bookmarks")
+@token_required
+def get_bookmarks(current_user):
+    interactions = UserInteraction.query.filter_by(
+        user_id=current_user.id,
+        type="bookmark",
+    ).all()
+
+    posts = []
+
+    for interaction in interactions:
+        post = db.session.get(Post, interaction.post_id)
+
+        if post:
+            posts.append(post_payload(post, current_user.id))
+
+    return jsonify(posts), 200
+
+
 @feed_bp.post("/recommendations/feedback")
 @token_required
 def recommendation_feedback(current_user):
@@ -297,11 +316,27 @@ def share_stats(current_user, post_id):
 @feed_bp.post("/posts/<int:post_id>/share")
 @token_required
 def send_post_to_user(current_user, post_id):
+    data = request.get_json(silent=True) or {}
     post = db.session.get(Post, post_id)
-    recipient_name = str((request.get_json(silent=True) or {}).get("username", "")).strip()
-    recipient = User.query.filter(User.username.ilike(recipient_name)).first()
+    recipient_id = data.get("recipient_id")
+    try:
+        recipient_id = int(recipient_id) if recipient_id is not None else 0
+    except (TypeError, ValueError):
+        recipient_id = 0
+    recipient_name = str(data.get("username", "")).strip()
+    recipient = db.session.get(User, recipient_id) if recipient_id else None
+    if not recipient and recipient_name:
+        recipient = User.query.filter(User.username.ilike(recipient_name)).first()
     if not post or not recipient:
         return jsonify({"message": "Post or recipient not found"}), 404
+    db.session.add(Message(
+        sender_id=current_user.id,
+        recipient_id=recipient.id,
+        post_id=post.id,
+        content=f"Shared post from @{current_user.username}",
+        type="post_share",
+        media_url="",
+    ))
     db.session.add(Notification(
         recipient_id=recipient.id,
         actor_id=current_user.id,

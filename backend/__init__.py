@@ -62,7 +62,8 @@ def create_app():
         Note,
         VideoLike,
         ModerationLog,
-        AppealTicket
+        AppealTicket,
+        Mute,
     )
 
     from backend.auth import auth_bp
@@ -98,6 +99,11 @@ def create_app():
     from backend.chat import chat_bp
     from backend.chat import routes as chat_routes
     app.register_blueprint(chat_bp)
+
+    from backend.messages import messages_bp
+    import backend.messages.routes as messages_routes
+
+    app.register_blueprint(messages_bp)
 
     @app.errorhandler(413)
     def request_entity_too_large(error):
@@ -137,6 +143,8 @@ def create_app():
                 db.session.execute(text("ALTER TABLE messages ADD COLUMN file_name VARCHAR(255) NOT NULL DEFAULT ''"))
             if "file_size" not in message_columns:
                 db.session.execute(text("ALTER TABLE messages ADD COLUMN file_size INTEGER NOT NULL DEFAULT 0"))
+            if "post_id" not in message_columns:
+                db.session.execute(text("ALTER TABLE messages ADD COLUMN post_id INTEGER"))
             columns = {
                 column[1]
                 for column in db.session.execute(text("PRAGMA table_info(users)"))
