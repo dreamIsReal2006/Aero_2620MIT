@@ -19,7 +19,7 @@ def create_app():
 
     @app.before_request
     def block_legacy_admin_page():
-        if request.path in {"/admin", "/admin.html"}:
+        if request.method != "OPTIONS" and request.path in {"/admin", "/admin.html"}:
             abort(404)
 
     app.config["SECRET_KEY"] = os.environ.get(
@@ -48,11 +48,23 @@ def create_app():
         upload_folder = base_dir / upload_folder
     app.config["UPLOAD_FOLDER"] = str(upload_folder.resolve())
     Path(app.config["UPLOAD_FOLDER"]).mkdir(parents=True, exist_ok=True)
-    allowed_origins = os.environ.get(
-        "AERO_ALLOWED_ORIGINS",
-        r"https://.*\.netlify\.app,https://GOH\.pythonanywhere\.com",
-    ).split(",")
-    CORS(app, origins=allowed_origins, supports_credentials=True)
+    required_origins = [
+        "https://aero-g04.netlify.app",
+        r"https://.*\.netlify\.app",
+        "https://GOH.pythonanywhere.com",
+    ]
+    configured_origins = [
+        origin.strip()
+        for origin in os.environ.get("AERO_ALLOWED_ORIGINS", "").split(",")
+        if origin.strip()
+    ]
+    CORS(
+        app,
+        resources={r"/*": {"origins": required_origins + configured_origins}},
+        supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    )
 
     db.init_app(app)  # connects SQLAlchemy to Flask
 
