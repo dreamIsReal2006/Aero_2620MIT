@@ -10,6 +10,12 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="light-mode">
+    <div class="gemini-bg-container" aria-hidden="true">
+        <div class="glow-ball glow-1"></div>
+        <div class="glow-ball glow-2"></div>
+        <div class="glow-ball glow-3"></div>
+        <div class="glass-overlay"></div>
+    </div>
 
     <!-- Sign in and sign up pop-up -->
     <div id="auth-overlay" class="auth-overlay">
@@ -186,6 +192,7 @@
                 <div class="feed-tabs" aria-label="Feed tabs">
                     <button id="tab-for-you" type="button" class="feed-tab active" data-i18n="For You">For You</button>
                     <button id="tab-following" type="button" class="feed-tab" data-i18n="Following">Following</button>
+                    <span class="tab-indicator" aria-hidden="true"></span>
                 </div>
                 <div class="compose-card glass-card liquid-glass liquid-glass-interactive g2-card compose-trigger" id="compose-trigger" role="button" tabindex="0" aria-label="Create a new post">
                     <div class="compose-trigger-copy"><span id="quick-post-avatar" class="compose-trigger-avatar" aria-hidden="true">U</span><span>Share what's on your mind...</span></div>
@@ -274,10 +281,12 @@
         </aside>
 
         <main id="view-chat" class="chat-wrapper view-container glass-card aero-glass-panel liquid-glass hidden" aria-label="Chat">
-            <aside class="chat-sidebar"><div class="chat-sidebar-header"><strong id="chat-current-username">Messages</strong><button type="button" class="chat-compose-btn" aria-label="New message">✎</button></div><input id="chat-contact-search" class="chat-search" type="search" placeholder="Search contacts" aria-label="Search contacts"><div class="chat-notes"></div><div id="chat-contacts-list" class="chat-contacts-list"></div></aside>
+            <aside class="chat-sidebar"><div class="chat-sidebar-header"><strong id="chat-current-username">Messages</strong><button type="button" id="chat-new-group-btn" class="chat-compose-btn" aria-label="Create group" title="Create group">+</button></div><input id="chat-contact-search" class="chat-search" type="search" placeholder="Search contacts" aria-label="Search contacts"><div class="chat-notes"></div><div id="chat-contacts-list" class="chat-contacts-list"></div></aside>
             <section class="chat-panel"><div id="chat-active-header" class="chat-active-header"><button type="button" id="chat-back-btn" class="chat-back-btn" aria-label="Back to contacts">Back</button><span id="chat-active-avatar" class="chat-active-avatar" aria-hidden="true">U</span><span id="chat-active-name">Select a contact</span><span class="chat-header-actions"><button type="button" id="chat-mute-btn" class="chat-header-action chat-mute-button hidden" aria-label="Mute user" title="Mute user"><svg class="chat-header-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"></path><path d="M10 21h4"></path></svg></button><button type="button" id="chat-block-btn" class="chat-header-action hidden" aria-label="Block user">Block</button></span></div><div id="chat-inline-alert" class="chat-inline-alert hidden" role="status"></div><div id="chat-messages-list" class="chat-messages"></div><form id="chat-form" class="chat-form"><button type="button" id="chat-attach-btn" class="chat-attach-btn" aria-label="Add attachment" title="Add attachment">+</button><input id="chat-file-input" type="file" hidden accept="image/*,video/*,audio/*,.pdf,.txt,.doc,.docx,.xls,.xlsx"><input id="chat-input" type="text" maxlength="2000" placeholder="Message..." aria-label="Message"><button type="button" id="chat-emoji-btn" aria-label="Add emoji">☺</button><button type="button" id="chat-gif-btn" aria-label="Add GIF">GIF</button><button type="submit" aria-label="Send message">➤</button><div id="chat-attachment-menu" class="chat-attachment-menu liquid-glass hidden"><button type="button" data-attachment-kind="media">Photo &amp; Video</button><button type="button" data-attachment-kind="document">Document</button><button type="button" data-attachment-kind="file">Camera/File</button></div></form></section>
         </aside>
 
+        <div id="chat-new-group-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="chat-new-group-title"><form id="chat-new-group-form" class="chat-group-modal glass-card liquid-glass"><div class="drawer-section-header"><h2 id="chat-new-group-title">New Group</h2><button type="button" id="chat-new-group-close" class="drawer-close-btn" aria-label="Close">&times;</button></div><input id="chat-group-name" class="chat-group-name" maxlength="80" placeholder="Group name" required><div id="chat-group-contact-picker" class="chat-group-contact-picker"></div><p id="chat-group-feedback" class="field-error" role="alert"></p><div class="chat-group-actions"><button type="button" id="chat-new-group-cancel" class="btn modal-cancel-btn">Cancel</button><button type="submit" class="btn btn-primary">Create</button></div></form></div>
+        <div id="chat-group-members-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="chat-group-members-title"><section class="chat-group-modal glass-card liquid-glass"><div class="drawer-section-header"><div><h2 id="chat-group-members-title">Group members</h2><p id="chat-group-member-count"></p></div><button type="button" id="chat-group-members-close" class="drawer-close-btn" aria-label="Close">&times;</button></div><div id="chat-group-members-list" class="chat-group-members-list"></div><div class="chat-group-actions"><button type="button" id="chat-group-leave-btn" class="btn modal-cancel-btn">Leave Group</button><button type="button" id="chat-group-delete-btn" class="btn delete-confirm-btn hidden">Delete Group</button></div></section></div>
         <aside id="short-comments-drawer" class="short-comments-drawer glass-card liquid-glass hidden" aria-label="Short video comments">
             <div class="drawer-section-header"><h2>Comments</h2><button type="button" class="drawer-close-btn" id="close-short-comments" aria-label="Close comments">&times;</button></div>
             <div id="short-comments-list" class="short-comments-list"></div>
@@ -286,16 +295,14 @@
 
     </div>
 
+    <div id="shorts-comments-backdrop" class="comments-backdrop hidden" aria-hidden="true"></div>
+
     <div id="mobile-nav-backdrop" class="mobile-nav-backdrop hidden"></div>
     <div id="mobile-nav-drawer" class="mobile-nav-drawer liquid-glass hidden" aria-label="Mobile navigation" aria-hidden="true">
         <div class="mobile-sheet-handle" aria-hidden="true"></div>
-        <div class="mobile-sheet-header"><strong>Menu</strong><button type="button" id="close-mobile-menu" aria-label="Close navigation">&times;</button></div>
-        <button type="button" data-mobile-nav="home-nav-btn">Home</button>
-        <button type="button" data-mobile-nav="video-dock-btn">Shorts</button>
-        <button type="button" data-mobile-nav="chat-dock-btn">Messages</button>
         <button type="button" data-mobile-nav="notification-dock-btn">Notifications</button>
-        <button type="button" data-mobile-nav="bookmark-dock-btn">Bookmarks</button>
         <button type="button" data-mobile-nav="history-dock-btn">History</button>
+        <button type="button" data-mobile-nav="bookmark-dock-btn">Bookmarks</button>
         <button type="button" data-mobile-nav="settings-nav-btn">Settings</button>
     </div>
 
@@ -303,8 +310,8 @@
         <button type="button" class="mobile-bottom-nav-item is-active" data-mobile-action="home" aria-label="Home" aria-current="page">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"></path><path d="M9 21v-7h6v7"></path></svg><span>Home</span>
         </button>
-        <button type="button" class="mobile-bottom-nav-item" data-mobile-action="search" aria-label="Search">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.5 4.5"></path></svg><span>Search</span>
+        <button type="button" class="mobile-bottom-nav-item" data-mobile-action="shorts" aria-label="Shorts">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m8 5 2-3m4 3 2-3m-8 9 4 2.5L8 14v-5Z"></path></svg><span>Shorts</span>
         </button>
         <button type="button" class="mobile-bottom-nav-item mobile-compose-nav-item" data-mobile-action="compose" aria-label="Create a new post">
             <span class="mobile-compose-icon" aria-hidden="true">+</span><span>Post</span>
@@ -338,7 +345,7 @@
             <div id="modal-preview" class="media-preview-grid" aria-live="polite"></div>
             <footer class="create-post-footer">
                 <label class="media-picker-btn" for="modal-post-images"><span aria-hidden="true">⌁</span> Add media</label>
-                <input type="file" id="modal-post-images" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime" multiple hidden>
+                <input type="file" id="modal-post-images" accept="image/png,image/jpeg,image/webp,image/avif,image/heic,image/heif,video/mp4,video/webm,video/quicktime,video/x-m4v" multiple hidden>
                 <button type="submit" id="modal-publish-btn" class="btn btn-primary g2-btn" disabled>Post</button>
             </footer>
         </form>
@@ -352,7 +359,7 @@
                 <span class="dropzone-prompt">Drag &amp; drop video here, or Browse</span>
                 <span id="video-file-details" class="dropzone-file-details"></span>
             </div>
-            <input id="short-upload-file" class="visually-hidden-file" type="file" accept="video/mp4,video/webm" required>
+            <input id="short-upload-file" class="visually-hidden-file" type="file" accept="video/mp4,video/webm,video/quicktime,video/x-m4v" required>
             <input id="short-upload-caption" class="video-title-input" type="text" maxlength="2000" placeholder="Video Title" aria-label="Video title">
             <footer class="create-post-footer"><button type="submit" class="btn btn-primary g2-btn">Upload</button></footer>
         </form>
@@ -378,6 +385,26 @@
             <p id="profile-edit-feedback" class="profile-edit-feedback" role="alert"></p>
             <footer class="profile-edit-actions"><button type="button" id="cancel-profile-edit" class="btn profile-edit-cancel">Cancel</button><button type="submit" id="save-profile-edit" class="btn btn-primary">Save Changes</button></footer>
         </form>
+    </div>
+
+    <div id="share-profile-modal" class="share-profile-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="share-profile-title">
+        <section class="share-profile-modal glass-card aero-glass-panel liquid-glass">
+            <header class="share-profile-header">
+                <div><span class="profile-edit-kicker">Profile</span><h2 id="share-profile-title">Share profile</h2></div>
+                <button type="button" id="close-share-profile" class="modal-close-btn" aria-label="Close profile sharing">&times;</button>
+            </header>
+            <div class="share-profile-identity">
+                <strong id="share-profile-name">Profile</strong>
+                <span id="share-profile-handle">@user</span>
+            </div>
+            <div class="profile-qr-frame"><img id="share-profile-qr" alt="Profile QR code"></div>
+            <button type="button" id="copy-profile-link" class="share-profile-copy-btn">Copy profile link</button>
+            <div id="nfc-share-panel" class="nfc-share-panel" aria-live="polite">
+                <span class="nfc-pulse" aria-hidden="true"><span></span></span>
+                <div><strong>NFC NameDrop</strong><p id="nfc-share-status">Checking device support...</p></div>
+                <button type="button" id="start-nfc-share" class="btn btn-primary g2-btn">Tap to share</button>
+            </div>
+        </section>
     </div>
 
     <script src="js/screen-time.js"></script>

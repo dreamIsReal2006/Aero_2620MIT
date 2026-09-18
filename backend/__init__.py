@@ -64,6 +64,8 @@ def create_app():
         ModerationLog,
         AppealTicket,
         Mute,
+        ChatGroup,
+        ChatGroupMember,
     )
 
     from backend.auth import auth_bp
@@ -145,6 +147,8 @@ def create_app():
                 db.session.execute(text("ALTER TABLE messages ADD COLUMN file_size INTEGER NOT NULL DEFAULT 0"))
             if "post_id" not in message_columns:
                 db.session.execute(text("ALTER TABLE messages ADD COLUMN post_id INTEGER"))
+            if "group_id" not in message_columns:
+                db.session.execute(text("ALTER TABLE messages ADD COLUMN group_id INTEGER"))
             columns = {
                 column[1]
                 for column in db.session.execute(text("PRAGMA table_info(users)"))
@@ -156,6 +160,10 @@ def create_app():
             if "is_banned" not in columns:
                 db.session.execute(text(
                     "ALTER TABLE users ADD COLUMN is_banned BOOLEAN NOT NULL DEFAULT 0"
+                ))
+            if "ban_count" not in columns:
+                db.session.execute(text(
+                    "ALTER TABLE users ADD COLUMN ban_count INTEGER NOT NULL DEFAULT 0"
                 ))
             if "role" not in columns:
                 db.session.execute(text(

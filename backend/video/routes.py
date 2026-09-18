@@ -48,12 +48,17 @@ def upload_short(current_user):
     if not video_file or not video_file.filename:
         return jsonify({"success": False, "message": "A video file is required"}), 400
     extension = Path(secure_filename(video_file.filename)).suffix.lower()
-    if extension not in {".mp4", ".webm"} or not (video_file.mimetype or "").startswith("video/"):
-        return jsonify({"success": False, "message": "Only MP4 and WEBM videos are supported"}), 400
+    if extension not in {".mp4", ".webm", ".mov", ".m4v"} or not (video_file.mimetype or "").startswith("video/"):
+        return jsonify({"success": False, "message": "Only MP4, WEBM, MOV, and M4V videos are supported"}), 400
     filename = f"short_{current_user.id}_{__import__('uuid').uuid4().hex}{extension}"
     destination = Path(current_app.config["UPLOAD_FOLDER"]) / filename
     video_file.save(destination)
-    return jsonify({"success": True, "video_url": f"/uploads/{filename}"}), 201
+    return jsonify({
+        "success": True,
+        "video_url": f"/uploads/{filename}",
+        "hdr_candidate": extension in {".mp4", ".webm", ".mov", ".m4v"},
+        "original_preserved": True,
+    }), 201
 
 
 @video_bp.post("/videos")

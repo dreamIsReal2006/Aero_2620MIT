@@ -12,16 +12,6 @@ document.addEventListener("DOMContentLoaded", () => {
         sessionStorage.clear();
     }
 
-    function showToast(message) {
-        const toast = byId("toast");
-        const messageElement = byId("toast-message");
-        if (!toast || !messageElement) return;
-        messageElement.textContent = message;
-        toast.classList.add("show");
-        window.clearTimeout(window.toastTimer);
-        window.toastTimer = window.setTimeout(() => toast.classList.remove("show"), 2500);
-    }
-
     async function request(path, options = {}) {
         const headers = new Headers(options.headers || {});
         headers.set("Accept", "application/json");
@@ -149,20 +139,6 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const data = await request("/users/me/profile");
             writeUser(data.user || {});
-            const adminButton = byId("admin-dashboard-button");
-            if (adminButton && (data.user?.is_admin === true || ["admin", "moderator"].includes(data.user?.role))) {
-                adminButton.classList.remove("hidden");
-                adminButton.addEventListener("click", async () => {
-                    adminButton.disabled = true;
-                    try {
-                        const entry = await request("/admin-entry");
-                        window.location.href = entry.url;
-                    } catch (error) {
-                        showToast(error.message);
-                        adminButton.disabled = false;
-                    }
-                }, { once: true });
-            }
             const notificationData = await request("/settings/notifications");
             const settings = notificationData.settings || {};
             [["toggle-push-notifications", settings.push_notifications], ["toggle-notify-likes", settings.likes], ["toggle-notify-comments", settings.comments]].forEach(([id, checked]) => {
@@ -170,7 +146,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (toggle && typeof checked === "boolean") toggle.checked = checked;
             });
         } catch (error) {
-            showToast(error.message);
+            console.error(error);
         }
     }
 
@@ -199,15 +175,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const username = byId("username")?.value.trim() || "";
         const email = byId("email")?.value.trim() || "";
         const bio = byId("bio")?.value.trim() || "";
-        if (!username || !email) return showToast("Username and email are required");
+        if (!username || !email) return;
         button.disabled = true;
         try {
             const currentUser = JSON.parse(localStorage.getItem("aero_user") || "{}");
             const data = await request("/users/me/profile", { method: "PUT", body: { username, email, bio, avatar_url: currentUser.avatar_url || "" } });
             writeUser(data.user || {});
-            showToast("Account information saved");
         } catch (error) {
-            showToast(error.message);
+            console.error(error);
         } finally {
             button.disabled = false;
         }
@@ -220,7 +195,6 @@ document.addEventListener("DOMContentLoaded", () => {
     window.AeroTheme?.applyTheme(selectedTheme);
     themeSelect?.addEventListener("change", (event) => {
         window.AeroTheme?.setTheme(event.target.value);
-        showToast("Theme updated");
     });
 
     [
@@ -241,10 +215,9 @@ document.addEventListener("DOMContentLoaded", () => {
             user[userField] = toggle.checked;
             if (otherToggle) user[otherField] = otherToggle.checked;
             localStorage.setItem("aero_user", JSON.stringify(user));
-            showToast("Privacy settings updated");
         } catch (error) {
             toggle.checked = !toggle.checked;
-            showToast(error.message);
+            console.error(error);
         } finally {
             toggle.disabled = false;
         }
@@ -261,10 +234,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const userField = field === "likes" ? "notify_likes" : field === "comments" ? "notify_comments" : field;
             user[userField] = value;
             localStorage.setItem("aero_user", JSON.stringify(user));
-            showToast("Notification settings updated");
         } catch (error) {
             toggle.checked = !value;
-            showToast(error.message);
+            console.error(error);
         } finally {
             toggle.disabled = false;
         }
@@ -277,7 +249,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (nextValue) {
             if (!("Notification" in window)) {
                 toggle.checked = false;
-                showToast("This browser does not support notifications");
                 return;
             }
 
@@ -285,7 +256,6 @@ document.addEventListener("DOMContentLoaded", () => {
             if (permission === "default") permission = await Notification.requestPermission();
             if (permission !== "granted") {
                 toggle.checked = false;
-                showToast(permission === "denied" ? "Notification permission was denied" : "Notification permission is required");
                 return;
             }
         }
@@ -310,7 +280,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const next = byId("new-password")?.value || "";
         const confirm = byId("confirm-password")?.value || "";
         const strong = next.length >= 8 && /[A-Z]/.test(next) && /[0-9]/.test(next) && /[^A-Za-z0-9]/.test(next);
-        if (!current || !strong || next !== confirm) return showToast("Use the current password and a strong matching new password");
+        if (!current || !strong || next !== confirm) return;
         event.currentTarget.disabled = true;
         try {
             await request("/auth/password", { method: "PUT", body: { old_password: current, new_password: next } });
@@ -319,7 +289,7 @@ document.addEventListener("DOMContentLoaded", () => {
             clearAuthState();
             window.location.href = "index.html";
         } catch (error) {
-            showToast(error.message);
+            console.error(error);
         } finally {
             event.currentTarget.disabled = false;
         }
@@ -353,7 +323,6 @@ document.addEventListener("DOMContentLoaded", () => {
             sessions.splice(index, 1);
             localStorage.setItem("aero_sessions", JSON.stringify(sessions.slice(1)));
             renderSessions();
-            showToast("Session revoked");
         }));
     }
     byId("sessions-button")?.addEventListener("click", () => { renderSessions(); openModal(sessionsModal); });
@@ -368,7 +337,7 @@ document.addEventListener("DOMContentLoaded", () => {
             clearAuthState();
             window.location.href = "index.html";
         } catch (error) {
-            showToast(error.message);
+            console.error(error);
             event.currentTarget.disabled = false;
         }
     });
@@ -378,7 +347,6 @@ document.addEventListener("DOMContentLoaded", () => {
     byId("reset-screen-time")?.addEventListener("click", () => {
         window.AeroScreenTime?.reset();
         renderScreenTime();
-        showToast("Screen time reset");
     });
     renderScreenTime();
     window.setInterval(renderScreenTime, 15000);

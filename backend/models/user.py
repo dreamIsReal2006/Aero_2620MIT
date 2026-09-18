@@ -71,6 +71,12 @@ class User(db.Model):
         nullable=False
     )
 
+    ban_count = db.Column(
+        db.Integer,
+        default=0,
+        nullable=False
+    )
+
     created_at = db.Column(
         db.DateTime,
         server_default=db.func.now(),

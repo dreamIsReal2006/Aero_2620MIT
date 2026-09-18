@@ -5,7 +5,6 @@ from flask import jsonify, request
 
 from backend import db
 from backend.auth.routes import token_required
-from backend.admin.decorators import require_role
 from backend.models import Comment, Follow, Notification, Post, Report, User, Video, VideoLike
 from backend.presence import is_user_online
 from backend.privacy import can_view_user_content
@@ -25,8 +24,9 @@ def serialize_post(post):
 
 @social_bp.patch("/users/<int:user_id>/role")
 @token_required
-@require_role("admin")
 def update_user_role(current_user, user_id):
+    if not (current_user.is_admin or current_user.role == "admin"):
+        return jsonify({"message": "Insufficient permissions"}), 403
     if current_user.id == user_id:
         return jsonify({"message": "Administrators cannot change their own role"}), 400
     user = db.session.get(User, user_id)

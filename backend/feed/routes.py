@@ -12,13 +12,18 @@ from backend import db
 from backend.auth.routes import token_required
 from backend.feed import feed_bp
 from backend.models import Comment, Follow, Like, Message, Notification, Post, User, UserInteraction
+from backend.mentions import add_mention_notifications
 from backend.privacy import visible_author_ids as get_visible_author_ids
 from backend.presence import is_user_online
 
 ALLOWED_MEDIA_TYPES = {
     "jpg": "image/", "jpeg": "image/", "png": "image/", "webp": "image/", "gif": "image/",
-    "mp4": "video/", "webm": "video/", "mov": "video/",
+    "avif": "image/", "heic": "image/", "heif": "image/",
+    "mp4": "video/", "webm": "video/", "mov": "video/", "m4v": "video/",
 }
+
+HDR_IMAGE_EXTENSIONS = {"avif", "heic", "heif"}
+HDR_VIDEO_EXTENSIONS = {"mp4", "webm", "mov", "m4v"}
 
 
 def post_payload(post, current_user_id=None):
@@ -139,7 +144,12 @@ def upload_media(current_user):
         return jsonify({"message": "Only JPG, PNG, JPEG, WEBP, MP4, WEBM, or MOV media are supported"}), 400
     filename = f"{uuid.uuid4().hex}.{extension}"
     file.save(Path(current_app.config["UPLOAD_FOLDER"]) / filename)
-    return jsonify({"url": f"/uploads/{filename}"}), 201
+    return jsonify({
+        "url": f"/uploads/{filename}",
+        "media_kind": "video" if extension in HDR_VIDEO_EXTENSIONS else "image",
+        "hdr_candidate": extension in HDR_IMAGE_EXTENSIONS or extension in HDR_VIDEO_EXTENSIONS,
+        "original_preserved": True,
+    }), 201
 
 
 @feed_bp.get("/uploads/<path:filename>")
@@ -166,6 +176,8 @@ def create_post(current_user):
         type=post_type,
     )
     db.session.add(post)
+    db.session.flush()
+    add_mention_notifications(content, current_user, post.id, "post")
     db.session.commit()
     return jsonify(post_payload(post, current_user.id)), 201
 

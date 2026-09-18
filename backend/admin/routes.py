@@ -26,6 +26,7 @@ def serialize_user(user):
         "username": user.username,
         "email": user.email,
         "is_banned": bool(user.is_banned),
+        "ban_count": user.ban_count or 0,
         "role": "admin" if user.is_admin or user.role == "admin" else (user.role if user.role == "moderator" else "user"),
     }
 
@@ -43,6 +44,8 @@ def serialize_post(post):
         "user_id": post.user_id,
         "username": post.author.username,
         "avatar_url": post.author.avatar_url or "",
+        "role": "admin" if post.author.is_admin or post.author.role == "admin" else post.author.role,
+        "is_admin": bool(post.author.is_admin),
     }
 
 
@@ -95,7 +98,7 @@ def search_users():
 
 @admin_bp.post("/users/<int:user_id>/toggle_ban")
 @login_required
-@admin_required
+@require_role(["admin", "moderator"])
 def toggle_ban(user_id):
     administrator = current_admin()
     if administrator.id == user_id:
@@ -103,8 +106,17 @@ def toggle_ban(user_id):
     user = db.session.get(User, user_id)
     if not user:
         return failure("User not found", 404)
+    effective_role = "admin" if administrator.is_admin else administrator.role
+    target_role = "admin" if user.is_admin else user.role
+    if effective_role == "moderator" and target_role in {"admin", "moderator"}:
+        return failure("Insufficient permissions", 403)
     try:
-        user.is_banned = not user.is_banned
+        was_banned = bool(user.is_banned)
+        if was_banned and (user.ban_count or 0) >= 3:
+            return failure("This account is permanently banned and cannot be unbanned", 403)
+        user.is_banned = not was_banned
+        if user.is_banned:
+            user.ban_count = (user.ban_count or 0) + 1
         db.session.add(ModerationLog(
             moderator_id=administrator.id,
             user_id=user.id,
@@ -207,6 +219,8 @@ def review_appeal(appeal_id, action):
         appeal.reviewed_at = db.func.now()
         if action == "approve":
             user = db.session.get(User, appeal.user_id)
+            if not user or (user.ban_count or 0) >= 3:
+                return failure("This account is permanently banned and cannot be unbanned by appeal", 403)
             user.is_banned = False
             db.session.add(ModerationLog(
                 moderator_id=current_admin().id,

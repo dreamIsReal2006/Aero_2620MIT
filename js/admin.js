@@ -17,6 +17,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     const userSearch = document.getElementById('admin-user-search');
     const appealsList = document.getElementById('admin-appeals-list');
     const isAdminViewer = user.is_admin === true || user.role === 'admin';
+    const isModeratorViewer = !isAdminViewer && user.role === 'moderator';
+    const dashboardTitle = document.getElementById('admin-dashboard-title');
+    const roleBadge = document.getElementById('admin-role-badge');
+    if (isModeratorViewer) {
+        if (dashboardTitle) dashboardTitle.textContent = 'Moderator Dashboard';
+        if (roleBadge) {
+            roleBadge.textContent = 'Moderator';
+            roleBadge.classList.add('moderator');
+        }
+    } else if (roleBadge) {
+        roleBadge.textContent = 'Admin';
+        roleBadge.classList.add('admin');
+    }
     const previewModal = document.getElementById('admin-post-preview-modal');
     const previewContent = document.getElementById('admin-post-preview-content');
     const showError = error => {
@@ -47,7 +60,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const escapeHtml = value => String(value || '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
     const renderUsers = users => {
         if (!usersList) return;
-        usersList.innerHTML = users.length ? users.map(user => `<div class="admin-user-row" data-user-id="${user.id}" data-username="${escapeHtml(user.username)}" data-role="${escapeHtml(user.role || 'user')}"><strong>@${escapeHtml(user.username)}</strong><span class="admin-user-role">${escapeHtml(user.role || 'user')}</span><span class="admin-user-status">${user.is_banned ? 'Banned' : 'Active'}</span>${isAdminViewer ? `<button class="btn admin-action-btn ban-user-btn" type="button">${user.is_banned ? 'Unban' : 'Ban'}</button><div class="role-segmented" role="group" aria-label="Set role for @${escapeHtml(user.username)}"><button class="role-segment ${user.role === 'user' ? 'is-active' : ''}" type="button" data-role="user">User</button><button class="role-segment ${user.role === 'moderator' ? 'is-active' : ''}" type="button" data-role="moderator">Moderator</button><button class="role-segment ${user.role === 'admin' ? 'is-active' : ''}" type="button" data-role="admin">Admin</button></div>` : ''}</div>`).join('') : '<p class="admin-empty">No matching users.</p>';
+        usersList.innerHTML = users.length ? users.map(user => {
+            const privilegedTarget = user.is_admin === true || ['admin', 'moderator'].includes(user.role);
+            const banDisabled = isModeratorViewer && privilegedTarget ? ' disabled title="Insufficient permissions"' : '';
+            return `<div class="admin-user-row" data-user-id="${user.id}" data-username="${escapeHtml(user.username)}" data-role="${escapeHtml(user.role || 'user')}"><strong>@${escapeHtml(user.username)}</strong><span class="admin-user-role">${escapeHtml(user.role || 'user')}</span><span class="admin-user-status">${user.is_banned ? 'Banned' : 'Active'}</span>${isAdminViewer || isModeratorViewer ? `<button class="btn admin-action-btn ban-user-btn" type="button"${banDisabled}>${user.is_banned ? 'Unban' : 'Ban'}</button>${isAdminViewer ? `<div class="role-segmented" role="group" aria-label="Set role for @${escapeHtml(user.username)}"><button class="role-segment ${user.role === 'user' ? 'is-active' : ''}" type="button" data-role="user">User</button><button class="role-segment ${user.role === 'moderator' ? 'is-active' : ''}" type="button" data-role="moderator">Moderator</button><button class="role-segment ${user.role === 'admin' ? 'is-active' : ''}" type="button" data-role="admin">Admin</button></div>` : ''}` : ''}</div>`;
+        }).join('') : '<p class="admin-empty">No matching users.</p>';
     };
     const renderAppeals = appeals => {
         if (!appealsList) return;
@@ -154,12 +171,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             dismissButton.dataset.reportIds = row.dataset.reportIds;
             actions.appendChild(dismissButton);
             const targetUserId = group.target_type === 'user' ? group.target_id : group.target?.user_id;
-            if (targetUserId && isAdminViewer) {
+            if (targetUserId && (isAdminViewer || isModeratorViewer)) {
                 const banButton = document.createElement('button');
                 banButton.className = 'btn admin-action-btn';
                 banButton.type = 'button';
                 banButton.textContent = 'Ban User';
                 banButton.dataset.userId = String(targetUserId);
+                if (isModeratorViewer && (group.target?.is_admin === true || ['admin', 'moderator'].includes(group.target?.role))) {
+                    banButton.disabled = true;
+                    banButton.title = 'Insufficient permissions';
+                }
                 actions.appendChild(banButton);
             }
             row.append(reporter, target, reason, actions);

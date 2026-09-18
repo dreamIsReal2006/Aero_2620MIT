@@ -23,7 +23,7 @@
 
     function profileRoleBadge(role) {
         const normalized = ['admin', 'moderator'].includes(role) ? role : '';
-        if (!normalized) return '';
+        if (!normalized || (window.shouldShowBadge && !window.shouldShowBadge(normalized))) return '';
         const icon = normalized === 'admin'
             ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Z"></path><path d="m9 12 2 2 4-4"></path></svg>'
             : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Z"></path><path d="M8 12h8M12 8v8"></path></svg>';
@@ -94,6 +94,64 @@
         document.getElementById('profile-edit-modal')?.classList.add('hidden');
         profileEditorUser = null;
         profileEditorFile = null;
+    }
+
+    function checkNFCSupport() {
+        const isMobile = window.innerWidth <= 768 || /Android|iPhone/i.test(navigator.userAgent);
+        return isMobile && 'NDEFReader' in window;
+    }
+
+    function profileShareUrl(userId) {
+        return `${window.location.origin}${window.location.pathname}#profile/${encodeURIComponent(userId)}`;
+    }
+
+    function setNfcStatus(message, active = false) {
+        const status = document.getElementById('nfc-share-status');
+        if (status) status.textContent = message;
+        document.getElementById('nfc-share-panel')?.classList.toggle('is-active', active);
+    }
+
+    async function startNFCShare(profileUrl) {
+        if (!checkNFCSupport()) {
+            setNfcStatus('NFC is unavailable here. Use the QR code or copy the link.');
+            window.showNotice?.('Web NFC is unavailable on this device or browser.', 'info');
+            return;
+        }
+        setNfcStatus('Ready. Hold another phone close to this one.', true);
+        try {
+            const ndef = new NDEFReader();
+            await ndef.write({ records: [
+                { recordType: 'url', data: profileUrl },
+                { recordType: 'text', data: `Check out this Aero profile: ${profileUrl}` }
+            ] });
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            setNfcStatus('NFC link written successfully.');
+            window.showNotice?.('NFC sharing is ready. Bring the phones together.', 'success');
+        } catch (error) {
+            console.error('NFC Write Error:', error);
+            setNfcStatus('NFC writing failed or permission was denied.');
+            window.showNotice?.(error.message || 'NFC writing failed.', 'error');
+        } finally {
+            document.getElementById('nfc-share-panel')?.classList.remove('is-active');
+        }
+    }
+
+    function openProfileShareModal(user, userId) {
+        const modal = document.getElementById('share-profile-modal');
+        const profileUrl = profileShareUrl(userId);
+        if (!modal) return;
+        document.getElementById('share-profile-name').textContent = user.display_name || user.username || 'Profile';
+        document.getElementById('share-profile-handle').textContent = `@${user.username || 'user'}`;
+        document.getElementById('share-profile-qr').src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(profileUrl)}`;
+        document.getElementById('copy-profile-link').dataset.profileUrl = profileUrl;
+        document.getElementById('start-nfc-share').dataset.profileUrl = profileUrl;
+        setNfcStatus(checkNFCSupport() ? 'Ready to share with a nearby phone.' : 'Use the QR code or copy the link on this device.');
+        modal.classList.remove('hidden');
+    }
+
+    function closeProfileShareModal() {
+        document.getElementById('share-profile-modal')?.classList.add('hidden');
+        document.getElementById('nfc-share-panel')?.classList.remove('is-active');
     }
 
     async function saveProfileEditor(event) {
@@ -197,6 +255,16 @@
         const isFollowing = type === 'following';
         forYouTab?.classList.toggle('active', !isFollowing);
         followingTab?.classList.toggle('active', isFollowing);
+        requestAnimationFrame(updateTabIndicator);
+    }
+
+    function updateTabIndicator() {
+        const container = document.querySelector('.feed-tabs');
+        const activeTab = container?.querySelector('.feed-tab.active');
+        const indicator = container?.querySelector('.tab-indicator');
+        if (!container || !activeTab || !indicator) return;
+        indicator.style.width = `${activeTab.offsetWidth}px`;
+        indicator.style.transform = `translateX(${activeTab.offsetLeft}px)`;
     }
 
     async function loadPosts(feedType = 'for_you') {
@@ -241,6 +309,7 @@
                     <div class="profile-header-copy">
                         <div class="profile-display-row">
                             <h2>${user.display_name || user.username || 'User'}${profileRoleBadge(user.role)}</h2>
+                            <button type="button" class="profile-share-btn" id="profile-share-btn" aria-label="Share profile" title="Share profile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5"></path></svg></button>
                         </div>
                         <div class="profile-handle">@${user.username || 'user'}</div>
                         <p class="profile-bio">${(user.bio || 'No bio yet.').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]))}</p>
@@ -256,6 +325,7 @@
                 </div>
             `;
 
+            header.querySelector('#profile-share-btn')?.addEventListener('click', () => openProfileShareModal(user, profileUserId));
             header.querySelector('.profile-edit-btn')?.addEventListener('click', () => openProfileEditor(user));
 
             if (!isOwnProfile) {
@@ -363,6 +433,9 @@
 
     function switchView(view, options = {}) {
         if (!views[view]) return;
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
         if (activeView === 'shorts' && view !== 'shorts') cleanupShortsPlayback();
         activeView = view;
         const currentViewId = views[view];
@@ -405,6 +478,20 @@
         document.getElementById('profile-edit-avatar')?.addEventListener('input', (event) => {
             if (!profileEditorFile) setProfileEditorPreview(event.target.value, String(document.getElementById('profile-edit-display-name')?.value || 'U').charAt(0).toUpperCase());
         });
+        document.getElementById('close-share-profile')?.addEventListener('click', closeProfileShareModal);
+        document.getElementById('share-profile-modal')?.addEventListener('click', (event) => {
+            if (event.target.id === 'share-profile-modal') closeProfileShareModal();
+        });
+        document.getElementById('copy-profile-link')?.addEventListener('click', async (event) => {
+            const url = event.currentTarget.dataset.profileUrl;
+            try {
+                await navigator.clipboard.writeText(url);
+                window.showNotice?.('Profile link copied.', 'success');
+            } catch (error) {
+                window.showNotice?.('Unable to copy the profile link.', 'error');
+            }
+        });
+        document.getElementById('start-nfc-share')?.addEventListener('click', (event) => startNFCShare(event.currentTarget.dataset.profileUrl));
         document.addEventListener('click', (event) => {
             const adminLink = event.target.closest('#admin-dashboard-link');
             if (adminLink) {
@@ -453,10 +540,14 @@
         });
         document.getElementById('tab-for-you')?.addEventListener('click', () => loadPosts('for_you'));
         document.getElementById('tab-following')?.addEventListener('click', () => loadPosts('following'));
-        navigate('main');
+        const sharedProfile = window.location.hash.match(/^#profile\/(\d+)$/);
+        if (sharedProfile) navigate('profile', { userId: Number(sharedProfile[1]) });
+        else navigate('main');
         setActiveFeedTab('for_you');
         setFabAuthState(Boolean(localStorage.getItem('aero_token')));
         window.addEventListener('resize', syncFabForViewport, { passive: true });
+        window.addEventListener('resize', updateTabIndicator, { passive: true });
+        updateTabIndicator();
     });
 
     window.setFabAuthState = setFabAuthState;
@@ -464,4 +555,6 @@
     window.switchView = switchView;
     window.navigateToUserProfile = navigateToUserProfile;
     window.AeroRouter = { navigate, switchView, get activeView() { return activeView; } };
+    window.checkNFCSupport = checkNFCSupport;
+    window.startNFCShare = startNFCShare;
 })();

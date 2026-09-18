@@ -2,6 +2,9 @@
     const STORAGE_KEY = 'aero_language';
     const originalTitle = document.title;
     const translations = {
+        en: {
+            'author': 'Author', 'author_badge': 'Author'
+        },
         zh: {
             'Settings': '设置', 'Back': '返回', 'Account': '账户', 'Appearance': '外观', 'Languages': '语言',
             'Notifications': '通知', 'Privacy': '隐私', 'Security': '安全', 'Screen Time': '屏幕使用时间',
@@ -29,7 +32,8 @@
             'Edit Profile': '编辑资料', 'Profile': '个人资料', 'Display Name': '显示名称', 'Handle / User ID': '用户名 / ID',
             'No posts yet.': '暂无帖子。', 'No results found': '未找到结果', 'Loading...': '加载中...',
             'Post options': '帖子选项', 'Like post': '点赞帖子', 'Comment on post': '评论帖子', 'Share post': '分享帖子',
-            'Add a comment...': '添加评论...', 'Write a comment...': '写下评论...', 'GIF': 'GIF', 'New message': '新消息'
+            'Add a comment...': '添加评论...', 'Write a comment...': '写下评论...', 'GIF': 'GIF', 'New message': '新消息',
+            'author': '作者', 'author_badge': '作者'
         }
     };
     const originalText = new WeakMap();
@@ -41,7 +45,7 @@
 
     function translateValue(value) {
         const language = getLanguage();
-        return language === 'zh' ? translations.zh[value] || value : value;
+        return translations[language][value] || value;
     }
 
     function formatChatTimestamp(timestamp) {
@@ -74,6 +78,8 @@
             return;
         }
         if (node.nodeType !== Node.ELEMENT_NODE || ['SCRIPT', 'STYLE'].includes(node.tagName)) return;
+        const translationKey = node.getAttribute('data-i18n');
+        if (translationKey) node.textContent = translateValue(translationKey);
         ['placeholder', 'title', 'aria-label'].forEach((attribute) => {
             const value = node.getAttribute(attribute);
             if (value && !originalAttributes.has(node)) originalAttributes.set(node, {});

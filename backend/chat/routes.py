@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 from backend import db
 from backend.auth.routes import token_required
 from backend.chat import chat_bp
-from backend.models import Block, Follow, Message, Mute, Note, Post, User
+from backend.models import Block, ChatGroup, ChatGroupMember, Follow, Message, Mute, Note, Post, User
 from backend.presence import is_user_online
 
 CHAT_UPLOAD_TYPES = {
@@ -25,6 +25,108 @@ def _user_payload(user, viewer_id=None):
         muter_id=viewer_id, muted_id=user.id
     ).first() is not None
     return {"id": user.id, "username": user.username, "display_name": user.display_name or user.username, "avatar_url": user.avatar_url or "", "role": user.role if user.role in {"admin", "moderator", "user"} else "user", "is_online": is_user_online(user, viewer_id), "is_muted": is_muted}
+
+
+def _group_payload(group, current_user_id):
+    latest = Message.query.filter_by(group_id=group.id).order_by(Message.created_at.desc()).first()
+    unread_count = Message.query.filter(
+        Message.group_id == group.id,
+        Message.recipient_id == current_user_id,
+        Message.sender_id != current_user_id,
+        Message.is_read.is_(False),
+    ).count()
+    return {
+        "id": group.id,
+        "group_id": group.id,
+        "kind": "group",
+        "is_group": True,
+        "name": group.name,
+        "username": group.name,
+        "owner_id": group.owner_id,
+        "member_count": ChatGroupMember.query.filter_by(group_id=group.id).count(),
+        "latest_message": latest.content if latest else "",
+        "unread_count": unread_count,
+        "is_owner": group.owner_id == current_user_id,
+    }
+
+
+def _group_member(group_id, user_id):
+    return ChatGroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
+
+
+@chat_bp.get("/chat/groups")
+@token_required
+def get_groups(current_user):
+    memberships = ChatGroupMember.query.filter_by(user_id=current_user.id).all()
+    groups = [db.session.get(ChatGroup, membership.group_id) for membership in memberships]
+    return jsonify([_group_payload(group, current_user.id) for group in groups if group])
+
+
+@chat_bp.post("/chat/groups")
+@token_required
+def create_group(current_user):
+    data = request.get_json(silent=True) or {}
+    name = str(data.get("name", "")).strip()
+    raw_member_ids = data.get("member_ids", data.get("memberIds", []))
+    if not name or len(name) > 80 or not isinstance(raw_member_ids, list):
+        return jsonify({"message": "A group name and member list are required"}), 400
+    try:
+        member_ids = {int(user_id) for user_id in raw_member_ids}
+    except (TypeError, ValueError):
+        return jsonify({"message": "Member IDs must be valid"}), 400
+    member_ids.discard(current_user.id)
+    if not member_ids:
+        return jsonify({"message": "Choose at least one other member"}), 400
+    members = User.query.filter(User.id.in_(member_ids), User.active.is_(True), User.is_banned.is_(False)).all()
+    if len(members) != len(member_ids):
+        return jsonify({"message": "One or more selected members are unavailable"}), 400
+    group = ChatGroup(name=name, owner_id=current_user.id)
+    db.session.add(group)
+    db.session.flush()
+    db.session.add(ChatGroupMember(group_id=group.id, user_id=current_user.id, is_admin=True))
+    db.session.add_all(ChatGroupMember(group_id=group.id, user_id=user.id) for user in members)
+    db.session.commit()
+    return jsonify(_group_payload(group, current_user.id)), 201
+
+
+@chat_bp.get("/chat/groups/<int:group_id>/members")
+@token_required
+def get_group_members(current_user, group_id):
+    group = db.session.get(ChatGroup, group_id)
+    if not group or not _group_member(group_id, current_user.id):
+        return jsonify({"message": "Group not found"}), 404
+    members = ChatGroupMember.query.filter_by(group_id=group_id).all()
+    return jsonify({
+        "group": _group_payload(group, current_user.id),
+        "members": [{**_user_payload(member.user, current_user.id), "is_admin": member.is_admin} for member in members],
+    })
+
+
+@chat_bp.delete("/chat/groups/<int:group_id>")
+@token_required
+def delete_group(current_user, group_id):
+    group = db.session.get(ChatGroup, group_id)
+    if not group or group.owner_id != current_user.id:
+        return jsonify({"message": "Only the group owner can delete this group"}), 403
+    Message.query.filter_by(group_id=group_id).delete(synchronize_session=False)
+    ChatGroupMember.query.filter_by(group_id=group_id).delete(synchronize_session=False)
+    db.session.delete(group)
+    db.session.commit()
+    return jsonify({"deleted": True, "group_id": group_id})
+
+
+@chat_bp.post("/chat/groups/<int:group_id>/leave")
+@token_required
+def leave_group(current_user, group_id):
+    group = db.session.get(ChatGroup, group_id)
+    membership = _group_member(group_id, current_user.id)
+    if not group or not membership:
+        return jsonify({"message": "Group not found"}), 404
+    if group.owner_id == current_user.id:
+        return jsonify({"message": "The group owner must delete the group instead"}), 400
+    db.session.delete(membership)
+    db.session.commit()
+    return jsonify({"left": True, "group_id": group_id})
 
 
 @chat_bp.get("/friends")
@@ -60,6 +162,47 @@ def get_unread_count(current_user):
     return jsonify({"unread_count": unread_count})
 
 
+@chat_bp.post("/chat/messages/mark-read")
+@token_required
+def mark_messages_read(current_user):
+    data = request.get_json(silent=True) or {}
+    try:
+        group_id = int(data.get("group_id", 0) or 0)
+    except (TypeError, ValueError):
+        group_id = 0
+    try:
+        sender_id = int(data.get("sender_id", 0) or 0)
+    except (TypeError, ValueError):
+        sender_id = 0
+
+    if group_id:
+        if not _group_member(group_id, current_user.id):
+            return jsonify({"message": "Group not found"}), 404
+        query = Message.query.filter(
+            Message.group_id == group_id,
+            Message.recipient_id == current_user.id,
+            Message.sender_id != current_user.id,
+            Message.is_read.is_(False),
+        )
+    elif sender_id and db.session.get(User, sender_id):
+        query = Message.query.filter(
+            Message.sender_id == sender_id,
+            Message.recipient_id == current_user.id,
+            Message.group_id.is_(None),
+            Message.is_read.is_(False),
+        )
+    else:
+        return jsonify({"message": "A valid conversation is required"}), 400
+
+    updated_count = query.update({Message.is_read: True}, synchronize_session=False)
+    db.session.commit()
+    unread_count = Message.query.filter_by(
+        recipient_id=current_user.id,
+        is_read=False,
+    ).count()
+    return jsonify({"marked_read": updated_count, "unread_count": unread_count}), 200
+
+
 @chat_bp.get("/notes")
 @token_required
 def get_notes(current_user):
@@ -72,18 +215,37 @@ def get_notes(current_user):
 @token_required
 def get_messages(current_user):
     try:
+        group_id = int(request.args.get("group_id", "0"))
+    except ValueError:
+        group_id = 0
+    if group_id:
+        group = db.session.get(ChatGroup, group_id)
+        if not group or not _group_member(group_id, current_user.id):
+            return jsonify({"message": "Group not found"}), 404
+        messages = Message.query.filter_by(group_id=group_id).order_by(Message.created_at.asc()).limit(200).all()
+        recipient_id = None
+    else:
+        recipient_id = None
+        messages = []
+    try:
         user_id = int(request.args.get("contact_id", request.args.get("user_id", "0")))
     except ValueError:
         user_id = 0
-    if not db.session.get(User, user_id):
+    if group_id:
+        user_id = 0
+    elif not db.session.get(User, user_id):
         return jsonify({"message": "Contact not found"}), 404
-    messages = Message.query.filter(
-        ((Message.sender_id == current_user.id) & (Message.recipient_id == user_id)) |
-        ((Message.sender_id == user_id) & (Message.recipient_id == current_user.id))
-    ).order_by(Message.created_at.asc()).limit(200).all()
-    Message.query.filter_by(sender_id=user_id, recipient_id=current_user.id, is_read=False).update(
-        {Message.is_read: True}, synchronize_session=False
-    )
+    else:
+        messages = Message.query.filter(
+            (
+                ((Message.sender_id == current_user.id) & (Message.recipient_id == user_id)) |
+                ((Message.sender_id == user_id) & (Message.recipient_id == current_user.id))
+            ),
+            Message.group_id.is_(None),
+        ).order_by(Message.created_at.asc()).limit(200).all()
+        Message.query.filter_by(sender_id=user_id, recipient_id=current_user.id, is_read=False).update(
+            {Message.is_read: True}, synchronize_session=False
+        )
     db.session.commit()
     payload = []
     for message in messages:
@@ -105,10 +267,12 @@ def get_messages(current_user):
         payload.append({
         "id": message.id,
         "post_id": message.post_id,
+        "group_id": message.group_id,
         "content": message.content,
         "media_url": message.media_url or "",
         "type": message.type or "text",
         "sender_id": message.sender_id,
+        "sender_username": message.sender.username if message.sender else "User",
         "created_at": f"{message.created_at.isoformat()}Z",
         "can_delete": message.sender_id == current_user.id,
         "file_name": message.file_name or "",
@@ -215,6 +379,10 @@ def delete_message(current_user, message_id):
 def send_message(current_user):
     data = request.get_json(silent=True) or {}
     try:
+        group_id = int(data.get("group_id", 0) or 0)
+    except (TypeError, ValueError):
+        group_id = 0
+    try:
         recipient_id = int(data.get("recipient_id", data.get("user_id")))
     except (TypeError, ValueError):
         recipient_id = 0
@@ -228,11 +396,16 @@ def send_message(current_user):
         file_size = max(0, int(data.get("file_size") or 0))
     except (TypeError, ValueError):
         file_size = 0
-    if not db.session.get(User, recipient_id) or (not content and not media_url) or len(content) > 2000 or len(media_url) > 500:
+    group = db.session.get(ChatGroup, group_id) if group_id else None
+    if group_id and (not group or not _group_member(group_id, current_user.id)):
+        return jsonify({"message": "Group not found"}), 404
+    if not group_id and (not db.session.get(User, recipient_id)):
         return jsonify({"message": "A valid recipient and message are required"}), 400
-    if Block.query.filter_by(blocker_id=recipient_id, blocked_id=current_user.id).first() or Block.query.filter_by(blocker_id=current_user.id, blocked_id=recipient_id).first():
+    if (not content and not media_url) or len(content) > 2000 or len(media_url) > 500:
+        return jsonify({"message": "A valid recipient and message are required"}), 400
+    if not group_id and (Block.query.filter_by(blocker_id=recipient_id, blocked_id=current_user.id).first() or Block.query.filter_by(blocker_id=current_user.id, blocked_id=recipient_id).first()):
         return jsonify({"message": "Messaging is unavailable for this contact"}), 403
-    message = Message(sender_id=current_user.id, recipient_id=recipient_id, content=content, media_url=media_url, type=message_type, file_name=file_name, file_size=file_size)
+    message = Message(sender_id=current_user.id, recipient_id=current_user.id if group_id else recipient_id, group_id=group_id or None, content=content, media_url=media_url, type=message_type, file_name=file_name, file_size=file_size)
     db.session.add(message)
     db.session.commit()
-    return jsonify({"id": message.id, "content": message.content, "media_url": message.media_url, "type": message.type, "file_name": message.file_name, "file_size": message.file_size, "sender_id": message.sender_id, "created_at": f"{message.created_at.isoformat()}Z"}), 201
+    return jsonify({"id": message.id, "group_id": message.group_id, "content": message.content, "media_url": message.media_url, "type": message.type, "file_name": message.file_name, "file_size": message.file_size, "sender_id": message.sender_id, "created_at": f"{message.created_at.isoformat()}Z"}), 201

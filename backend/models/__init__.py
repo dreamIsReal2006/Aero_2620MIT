@@ -17,3 +17,4 @@ from backend.models.moderation_log import ModerationLog
 from backend.models.appeal_ticket import AppealTicket
 from backend.models.block import Block
 from backend.models.mute import Mute
+from backend.models.chat_group import ChatGroup, ChatGroupMember

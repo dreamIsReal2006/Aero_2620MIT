@@ -135,6 +135,8 @@ def signup():
     user = None
     try:
         existing = User.query.filter((User.username.ilike(username)) | (User.email.ilike(email))).first()
+        if existing and (existing.ban_count or 0) >= 3:
+            return jsonify({"message": "This account is permanently banned and cannot be registered again"}), 403
         if existing and existing.active:
             return jsonify({"message": "Username or email is already registered"}), 409
         user = existing or User(username=username, email=email, active=False)
@@ -190,6 +192,7 @@ def verify_otp():
         "id": user.id, "username": user.username, "display_name": user.display_name or user.username, "email": user.email,
         "bio": user.bio or "", "avatar_url": user.avatar_url or "",
         "role": user.role if user.role in {"admin", "moderator", "user"} else "user",
+        "is_moderator": user.role == "moderator",
         "is_admin": user.is_admin, "is_banned": user.is_banned,
         "is_private": user.is_private, "show_online_status": user.show_online_status,
     }}), 200
@@ -256,12 +259,16 @@ def signin():
         return jsonify({"message": "Incorrect username or password"}), 401
     if not user.active:
         return jsonify({"message": "Account has not been activated by email"}), 403
+    if (user.ban_count or 0) >= 3:
+        return jsonify({"message": "Your account has been permanently banned after reaching the maximum number of bans", "suspended": True, "permanent": True, "username": user.username}), 403
     if user.is_banned:
         return jsonify({"message": "Account suspended", "suspended": True, "username": user.username}), 403
     session["user_id"] = user.id
     return jsonify({"token": make_token(user), "user": {
         "id": user.id, "username": user.username, "display_name": user.display_name or user.username, "email": user.email,
         "bio": user.bio or "", "avatar_url": user.avatar_url or "",
+        "role": user.role if user.role in {"admin", "moderator", "user"} else "user",
+        "is_moderator": user.role == "moderator",
         "is_admin": user.is_admin, "is_banned": user.is_banned,
         "is_private": user.is_private, "show_online_status": user.show_online_status,
     }}), 200
@@ -275,6 +282,8 @@ def submit_appeal():
     user = User.query.filter(User.username.ilike(username)).first()
     if not user or not user.is_banned or not content or len(content) > 2000:
         return jsonify({"message": "A banned username and appeal text are required"}), 400
+    if (user.ban_count or 0) >= 3:
+        return jsonify({"message": "Appeals are unavailable because this account is permanently banned"}), 403
     db.session.add(AppealTicket(user_id=user.id, content=content))
     db.session.commit()
     return jsonify({"message": "Appeal submitted"}), 201

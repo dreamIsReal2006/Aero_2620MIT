@@ -4,6 +4,7 @@ from backend import db
 from backend.auth.routes import token_required
 from backend.interact import interact_bp
 from backend.models import Post, Like, Comment, CommentLike, Notification
+from backend.mentions import add_mention_notifications
 
 
 @interact_bp.route("/test", methods=["GET"])
@@ -156,6 +157,7 @@ def create_comment(current_user, post_id):
     )
 
     db.session.add(comment)
+    add_mention_notifications(content, current_user, post.id, "comment")
     if post.user_id != user_id and current_user.notify_comments:
         db.session.add(Notification(
             recipient_id=post.user_id,
@@ -228,6 +230,7 @@ def create_reply(current_user, comment_id):
     )
 
     db.session.add(reply)
+    add_mention_notifications(content, current_user, parent_comment.post_id, "comment")
     db.session.commit()
 
     return jsonify({
