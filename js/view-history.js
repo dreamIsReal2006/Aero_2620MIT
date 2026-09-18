@@ -30,7 +30,7 @@
         const username = post.username || 'User';
         const avatarUrl = String(post.avatar_url || '');
         if (!avatarUrl) return `<span>${escapeHtml(username.charAt(0).toUpperCase() || 'U')}</span>`;
-        const normalizedUrl = avatarUrl.startsWith('http') ? avatarUrl : `${window.location.origin}${avatarUrl}`;
+        const normalizedUrl = avatarUrl.startsWith('http') ? avatarUrl : `${window.AeroConfig.API_ORIGIN}${avatarUrl}`;
         return `<img src="${escapeHtml(normalizedUrl)}" alt="@${escapeHtml(username)}" loading="lazy"><span class="history-avatar-fallback">${escapeHtml(username.charAt(0).toUpperCase() || 'U')}</span>`;
     }
 

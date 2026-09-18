@@ -1,5 +1,5 @@
 (() => {
-    const apiBase = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000/api' : `${window.location.origin}/api`;
+    const apiBase = window.AeroConfig.API_BASE_URL;
     let videos = [];
     let currentIndex = 0;
     let activeMedia = null;

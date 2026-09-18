@@ -11,14 +11,12 @@
     let profileEditorUser = null;
     let profileEditorFile = null;
 
-    const profileApiBase = () => window.location.protocol === 'file:'
-        ? 'http://127.0.0.1:5000/api'
-        : `${window.location.origin}/api`;
+    const profileApiBase = () => window.AeroConfig.API_BASE_URL;
 
     function profileAvatarValue(user = {}) {
         const value = String(user.avatar_url || '');
         if (value.startsWith('letter:')) return { letter: value.slice(7, 8).toUpperCase() || 'U' };
-        return { url: value ? (value.startsWith('http') ? value : `${window.location.origin}${value}`) : '', letter: String(user.display_name || user.username || 'U').charAt(0).toUpperCase() };
+        return { url: value ? (value.startsWith('http') ? value : `${window.AeroConfig.API_ORIGIN}${value}`) : '', letter: String(user.display_name || user.username || 'U').charAt(0).toUpperCase() };
     }
 
     function profileRoleBadge(role) {
@@ -65,7 +63,7 @@
         const stringValue = String(value || '');
         if (stringValue && !stringValue.startsWith('letter:') && /^(https?:\/\/|\/)/i.test(stringValue)) {
             const image = document.createElement('img');
-            image.src = stringValue.startsWith('http') ? stringValue : `${window.location.origin}${stringValue}`;
+            image.src = stringValue.startsWith('http') ? stringValue : `${window.AeroConfig.API_ORIGIN}${stringValue}`;
             image.alt = '';
             image.onerror = () => { preview.replaceChildren(); preview.textContent = fallback; };
             preview.appendChild(image);
@@ -279,7 +277,7 @@
         if (!section || !container || !header) return;
 
         try {
-            const apiBase = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000/api' : `${window.location.origin}/api`;
+            const apiBase = window.AeroConfig.API_BASE_URL;
             const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
             const currentUserId = Number(currentUser.id || currentUser.user_id || 0);
             const profileUserId = userId == null ? currentUserId : Number(userId);
@@ -395,7 +393,7 @@
         const container = document.getElementById('profile-posts-container');
         if (!container) return;
         container.innerHTML = '<div class="profile-loading" aria-live="polite">Loading...</div>';
-        const apiBase = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000/api' : `${window.location.origin}/api`;
+        const apiBase = window.AeroConfig.API_BASE_URL;
         try {
             const response = await fetch(`${apiBase}/users/${userId}/content?type=${encodeURIComponent(contentType)}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
@@ -496,9 +494,7 @@
             const adminLink = event.target.closest('#admin-dashboard-link');
             if (adminLink) {
                 event.preventDefault();
-                const apiBase = window.location.protocol === 'file:'
-                    ? 'http://127.0.0.1:5000/api'
-                    : `${window.location.origin}/api`;
+                const apiBase = window.AeroConfig.API_BASE_URL;
                 fetch(`${apiBase}/admin-entry`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
                 }).then(async (response) => {

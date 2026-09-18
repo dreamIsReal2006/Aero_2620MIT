@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="js/i18n.js"></script>
+    <script src="js/config.js"></script>
     <title>Account Suspended</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
@@ -21,7 +22,7 @@
         </form>
     </main>
     <script>
-        const base = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000/api' : `${window.location.origin}/api`;
+        const base = window.AeroConfig.API_BASE_URL;
         const username = sessionStorage.getItem('aero_suspended_username');
         if (username) document.getElementById('appeal-username').value = username;
         document.getElementById('appeal-form').addEventListener('submit', async event => {

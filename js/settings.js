@@ -1,9 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     const $ = (selector) => document.querySelector(selector);
     const byId = (id) => document.getElementById(id);
-    const API_BASE = window.location.protocol === "file:"
-        ? "http://127.0.0.1:5000/api"
-        : `${window.location.origin}/api`;
+    const API_BASE = window.AeroConfig.API_BASE_URL;
 
     const token = () => localStorage.getItem("aero_token");
 

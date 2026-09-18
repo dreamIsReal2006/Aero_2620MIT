@@ -1,5 +1,5 @@
 (() => {
-    const apiBase = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000/api' : `${window.location.origin}/api`;
+    const apiBase = window.AeroConfig.API_BASE_URL;
     const escapeText = (value) => String(value || '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));
     const renderMessageText = (value) => escapeText(value).replace(
         /(https?:\/\/[^\s<]+|\/#post-\d+)/g,
@@ -30,7 +30,7 @@
     function contactAvatarUrl(contact) {
         const value = contact?.avatar_url || contact?.avatarUrl || contact?.avatar || '';
         return value && !String(value).startsWith('letter:')
-            ? (String(value).startsWith('http') ? String(value) : `${window.location.origin}${value}`)
+            ? (String(value).startsWith('http') ? String(value) : `${window.AeroConfig.API_ORIGIN}${value}`)
             : '';
     }
 
@@ -126,7 +126,7 @@
         const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
         if (!box) return;
         const attachmentMarkup = (message) => {
-            const url = message.media_url ? (String(message.media_url).startsWith('http') ? message.media_url : `${window.location.origin}${message.media_url}`) : '';
+            const url = message.media_url ? (String(message.media_url).startsWith('http') ? message.media_url : `${window.AeroConfig.API_ORIGIN}${message.media_url}`) : '';
             if (!url) return '';
             if (message.type === 'image' || message.type === 'gif') return `<button type="button" class="chat-media-preview" data-lightbox-src="${escapeText(url)}"><img src="${escapeText(url)}" alt="Attached image" loading="lazy"></button>`;
             if (message.type === 'video') return `<video class="chat-inline-video" src="${escapeText(url)}" controls preload="metadata"></video>`;

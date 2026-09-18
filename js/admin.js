@@ -2,9 +2,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('aero_token');
     const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
     const adminRoute = window.location.pathname.split('/').filter(Boolean).find(segment => segment.startsWith('admin_')) || 'admin_default_fallback';
-    const apiBase = window.location.protocol === 'file:'
-        ? `http://127.0.0.1:5000/api/${adminRoute}`
-        : `${window.location.origin}/api/${adminRoute}`;
+    const apiBase = `${window.AeroConfig.API_BASE_URL}/${adminRoute}`;
     const apiRoot = apiBase.replace(/\/admin_[^/]+$/, '');
     if (!token || (user.is_admin !== true && !['admin', 'moderator'].includes(user.role))) {
         window.location.href = 'index.html';
@@ -70,7 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!appealsList) return;
         appealsList.innerHTML = appeals.map(appeal => `<div class="admin-user-row" data-appeal-id="${appeal.id}"><strong>@${escapeHtml(appeal.username)}</strong><span>${escapeHtml(appeal.content)}</span><button class="btn admin-action-btn appeal-approve-btn" type="button">Approve</button><button class="btn admin-action-btn appeal-reject-btn" type="button">Reject</button></div>`).join('') || '<p class="admin-empty">No pending appeals.</p>';
     };
-    const imageUrl = value => value && value.startsWith('http') ? value : `${window.location.origin}${value || ''}`;
+    const imageUrl = value => value && value.startsWith('http') ? value : `${window.AeroConfig.API_ORIGIN}${value || ''}`;
 
     const openPreview = post => {
         if (!previewContent || !post) return;

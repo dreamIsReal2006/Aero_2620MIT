@@ -1,7 +1,5 @@
-const API_BASE = window.location.protocol === 'file:'
-    ? 'http://127.0.0.1:5000/api'
-    : `${window.location.origin}/api`;
-const API_ORIGIN = API_BASE.replace(/\/api$/, '');
+const API_BASE = window.AeroConfig.API_BASE_URL;
+const API_ORIGIN = window.AeroConfig.API_ORIGIN;
 const ADMIN_ROUTE = window.location.pathname.split('/').filter(Boolean).find(segment => segment.startsWith('admin_')) || 'admin_default_fallback';
 const ADMIN_API_BASE = `${API_ORIGIN}/api/${ADMIN_ROUTE}`;
 
@@ -2540,7 +2538,7 @@ window.addEventListener('aero:language-change', () => {
 window.toggleFollowUser = async (userId, userMeta = {}) => {
     const api = window.apiService || window.api;
     if (api && typeof api.toggleFollow === 'function') return api.toggleFollow(userId, userMeta);
-    const apiOrigin = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000' : window.location.origin;
+    const apiOrigin = window.AeroConfig.API_ORIGIN;
     const response = await fetch(`${apiOrigin}/api/users/${userId}/follow`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }

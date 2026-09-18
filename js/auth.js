@@ -1,5 +1,5 @@
 (() => {
-    const apiBase = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000/api' : `${window.location.origin}/api`;
+    const apiBase = window.AeroConfig.API_BASE_URL;
     const escapeText = (value) => String(value || '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));
     let resetCode = '';
     let resetTimer;

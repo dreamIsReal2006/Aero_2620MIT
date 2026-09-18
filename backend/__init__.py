@@ -42,7 +42,11 @@ def create_app():
         "AERO_UPLOAD_DIR", str(base_dir / "uploads")
     )
     Path(app.config["UPLOAD_FOLDER"]).mkdir(parents=True, exist_ok=True)
-    CORS(app, origins=os.environ.get("AERO_ALLOWED_ORIGINS", "*").split(","))
+    allowed_origins = os.environ.get(
+        "AERO_ALLOWED_ORIGINS",
+        r"https://.*\.netlify\.app,https://GOH.pythonanywhere.com,http://localhost:5000,http://127.0.0.1:5000",
+    ).split(",")
+    CORS(app, origins=allowed_origins, supports_credentials=True)
 
     db.init_app(app)  # connects SQLAlchemy to Flask
 
