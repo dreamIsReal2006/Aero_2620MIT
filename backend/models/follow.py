@@ -22,6 +22,8 @@ class Follow(db.Model):
         nullable=False
     )
 
+    status = db.Column(db.String(20), default="approved", nullable=False)
+
     created_at = db.Column(
         db.DateTime,
         default=datetime.utcnow,

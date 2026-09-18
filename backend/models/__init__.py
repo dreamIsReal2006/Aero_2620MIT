@@ -5,3 +5,16 @@ from backend.models.follow import Follow
 from backend.models.like import Like
 from backend.models.otp import OTPCode
 from backend.models.report import Report
+from backend.models.user_interaction import UserInteraction
+from backend.models.notification import Notification
+from backend.models.comment_like import CommentLike
+from backend.models.video import Video
+from backend.models.message import Message
+from backend.models.video_comment import VideoComment
+from backend.models.video_like import VideoLike
+from backend.models.note import Note
+from backend.models.moderation_log import ModerationLog
+from backend.models.appeal_ticket import AppealTicket
+from backend.models.block import Block
+from backend.models.mute import Mute
+from backend.models.chat_group import ChatGroup, ChatGroupMember
