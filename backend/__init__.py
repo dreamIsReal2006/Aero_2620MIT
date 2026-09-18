@@ -25,7 +25,12 @@ def create_app():
     app.config["SECRET_KEY"] = os.environ.get(
         "AERO_SECRET_KEY", "development-only-change-this-secret"
     )
-    database_setting = os.environ.get("AERO_DATABASE", str(base_dir / "aero.db"))
+    database_setting = os.environ.get("AERO_DATABASE", "aero.db")
+    if "://" not in database_setting:
+        database_path = Path(database_setting)
+        if not database_path.is_absolute():
+            database_path = base_dir / database_path
+        database_setting = str(database_path.resolve())
     app.config["SQLALCHEMY_DATABASE_URI"] = (
         database_setting if "://" in database_setting else f"sqlite:///{database_setting}"
     )
@@ -38,13 +43,14 @@ def create_app():
     app.config["MAIL_DEFAULT_SENDER"] = os.environ.get(
         "AERO_MAIL_DEFAULT_SENDER", app.config["MAIL_USERNAME"]
     )
-    app.config["UPLOAD_FOLDER"] = os.environ.get(
-        "AERO_UPLOAD_DIR", str(base_dir / "uploads")
-    )
+    upload_folder = Path(os.environ.get("AERO_UPLOAD_DIR", "uploads"))
+    if not upload_folder.is_absolute():
+        upload_folder = base_dir / upload_folder
+    app.config["UPLOAD_FOLDER"] = str(upload_folder.resolve())
     Path(app.config["UPLOAD_FOLDER"]).mkdir(parents=True, exist_ok=True)
     allowed_origins = os.environ.get(
         "AERO_ALLOWED_ORIGINS",
-        r"https://.*\.netlify\.app,https://GOH.pythonanywhere.com,http://localhost:5000,http://127.0.0.1:5000",
+        r"https://.*\.netlify\.app,https://GOH\.pythonanywhere\.com",
     ).split(",")
     CORS(app, origins=allowed_origins, supports_credentials=True)
 

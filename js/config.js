@@ -1,11 +1,28 @@
 (function configureAeroApi() {
-    const localApiOrigin = 'http://127.0.0.1:5000';
     const productionApiOrigin = 'https://GOH.pythonanywhere.com';
-    const hostname = window.location.hostname;
-    const isLocalDevelopment = hostname === '127.0.0.1' || hostname === 'localhost';
 
     window.AeroConfig = Object.freeze({
-        API_ORIGIN: isLocalDevelopment ? localApiOrigin : productionApiOrigin,
-        API_BASE_URL: `${isLocalDevelopment ? localApiOrigin : productionApiOrigin}/api`
+        API_ORIGIN: productionApiOrigin,
+        API_BASE_URL: `${productionApiOrigin}/api`
+    });
+
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = (input, init) => nativeFetch(input, init)
+        .then((response) => {
+            if (!response.ok) {
+                console.error('[Aero API response error]', response.status, response.statusText, input);
+            }
+            return response;
+        })
+        .catch((error) => {
+            console.error('[Aero API request error]', input, error);
+            throw error;
+        });
+
+    window.addEventListener('error', (event) => {
+        console.error('[Aero frontend error]', event.error || event.message, event.filename || '');
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+        console.error('[Aero unhandled API/client rejection]', event.reason);
     });
 })();
