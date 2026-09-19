@@ -1,7 +1,6 @@
 const API_BASE = window.AeroConfig.API_BASE_URL;
 const API_ORIGIN = window.AeroConfig.API_ORIGIN;
-const ADMIN_ROUTE = window.location.pathname.split('/').filter(Boolean).find(segment => segment.startsWith('admin_')) || 'admin_default_fallback';
-const ADMIN_API_BASE = `${API_ORIGIN}/api/${ADMIN_ROUTE}`;
+const ADMIN_API_BASE = `${API_BASE}/admin`;
 
 const HDR_MEDIA_QUERY = '(dynamic-range: high)';
 
@@ -1853,7 +1852,7 @@ const AeroAPI = {
 
     async getAdminStats() {
         const res = await fetch(`${ADMIN_API_BASE}/stats`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token') || localStorage.getItem('token')}` }
         });
         const data = await res.json();
         if (!res.ok || data.success === false) throw new Error(data.error || data.message || 'Unable to load admin statistics');
@@ -1862,7 +1861,7 @@ const AeroAPI = {
 
     async getAdminReports() {
         const res = await fetch(`${ADMIN_API_BASE}/reports`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token') || localStorage.getItem('token')}` }
         });
         const data = await res.json();
         if (!res.ok || data.success === false) throw new Error(data.error || data.message || 'Unable to load reports');
@@ -1872,7 +1871,7 @@ const AeroAPI = {
     async adminDeletePost(postId) {
         const res = await fetch(`${ADMIN_API_BASE}/posts/${postId}`, {
             method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token') || localStorage.getItem('token')}` }
         });
         const data = await res.json();
         if (!res.ok || data.success === false) throw new Error(data.error || data.message || 'Unable to delete post');
@@ -1882,7 +1881,7 @@ const AeroAPI = {
     async adminToggleBan(userId) {
         const res = await fetch(`${ADMIN_API_BASE}/users/${userId}/toggle_ban`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token') || localStorage.getItem('token')}` }
         });
         const data = await res.json();
         if (!res.ok || data.success === false) throw new Error(data.error || data.message || 'Unable to update user status');

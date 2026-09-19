@@ -178,8 +178,7 @@ def create_app():
 
     app.register_blueprint(admin_bp)
 
-    admin_secret_path = os.environ.get("ADMIN_SECRET_PATH", "default_fallback").strip() or "default_fallback"
-    admin_page_path = f"/admin_{admin_secret_path}"
+    admin_page_path = "/admin.html"
 
     @app.get(admin_page_path)
     @login_required
@@ -191,6 +190,6 @@ def create_app():
     @login_required
     @require_role(["admin", "moderator"])
     def admin_entry():
-        return jsonify({"url": f"admin.html#{'admin' if g.current_user.is_admin or g.current_user.role == 'admin' else 'moderator'}", "api_base": f"/api/admin_{admin_secret_path}"}), 200
+        return jsonify({"url": f"admin.html#{'admin' if g.current_user.is_admin or g.current_user.role == 'admin' else 'moderator'}", "api_base": "/api/admin"}), 200
 
     return app
