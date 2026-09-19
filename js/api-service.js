@@ -2140,8 +2140,7 @@ const AeroAPI = {
             moreButton.setAttribute('aria-label', 'Post options');
             moreButton.title = 'Post options';
             moreButton.textContent = '\u22ee';
-            const optionsMenu = document.createElement('div');
-            optionsMenu.className = 'post-dropdown-menu post-menu liquid-glass liquid-glass-interactive';
+            const optionsMenu = getGlobalPostMenu();
             const isOwnPost = post.user_id === currentUser.id;
             const isAdmin = currentUser.is_admin === true;
             const openDeleteModal = () => {
@@ -2151,7 +2150,9 @@ const AeroAPI = {
                 overlay.classList.remove('hidden');
                 document.getElementById('confirm-delete-btn')?.focus();
             };
-            const addMenuItem = (label, iconPath, action, danger = false, translationKey = '') => {
+            const populatePostMenu = () => {
+                optionsMenu.replaceChildren();
+                const addMenuItem = (label, iconPath, action, danger = false, translationKey = '') => {
                 const item = document.createElement('button');
                 item.type = 'button';
                 item.className = 'menu-item';
@@ -2182,8 +2183,8 @@ const AeroAPI = {
                     closeAllPostMenus();
                     action();
                 });
-                optionsMenu.appendChild(item);
-            };
+                    optionsMenu.appendChild(item);
+                };
             addMenuItem(post.is_bookmarked ? 'Remove Bookmark' : 'Bookmark Post', '<path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-3-6 3V4.5Z"></path>', async () => {
                 try {
                     const menuButton = Array.from(optionsMenu.querySelectorAll('button')).find((button) => button.textContent.includes('Bookmark'));
@@ -2233,18 +2234,26 @@ const AeroAPI = {
                 }, false, post.is_following ? 'post.unfollow' : 'post.follow');
             }
             if (isAdmin || isOwnPost) addMenuItem(isAdmin && !isOwnPost ? 'Delete Post (Admin)' : 'Delete Post', '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3"></path>', openDeleteModal, true);
-            addMenuItem('Report Post', '<path d="M5 21V4m0 0c4-3 7 3 14 0v10c-7 3-10-3-14 0"></path>', () => this.showReportModal(post.id), true, 'post.report');
+                addMenuItem('Report Post', '<path d="M5 21V4m0 0c4-3 7 3 14 0v10c-7 3-10-3-14 0"></path>', () => this.showReportModal(post.id), true, 'post.report');
+            };
             const menuWrapper = document.createElement('div');
             menuWrapper.className = 'post-menu-wrapper';
             moreButton.addEventListener('click', event => {
                 event.stopPropagation();
-                const shouldOpen = !optionsMenu.classList.contains('active');
-                closeAllPostMenus(optionsMenu);
-                menuWrapper.classList.toggle('open', shouldOpen);
-                optionsMenu.classList.toggle('active', shouldOpen);
-                postEl.classList.toggle('menu-open', shouldOpen);
+                const shouldOpen = !optionsMenu.classList.contains('active') || optionsMenu.dataset.postId !== String(post.id);
+                closeAllPostMenus();
+                if (!shouldOpen) return;
+                populatePostMenu();
+                optionsMenu.dataset.postId = String(post.id);
+                document.body.appendChild(optionsMenu);
+                optionsMenu.classList.add('active');
+                menuWrapper.classList.add('open');
+                postEl.classList.add('menu-open');
+                const rect = moreButton.getBoundingClientRect();
+                optionsMenu.style.setProperty('top', `${rect.bottom + 4}px`, 'important');
+                optionsMenu.style.setProperty('left', `${rect.right - optionsMenu.offsetWidth}px`, 'important');
             });
-            menuWrapper.append(moreButton, optionsMenu);
+            menuWrapper.append(moreButton);
             header.appendChild(menuWrapper);
             const content = document.createElement('div');
             content.className = 'post-content';
@@ -2759,18 +2768,30 @@ window.toggleFollowUser = async (userId, userMeta = {}) => {
     return data;
 };
 
-function closeAllPostMenus(exceptMenu = null) {
+function getGlobalPostMenu() {
+    let menu = document.getElementById('global-post-menu');
+    if (!menu) {
+        menu = document.createElement('div');
+        menu.id = 'global-post-menu';
+        menu.className = 'post-dropdown-menu post-menu liquid-glass liquid-glass-interactive';
+    }
+    return menu;
+}
+
+function closeAllPostMenus() {
+    const globalMenu = document.getElementById('global-post-menu');
+    globalMenu?.classList.remove('show', 'active');
+    globalMenu?.removeAttribute('data-post-id');
+    globalMenu?.remove();
+    globalMenu?.style.removeProperty('top');
+    globalMenu?.style.removeProperty('left');
+    document.querySelectorAll('.post-menu-wrapper.open').forEach(wrapper => wrapper.classList.remove('open'));
     document.querySelectorAll('.post-dropdown-menu, .post-menu').forEach(menu => {
-        if (menu !== exceptMenu) {
-            menu.classList.remove('show');
-            menu.classList.remove('active');
-            menu.closest('.post-menu-wrapper')?.classList.remove('open');
-            menu.closest('.post-card, .post-item')?.classList.remove('menu-open');
-        }
+        menu.classList.remove('show', 'active');
+        menu.closest('.post-menu-wrapper')?.classList.remove('open');
+        menu.closest('.post-card, .post-item')?.classList.remove('menu-open');
     });
-    document.querySelectorAll('.post-card.menu-open, .post-item.menu-open').forEach((post) => {
-        if (!exceptMenu || !post.contains(exceptMenu)) post.classList.remove('menu-open');
-    });
+    document.querySelectorAll('.post-card.menu-open, .post-item.menu-open').forEach(post => post.classList.remove('menu-open'));
 }
 
 async function copyPostLink(postId) {
@@ -3254,3 +3275,5 @@ document.addEventListener('click', event => {
         closeAllPostMenus();
     }
 });
+
+window.addEventListener('scroll', closeAllPostMenus, { passive: true });

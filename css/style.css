@@ -4102,6 +4102,18 @@ body.dark-mode .role-badge.moderator, html.dark-mode .role-badge.moderator { col
 }
 .post-header { position: relative; z-index: 2; }
 .post-menu, .post-dropdown-menu { z-index: 999 !important; }
+#global-post-menu {
+    position: fixed !important;
+    z-index: 999999 !important;
+    top: auto !important;
+    right: auto !important;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
 .appeal-page { display: grid; min-height: 100vh; place-items: center; padding: 24px; background: var(--bg-main); }
 .appeal-card { width: min(100%, 560px); margin: 0; padding: clamp(24px, 5vw, 42px); }
 .appeal-card form { display: grid; gap: 14px; }
