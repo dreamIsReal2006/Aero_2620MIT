@@ -27,13 +27,13 @@ def create_app():
     )
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
         "AERO_DATABASE",
-        "postgresql://postgres.tamzlrygqskxscofwnho:Aero2620Pass!@"
+        "postgresql://postgres.tamzlryggksxcofwnho:Aero2620Pass!@"
         "aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres",
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
         "pool_pre_ping": True,
-        "pool_recycle": 1800,
+        "pool_recycle": 300,
     }
     app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
     app.config["MAIL_SERVER"] = os.environ.get("AERO_MAIL_SERVER", "smtp.gmail.com")
