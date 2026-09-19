@@ -1869,6 +1869,35 @@ const AeroAPI = {
         }
     },
 
+    async searchAdminUsers(query, signal) {
+        const token = localStorage.getItem('aero_token') || localStorage.getItem('token');
+        if (!String(query || '').trim()) return [];
+        const requestController = new AbortController();
+        const abortRequest = () => requestController.abort();
+        const timeoutId = window.setTimeout(abortRequest, 8000);
+        signal?.addEventListener('abort', abortRequest, { once: true });
+        try {
+            const response = await fetch(`${ADMIN_API_BASE}/users?q=${encodeURIComponent(String(query).trim())}`, {
+                signal: requestController.signal,
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                }
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload.success === false) return [];
+            const data = payload.data || payload;
+            return Array.isArray(data) ? data : Array.isArray(data.users) ? data.users : [];
+        } catch (error) {
+            if (error.name !== 'AbortError') console.warn('[Aero admin user search]', error);
+            return [];
+        } finally {
+            window.clearTimeout(timeoutId);
+            signal?.removeEventListener('abort', abortRequest);
+        }
+    },
+
     async getAdminReports() {
         const res = await fetch(`${ADMIN_API_BASE}/reports`, {
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token') || localStorage.getItem('token')}` }

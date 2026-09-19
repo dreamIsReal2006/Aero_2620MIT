@@ -246,8 +246,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     let searchTimer;
     let searchRequestId = 0;
+    let searchController = null;
     userSearch?.addEventListener('input', () => {
         window.clearTimeout(searchTimer);
+        searchController?.abort();
+        searchController = null;
         const query = userSearch.value.trim();
         if (!query) {
             searchRequestId += 1;
@@ -256,12 +259,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         searchTimer = window.setTimeout(async () => {
             const requestId = ++searchRequestId;
+            searchController = new AbortController();
             usersList.innerHTML = '<p class="admin-empty">Searching...</p>';
             try {
-                const users = await request(`/search_users?q=${encodeURIComponent(query)}`);
+                const users = window.AeroAPI?.searchAdminUsers
+                    ? await window.AeroAPI.searchAdminUsers(query, searchController.signal)
+                    : [];
                 if (requestId === searchRequestId) renderUsers(users);
-            } catch (error) {
-                if (requestId === searchRequestId) showError(error);
+            } finally {
+                if (requestId === searchRequestId) {
+                    searchController = null;
+                }
             }
         }, 300);
     });

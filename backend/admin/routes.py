@@ -82,18 +82,25 @@ def get_stats():
     })
 
 
-@admin_bp.get("/search_users")
+@admin_bp.get("/users")
 @login_required
 @require_role(["admin", "moderator"])
 def search_users():
     query = str(request.args.get("q", "")).strip()
     if not query:
-        return success([])
+        return jsonify({"users": [], "total": 0}), 200
     pattern = f"%{query}%"
     users = User.query.filter(
         (User.username.ilike(pattern)) | (User.email.ilike(pattern))
     ).order_by(User.username).limit(10).all()
-    return success([serialize_user(user) for user in users])
+    return jsonify({"users": [serialize_user(user) for user in users], "total": len(users)}), 200
+
+
+@admin_bp.get("/search_users")
+@login_required
+@require_role(["admin", "moderator"])
+def search_users_legacy():
+    return search_users()
 
 
 @admin_bp.post("/users/<int:user_id>/toggle_ban")
