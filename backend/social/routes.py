@@ -2,6 +2,7 @@ import json
 import re
 
 from flask import jsonify, request
+from sqlalchemy import func
 
 from backend import db
 from backend.auth.routes import token_required
@@ -132,6 +133,43 @@ def get_profile(current_user, user_id):
         "followers_count": followers_count,
         "following_count": following_count,
         "posts": [serialize_post(post) for post in posts],
+    }), 200
+
+
+@social_bp.get("/users/profile")
+@token_required
+def get_profile_by_username(current_user):
+    username = str(request.args.get("username", "")).strip()
+    if not username:
+        return jsonify({"message": "A username is required"}), 400
+    user = User.query.filter(func.lower(User.username) == username.lower()).first()
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    followers_count = Follow.query.filter_by(following_id=user.id, status="approved").count()
+    following_count = Follow.query.filter_by(follower_id=user.id, status="approved").count()
+    allowed = can_view_user_content(current_user, user)
+    is_following = Follow.query.filter_by(
+        follower_id=current_user.id,
+        following_id=user.id,
+        status="approved",
+    ).first() is not None
+    return jsonify({
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "display_name": user.display_name or user.username,
+            "email": user.email,
+            "bio": user.bio or "",
+            "avatar_url": user.avatar_url or "",
+            "role": user.role if user.role in {"admin", "moderator", "user"} else "user",
+            "is_online": is_user_online(user, current_user.id),
+            "created_at": user.created_at.isoformat(),
+        },
+        "is_following": is_following,
+        "followers_count": followers_count,
+        "following_count": following_count,
+        "posts": [serialize_post(post) for post in Post.query.filter_by(user_id=user.id).order_by(Post.created_at.desc()).all()] if allowed else [],
     }), 200
 
 

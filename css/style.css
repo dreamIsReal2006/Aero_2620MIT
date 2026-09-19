@@ -238,7 +238,7 @@ body.dark-mode .glass-overlay {
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
     box-shadow: inset 0 0 4px 1px rgba(255, 255, 255, 0.6);
-    transition: all 0.2s ease;
+    transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 #change-bg:hover { background: rgba(255, 255, 255, 0.35); transform: translateY(-2px); }
@@ -1171,7 +1171,7 @@ body.dark-mode .search-shell.is-open .search-bar {
     padding: 8px 14px;
     border-radius: 999px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .search-tab.active {
@@ -5072,4 +5072,85 @@ body[data-viewer-role="moderator"] .role-badge.moderator {
         min-height: 44px;
         padding: 12px 0 0;
     }
+}
+
+/* Performance overrides: preserve the existing glass treatment with cheaper compositing. */
+.aero-glass-panel,
+.glass-card,
+.dock-left,
+.dock-right,
+.mobile-bottom-nav,
+.chat-wrapper,
+.post-card {
+    transform: translateZ(0);
+    will-change: transform;
+}
+
+.aero-glass-panel,
+.glass-card,
+.post-card,
+.chat-wrapper {
+    backdrop-filter: blur(8px) saturate(180%);
+    -webkit-backdrop-filter: blur(8px) saturate(180%);
+}
+
+.post-card,
+.short-video-card,
+.short-card,
+.chat-message {
+    contain: content;
+    content-visibility: auto;
+    contain-intrinsic-size: 0 100px;
+}
+
+.is-scrolling .glow-ball,
+.is-scrolling .glass-overlay,
+.is-scrolling [class*="float"],
+.is-scrolling [class*="pulse"] {
+    animation-play-state: paused !important;
+    transition: none !important;
+}
+
+.shorts-container {
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+}
+
+.shorts-stage,
+.short-card {
+    min-height: 100vh;
+    min-height: 100dvh;
+}
+
+.short-card {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+}
+
+.short-playback-indicator {
+    display: grid;
+    width: 72px;
+    height: 72px;
+    place-items: center;
+    border-radius: 50%;
+    color: rgba(255, 255, 255, .96);
+    background: rgba(255, 255, 255, .2);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, .2);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.short-playback-indicator.is-visible {
+    animation: shortPlaybackFeedback 1.2s ease both;
+}
+
+@keyframes shortPlaybackFeedback {
+    0% { opacity: 0; transform: scale(.72); }
+    18% { opacity: 1; transform: scale(1); }
+    72% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.08); }
 }

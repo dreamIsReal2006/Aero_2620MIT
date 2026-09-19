@@ -253,6 +253,19 @@
         updateFab(activeView);
     }
 
+    function setupScrollPerformance() {
+        let scrollResetTimer = 0;
+        const markScrolling = () => {
+            document.body.classList.add('is-scrolling');
+            window.clearTimeout(scrollResetTimer);
+            scrollResetTimer = window.setTimeout(() => document.body.classList.remove('is-scrolling'), 150);
+        };
+        window.addEventListener('scroll', markScrolling, { passive: true });
+        document.querySelectorAll('.chat-messages, .shorts-stage, .short-comments-list').forEach((container) => {
+            container.addEventListener('scroll', markScrolling, { passive: true });
+        });
+    }
+
     function setActiveFeedTab(type = 'for_you') {
         const forYouTab = document.getElementById('tab-for-you');
         const followingTab = document.getElementById('tab-following');
@@ -287,16 +300,15 @@
             const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
             const currentUserId = Number(currentUser.id || currentUser.user_id || 0);
             const queryParams = new URLSearchParams(window.location.search);
-            const sharedUsername = queryParams.get('user') || queryParams.get('profile');
+            const sharedUsername = (queryParams.get('user') || queryParams.get('profile') || '').trim();
             let profileUserId = userId == null ? currentUserId : Number(userId);
             if (sharedUsername && !/^\d+$/.test(sharedUsername)) {
-                const searchResponse = await fetch(`${apiBase}/search?q=${encodeURIComponent(sharedUsername)}`, {
+                const profileResponse = await fetch(`${apiBase}/users/profile?username=${encodeURIComponent(sharedUsername)}`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
                 });
-                const searchPayload = await searchResponse.json().catch(() => ({}));
-                const matchedUser = (searchPayload.users || []).find((item) => String(item.username || '').toLowerCase() === sharedUsername.toLowerCase());
-                if (!matchedUser?.id) throw new Error('Profile not found');
-                profileUserId = Number(matchedUser.id);
+                const profilePayload = await profileResponse.json().catch(() => ({}));
+                if (!profileResponse.ok || !profilePayload.user?.id) throw new Error(profilePayload.message || 'Profile not found');
+                profileUserId = Number(profilePayload.user.id);
             } else if (sharedUsername) {
                 profileUserId = Number(sharedUsername);
             }
@@ -558,13 +570,14 @@
         document.getElementById('tab-for-you')?.addEventListener('click', () => loadPosts('for_you'));
         document.getElementById('tab-following')?.addEventListener('click', () => loadPosts('following'));
         const routeParams = new URLSearchParams(window.location.search);
-        const sharedProfile = routeParams.get('user') || routeParams.get('profile');
+        const sharedProfile = (routeParams.get('user') || routeParams.get('profile') || '').trim();
         const legacyProfile = window.location.hash.match(/^#profile\/(\d+)$/);
         if (sharedProfile) navigate('profile', { userId: /^\d+$/.test(sharedProfile) ? Number(sharedProfile) : sharedProfile });
         else if (legacyProfile) navigate('profile', { userId: Number(legacyProfile[1]) });
         else navigate('main');
         setActiveFeedTab('for_you');
         setFabAuthState(Boolean(localStorage.getItem('aero_token')));
+        setupScrollPerformance();
         window.addEventListener('resize', syncFabForViewport, { passive: true });
         window.addEventListener('resize', updateTabIndicator, { passive: true });
         updateTabIndicator();

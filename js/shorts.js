@@ -3,6 +3,9 @@
     let videos = [];
     let currentIndex = 0;
     let activeMedia = null;
+    let shortObserver = null;
+    let tapTimer = 0;
+    let touchStartY = 0;
 
     const authHeaders = () => ({ 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` });
     const escapeText = (value) => String(value || '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));
@@ -35,10 +38,10 @@
         activeMedia = media;
         media.muted = false;
         media.play().catch(() => { media.muted = true; media.play().catch(() => {}); });
-        media.addEventListener('click', () => {
+        const togglePlayback = () => {
             const indicator = stage.querySelector('.short-playback-indicator');
             if (media.paused) {
-                media.play();
+                media.play().catch(() => {});
                 indicator.textContent = '▶';
             } else {
                 media.pause();
@@ -47,6 +50,18 @@
             indicator.classList.remove('is-visible');
             void indicator.offsetWidth;
             indicator.classList.add('is-visible');
+        };
+        media.addEventListener('click', () => {
+            if (tapTimer) {
+                window.clearTimeout(tapTimer);
+                tapTimer = 0;
+                stage.querySelector('#short-like-btn')?.click();
+                return;
+            }
+            tapTimer = window.setTimeout(() => {
+                tapTimer = 0;
+                togglePlayback();
+            }, 240);
         });
         stage.querySelector('.short-subscribe')?.addEventListener('click', async (event) => {
             const button = event.currentTarget;
@@ -79,12 +94,40 @@
             if (typeof showNotice === 'function') showNotice('Link copied to clipboard!', 'success');
         });
         stage.querySelector('#short-comment-btn')?.addEventListener('click', () => openShortComments(video.id));
+        shortObserver?.disconnect();
+        shortObserver = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (entry.intersectionRatio >= 0.75) {
+                    activeMedia = media;
+                    media.muted = false;
+                    media.play().catch(() => { media.muted = true; media.play().catch(() => {}); });
+                } else {
+                    media.pause();
+                    media.currentTime = 0;
+                }
+            });
+        }, { threshold: [0, 0.75, 1] });
+        shortObserver.observe(stage.querySelector('.short-card'));
     }
 
     function changeVideo(direction) {
         if (!videos.length) return;
         currentIndex = (currentIndex + direction + videos.length) % videos.length;
         renderCurrentVideo();
+        document.getElementById('shorts-stage')?.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function setupTouchFallback(stage) {
+        stage.addEventListener('touchstart', (event) => {
+            touchStartY = event.touches[0]?.clientY || 0;
+        }, { passive: true });
+        stage.addEventListener('touchend', (event) => {
+            if (!touchStartY) return;
+            const deltaY = (event.changedTouches[0]?.clientY || 0) - touchStartY;
+            touchStartY = 0;
+            if (Math.abs(deltaY) <= 50) return;
+            changeVideo(deltaY < 0 ? 1 : -1);
+        }, { passive: true });
     }
 
     async function loadShorts() {
@@ -151,14 +194,21 @@
     window.toggleShortsComments = toggleShortsComments;
 
     window.openVideoUploadModal = () => document.getElementById('short-upload-modal')?.classList.remove('hidden');
-    window.cleanupShortsPlayback = () => { activeMedia = null; };
+    window.cleanupShortsPlayback = () => {
+        shortObserver?.disconnect();
+        shortObserver = null;
+        activeMedia?.pause();
+        activeMedia = null;
+    };
 
     document.addEventListener('DOMContentLoaded', () => {
         window.addEventListener('aero:view-change', (event) => { if (event.detail.view === 'shorts') loadShorts(); });
         document.addEventListener('click', (event) => {
             if (event.target.closest('#shorts-empty-upload')) window.openVideoUploadModal();
         });
-        document.getElementById('shorts-stage')?.addEventListener('wheel', (event) => { if (Math.abs(event.deltaY) > 20) { event.preventDefault(); changeVideo(event.deltaY > 0 ? 1 : -1); } }, { passive: false });
+        const shortsStage = document.getElementById('shorts-stage');
+        shortsStage && setupTouchFallback(shortsStage);
+        shortsStage?.addEventListener('wheel', (event) => { if (Math.abs(event.deltaY) > 20) { event.preventDefault(); changeVideo(event.deltaY > 0 ? 1 : -1); } }, { passive: false });
         document.addEventListener('keydown', (event) => { if (document.getElementById('view-shorts')?.classList.contains('hidden')) return; if (event.key === 'ArrowDown') changeVideo(1); if (event.key === 'ArrowUp') changeVideo(-1); });
         document.querySelector('.comment-drawer-close')?.addEventListener('click', () => {
             toggleShortsComments(false, document.getElementById('shorts-comment-drawer'));
