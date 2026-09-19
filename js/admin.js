@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const previewModal = document.getElementById('admin-post-preview-modal');
     const previewContent = document.getElementById('admin-post-preview-content');
+    const defaultAdminStats = { total_users: 0, total_posts: 0, pending_reports: 0 };
     const showError = error => {
         if (!errorBox) return;
         errorBox.textContent = error.message;
@@ -44,11 +45,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(requestOptions.headers || {}) }
         });
         const data = await response.json().catch(() => ({}));
-        if (!response.ok || data.success === false) throw new Error(data.error || data.message || 'Admin request failed');
+        if (!response.ok || data.success === false) {
+            if ([404, 500, 502, 503, 504].includes(response.status)) {
+                if (path === '/stats') return { ...defaultAdminStats };
+                if (path === '/reports' || path === '/appeals') return [];
+            }
+            throw new Error(data.error || data.message || 'Admin request failed');
+        }
         return data.data;
     };
     const updateStats = async () => {
-        const stats = await request('/stats');
+        const stats = window.AeroAPI?.getAdminStats
+            ? await window.AeroAPI.getAdminStats()
+            : await request('/stats');
         document.getElementById('admin-users-count').textContent = stats.total_users;
         document.getElementById('admin-posts-count').textContent = stats.total_posts;
         document.getElementById('admin-reports-count').textContent = stats.pending_reports;

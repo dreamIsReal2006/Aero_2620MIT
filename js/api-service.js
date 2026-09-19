@@ -1,6 +1,7 @@
 const API_BASE = window.AeroConfig.API_BASE_URL;
 const API_ORIGIN = window.AeroConfig.API_ORIGIN;
 const ADMIN_API_BASE = `${API_BASE}/admin`;
+const DEFAULT_ADMIN_STATS = { total_users: 0, total_posts: 0, pending_reports: 0 };
 
 const HDR_MEDIA_QUERY = '(dynamic-range: high)';
 
@@ -1851,12 +1852,21 @@ const AeroAPI = {
     },
 
     async getAdminStats() {
-        const res = await fetch(`${ADMIN_API_BASE}/stats`, {
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token') || localStorage.getItem('token')}` }
-        });
-        const data = await res.json();
-        if (!res.ok || data.success === false) throw new Error(data.error || data.message || 'Unable to load admin statistics');
-        return data.data;
+        try {
+            const token = localStorage.getItem('aero_token') || localStorage.getItem('token');
+            const res = await fetch(`${ADMIN_API_BASE}/stats`, {
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || data.success === false) {
+                if ([404, 500, 502, 503, 504].includes(res.status)) return { ...DEFAULT_ADMIN_STATS };
+                throw new Error(data.error || data.message || 'Unable to load admin statistics');
+            }
+            return { ...DEFAULT_ADMIN_STATS, ...(data.data || {}) };
+        } catch (error) {
+            if (error instanceof TypeError) return { ...DEFAULT_ADMIN_STATS };
+            throw error;
+        }
     },
 
     async getAdminReports() {
