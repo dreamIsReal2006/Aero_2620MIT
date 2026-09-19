@@ -2768,6 +2768,9 @@ function closeAllPostMenus(exceptMenu = null) {
             menu.closest('.post-card, .post-item')?.classList.remove('menu-open');
         }
     });
+    document.querySelectorAll('.post-card.menu-open, .post-item.menu-open').forEach((post) => {
+        if (!exceptMenu || !post.contains(exceptMenu)) post.classList.remove('menu-open');
+    });
 }
 
 async function copyPostLink(postId) {
