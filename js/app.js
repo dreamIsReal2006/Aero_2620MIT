@@ -100,7 +100,8 @@
     }
 
     function profileShareUrl(userId) {
-        return `${window.location.origin}${window.location.pathname}#profile/${encodeURIComponent(userId)}`;
+        const username = typeof userId === 'object' ? userId.username : userId;
+        return `${window.location.origin}${window.location.pathname}?user=${encodeURIComponent(username)}`;
     }
 
     function setNfcStatus(message, active = false) {
@@ -110,25 +111,30 @@
     }
 
     async function startNFCShare(profileUrl) {
+        const fallbackToClipboard = async () => {
+            try {
+                await navigator.clipboard.writeText(profileUrl);
+                setNfcStatus('NFC is unavailable. Profile link copied to clipboard.');
+                window.showNotice?.('NFC 写入不可用，已自动复制 Profile 链接至剪贴板', 'info');
+            } catch (clipboardError) {
+                setNfcStatus('NFC is unavailable. Use the QR code or copy the link.');
+                window.showNotice?.('NFC writing is unavailable. Please copy the Profile link manually.', 'info');
+            }
+        };
         if (!checkNFCSupport()) {
-            setNfcStatus('NFC is unavailable here. Use the QR code or copy the link.');
-            window.showNotice?.('Web NFC is unavailable on this device or browser.', 'info');
+            await fallbackToClipboard();
             return;
         }
         setNfcStatus('Ready. Hold another phone close to this one.', true);
         try {
             const ndef = new NDEFReader();
-            await ndef.write({ records: [
-                { recordType: 'url', data: profileUrl },
-                { recordType: 'text', data: `Check out this Aero profile: ${profileUrl}` }
-            ] });
+            await ndef.write({ records: [{ recordType: 'url', data: profileUrl }] });
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             setNfcStatus('NFC link written successfully.');
             window.showNotice?.('NFC sharing is ready. Bring the phones together.', 'success');
         } catch (error) {
             console.error('NFC Write Error:', error);
-            setNfcStatus('NFC writing failed or permission was denied.');
-            window.showNotice?.(error.message || 'NFC writing failed.', 'error');
+            await fallbackToClipboard();
         } finally {
             document.getElementById('nfc-share-panel')?.classList.remove('is-active');
         }
@@ -136,7 +142,7 @@
 
     function openProfileShareModal(user, userId) {
         const modal = document.getElementById('share-profile-modal');
-        const profileUrl = profileShareUrl(userId);
+        const profileUrl = profileShareUrl(user);
         if (!modal) return;
         document.getElementById('share-profile-name').textContent = user.display_name || user.username || 'Profile';
         document.getElementById('share-profile-handle').textContent = `@${user.username || 'user'}`;
@@ -280,7 +286,20 @@
             const apiBase = window.AeroConfig.API_BASE_URL;
             const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
             const currentUserId = Number(currentUser.id || currentUser.user_id || 0);
-            const profileUserId = userId == null ? currentUserId : Number(userId);
+            const queryParams = new URLSearchParams(window.location.search);
+            const sharedUsername = queryParams.get('user') || queryParams.get('profile');
+            let profileUserId = userId == null ? currentUserId : Number(userId);
+            if (sharedUsername && !/^\d+$/.test(sharedUsername)) {
+                const searchResponse = await fetch(`${apiBase}/search?q=${encodeURIComponent(sharedUsername)}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+                });
+                const searchPayload = await searchResponse.json().catch(() => ({}));
+                const matchedUser = (searchPayload.users || []).find((item) => String(item.username || '').toLowerCase() === sharedUsername.toLowerCase());
+                if (!matchedUser?.id) throw new Error('Profile not found');
+                profileUserId = Number(matchedUser.id);
+            } else if (sharedUsername) {
+                profileUserId = Number(sharedUsername);
+            }
             const response = await fetch(`${apiBase}/${profileUserId && profileUserId !== currentUserId ? `users/${profileUserId}` : 'users/me'}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
             });
@@ -307,7 +326,7 @@
                     <div class="profile-header-copy">
                         <div class="profile-display-row">
                             <h2>${user.display_name || user.username || 'User'}${profileRoleBadge(user.role)}</h2>
-                            <button type="button" class="profile-share-btn" id="profile-share-btn" aria-label="Share profile" title="Share profile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5"></path></svg></button>
+                            ${isOwnProfile ? '<button type="button" class="profile-share-btn" id="profile-share-btn" aria-label="Share profile" title="Share profile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5"></path></svg></button>' : ''}
                         </div>
                         <div class="profile-handle">@${user.username || 'user'}</div>
                         <p class="profile-bio">${(user.bio || 'No bio yet.').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]))}</p>
@@ -323,7 +342,9 @@
                 </div>
             `;
 
-            header.querySelector('#profile-share-btn')?.addEventListener('click', () => openProfileShareModal(user, profileUserId));
+            header.querySelector('#profile-share-btn')?.addEventListener('click', () => {
+                if (isOwnProfile) openProfileShareModal(user, profileUserId);
+            });
             header.querySelector('.profile-edit-btn')?.addEventListener('click', () => openProfileEditor(user));
 
             if (!isOwnProfile) {
@@ -453,8 +474,8 @@
         window.dispatchEvent(new CustomEvent('aero:view-change', { detail: { view } }));
     }
 
-    function navigate(view) {
-        switchView(view);
+    function navigate(view, options = {}) {
+        switchView(view, options);
     }
 
     function navigateToUserProfile(userId) {
@@ -536,8 +557,11 @@
         });
         document.getElementById('tab-for-you')?.addEventListener('click', () => loadPosts('for_you'));
         document.getElementById('tab-following')?.addEventListener('click', () => loadPosts('following'));
-        const sharedProfile = window.location.hash.match(/^#profile\/(\d+)$/);
-        if (sharedProfile) navigate('profile', { userId: Number(sharedProfile[1]) });
+        const routeParams = new URLSearchParams(window.location.search);
+        const sharedProfile = routeParams.get('user') || routeParams.get('profile');
+        const legacyProfile = window.location.hash.match(/^#profile\/(\d+)$/);
+        if (sharedProfile) navigate('profile', { userId: /^\d+$/.test(sharedProfile) ? Number(sharedProfile) : sharedProfile });
+        else if (legacyProfile) navigate('profile', { userId: Number(legacyProfile[1]) });
         else navigate('main');
         setActiveFeedTab('for_you');
         setFabAuthState(Boolean(localStorage.getItem('aero_token')));
