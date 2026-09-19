@@ -527,14 +527,9 @@
             const adminLink = event.target.closest('#admin-dashboard-link');
             if (adminLink) {
                 event.preventDefault();
-                const apiBase = window.AeroConfig.API_BASE_URL;
-                fetch(`${apiBase}/admin-entry`, {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
-                }).then(async (response) => {
-                    const data = await response.json().catch(() => ({}));
-                    if (!response.ok || !data.url) throw new Error(data.message || 'Unable to open Admin Dashboard');
-                    window.location.href = data.url;
-                }).catch((error) => window.showNotice?.(error.message, 'error'));
+                const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
+                const route = user.is_admin === true || user.role === 'admin' ? 'admin' : 'moderator';
+                window.location.href = `admin.html#${route}`;
                 return;
             }
             const dockButton = event.target.closest('#home-nav-btn, #video-dock-btn, #chat-dock-btn');

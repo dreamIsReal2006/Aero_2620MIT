@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from flask import Flask, abort, jsonify, request, send_from_directory
+from flask import Flask, abort, g, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import create_engine, text
@@ -191,6 +191,6 @@ def create_app():
     @login_required
     @require_role(["admin", "moderator"])
     def admin_entry():
-        return jsonify({"url": admin_page_path}), 200
+        return jsonify({"url": f"admin.html#{'admin' if g.current_user.is_admin or g.current_user.role == 'admin' else 'moderator'}", "api_base": f"/api/admin_{admin_secret_path}"}), 200
 
     return app

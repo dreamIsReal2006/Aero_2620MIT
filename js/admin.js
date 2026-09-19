@@ -1,9 +1,8 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('aero_token');
     const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
-    const adminRoute = window.location.pathname.split('/').filter(Boolean).find(segment => segment.startsWith('admin_')) || 'admin_default_fallback';
-    const apiBase = `${window.AeroConfig.API_BASE_URL}/${adminRoute}`;
-    const apiRoot = apiBase.replace(/\/admin_[^/]+$/, '');
+    let apiBase = '';
+    let apiRoot = window.AeroConfig.API_BASE_URL;
     if (!token || (user.is_admin !== true && !['admin', 'moderator'].includes(user.role))) {
         window.location.href = 'index.html';
         return;
@@ -313,5 +312,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('close-admin-post-preview')?.addEventListener('click', closePreview);
     previewModal?.addEventListener('click', event => { if (event.target === previewModal) closePreview(); });
     document.getElementById('admin-refresh')?.addEventListener('click', loadDashboard);
+    const entryResponse = await fetch(`${window.AeroConfig.API_BASE_URL}/admin-entry`, {
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` }
+    });
+    const entryData = await entryResponse.json().catch(() => ({}));
+    if (!entryResponse.ok || !entryData.api_base) {
+        showError(new Error(entryData.message || 'Unable to resolve the admin API route'));
+        return;
+    }
+    apiBase = `${window.AeroConfig.API_ORIGIN}${entryData.api_base}`;
     await loadDashboard();
 });
