@@ -976,30 +976,48 @@ function isActiveChatMessage(message, contact) {
         && Number(message.recipient_id) === Number(JSON.parse(localStorage.getItem('aero_user') || '{}').id);
 }
 
-async function appendRealtimeChatMessage(message) {
-    const contact = activeChatUser || window.activeChatUser;
+async function appendSingleMessageToUI(message, conversation = activeChatUser || window.activeChatUser) {
+    const contact = conversation;
     const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
     const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
-    if (!box || !isActiveChatMessage(message, contact) || box.querySelector(`[data-message-id="${message.id}"]`)) return;
+    if (!box || !contact || box.querySelector(`[data-message-id="${message.id}"]`)) return false;
     const content = escapeHtml(await decryptChatContent(message.content, contact));
     const mediaUrl = message.media_url ? (String(message.media_url).startsWith('http') ? message.media_url : `${API_ORIGIN}${message.media_url}`) : '';
     const media = mediaUrl && message.type === 'image'
         ? `<img src="${escapeHtml(mediaUrl)}" class="chat-gif-media" alt="Attached image" loading="lazy">`
+        : mediaUrl && message.type === 'gif'
+            ? `<img src="${escapeHtml(mediaUrl)}" class="chat-gif-media" alt="GIF" loading="lazy">`
         : mediaUrl && message.type === 'video'
             ? `<video class="chat-inline-video" src="${escapeHtml(mediaUrl)}" controls preload="metadata"></video>`
+            : mediaUrl && message.type === 'audio'
+                ? `<audio class="chat-inline-audio" src="${escapeHtml(mediaUrl)}" controls></audio>`
             : '';
     const node = document.createElement('div');
     node.className = `chat-message ${Number(message.sender_id) === Number(currentUser.id) ? 'mine' : ''}`;
     node.dataset.messageId = message.id;
-    node.innerHTML = `${contact.is_group && Number(message.sender_id) !== Number(currentUser.id) ? '<small class="chat-group-sender">New message</small>' : ''}<div class="chat-bubble-content">${media}${content}</div><div class="chat-message-meta"><time>${escapeHtml(window.AeroI18n?.formatChatTimestamp?.(message.created_at) || '')}</time></div>`;
+    const timestamp = window.AeroI18n?.formatChatTimestamp?.(message.created_at) || formatRelativeTime(message.created_at);
+    node.innerHTML = `${contact.is_group && Number(message.sender_id) !== Number(currentUser.id) ? '<small class="chat-group-sender">New message</small>' : ''}<div class="chat-bubble-content message-bubble">${media}${content}</div><div class="chat-message-meta"><time class="message-time">${escapeHtml(timestamp)}</time></div>`;
     box.appendChild(node);
     box.scrollTop = box.scrollHeight;
+    return true;
 }
 
-function updateChatContactPreview(message, preview) {
+window.appendSingleMessageToUI = appendSingleMessageToUI;
+
+async function appendRealtimeChatMessage(message) {
+    const contact = activeChatUser || window.activeChatUser;
+    if (!isActiveChatMessage(message, contact)) return false;
+    return appendSingleMessageToUI(message, contact);
+}
+
+function updateChatContactPreview(message, preview, conversation = activeChatUser || window.activeChatUser) {
+    const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
+    const contactId = message.group_id
+        ? message.group_id
+        : Number(message.sender_id) === Number(currentUser.id) ? message.recipient_id : message.sender_id;
     const selector = message.group_id
         ? `.chat-contact[data-group-id="${CSS.escape(String(message.group_id))}"]`
-        : `.chat-contact[data-user-id="${CSS.escape(String(message.sender_id))}"]`;
+        : `.chat-contact[data-user-id="${CSS.escape(String(contactId))}"]`;
     const item = document.querySelector(selector);
     if (!item) return;
     const summary = item.querySelector('small');
@@ -1007,7 +1025,10 @@ function updateChatContactPreview(message, preview) {
     const timestamp = item.querySelector('time');
     if (timestamp) timestamp.textContent = formatRelativeTime(message.created_at);
     item.dataset.latestMessageAt = message.created_at || '';
-    item.classList.toggle('unread', !(activeChatUser && (message.group_id ? activeChatUser.is_group && Number(activeChatUser.id) === Number(message.group_id) : !activeChatUser.is_group && Number(activeChatUser.id) === Number(message.sender_id))));
+    const isCurrentConversation = conversation && (message.group_id
+        ? conversation.is_group && String(conversation.group_id || conversation.id) === String(message.group_id)
+        : !conversation.is_group && String(conversation.id) === String(contactId));
+    item.classList.toggle('unread', !isCurrentConversation && Number(message.sender_id) !== Number(currentUser.id));
 }
 
 function getLocalGroupUnreadCount() {
@@ -1026,11 +1047,18 @@ function setupChatRealtime() {
             table: 'messages'
         }, ({ new: message }) => {
             if (Number(message.sender_id) === Number(currentUser.id)) return;
-            if (isActiveChatMessage(message, activeChatUser || window.activeChatUser)) {
-                appendRealtimeChatMessage(message).then(async () => {
-                    updateChatContactPreview(message, await decryptChatContent(message.content, activeChatUser || window.activeChatUser));
+            const contact = activeChatUser || window.activeChatUser;
+            const activeContactId = contact?.group_id || contact?.id;
+            const isCurrentChat = Boolean(contact) && (contact.is_group
+                ? String(message.group_id) === String(activeContactId)
+                : !message.group_id
+                    && String(message.sender_id) === String(activeContactId)
+                    && String(message.recipient_id) === String(currentUser.id));
+            if (isCurrentChat) {
+                appendSingleMessageToUI(message, contact).then(async () => {
+                    updateChatContactPreview(message, await decryptChatContent(message.content, contact), contact);
+                    markConversationRead(contact).catch(() => {});
                 }).catch(() => {});
-                markConversationRead(activeChatUser || window.activeChatUser).catch(() => {});
             } else {
                 const isIncoming = Number(message.sender_id) !== Number(currentUser.id)
                     && (message.group_id || Number(message.recipient_id) === Number(currentUser.id));
@@ -1039,7 +1067,7 @@ function setupChatRealtime() {
                     chatGroupUnreadCounts.set(groupId, (chatGroupUnreadCounts.get(groupId) || 0) + 1);
                     updateDockBadge('chat-dock-btn', (chatUnreadCount || 0) + getLocalGroupUnreadCount());
                 }
-                decryptChatPreview(message.content, message.group_id ? { id: message.group_id, group_id: message.group_id, is_group: true } : { id: message.sender_id }).then((preview) => updateChatContactPreview(message, preview)).catch(() => {});
+                decryptChatPreview(message.content, message.group_id ? { id: message.group_id, group_id: message.group_id, is_group: true } : { id: message.sender_id }).then((preview) => updateChatContactPreview(message, preview, contact)).catch(() => {});
                 loadUnreadChatCount().catch(() => {});
                 loadChatContacts().catch(() => {});
             }
@@ -1406,18 +1434,20 @@ function setupMediaAndChat() {
         const mediaUrl = input?.dataset.mediaUrl || '';
         const messageType = input?.dataset.messageType || 'text';
         if (!contact || (!content && !mediaUrl)) return;
-        const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
-        if (box) {
-            const message = document.createElement('div');
-            message.className = 'chat-message mine';
-            const gif = window.parseGifContent?.(content, mediaUrl, input.dataset.messageType) || { url: mediaUrl, text: content };
-            message.innerHTML = `<div class="chat-bubble-content">${gif.url ? `<img src="${escapeHtml(gif.url)}" class="chat-gif-media" alt="GIF" loading="lazy">` : ''}${gif.text ? escapeHtml(gif.text) : ''}</div>`;
-            box.appendChild(message);
-            box.scrollTop = box.scrollHeight;
-        }
         const encryptedContent = await encryptChatContent(content, contact);
         const response = await fetch(`${API_BASE}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: JSON.stringify(contact.is_group ? { group_id: contact.group_id || contact.id, content: encryptedContent, media_url: mediaUrl, type: messageType, file_name: input.dataset.fileName || '', file_size: input.dataset.fileSize || 0 } : { user_id: contact.id, recipient_id: contact.id, content: encryptedContent, media_url: mediaUrl, type: messageType, file_name: input.dataset.fileName || '', file_size: input.dataset.fileSize || 0 }) });
         if (response.ok) {
+            const savedMessage = await response.json().catch(() => ({}));
+            const renderedMessage = {
+                ...savedMessage,
+                content: encryptedContent,
+                sender_id: JSON.parse(localStorage.getItem('aero_user') || '{}').id,
+                recipient_id: contact.is_group ? JSON.parse(localStorage.getItem('aero_user') || '{}').id : contact.id,
+                group_id: contact.is_group ? contact.group_id || contact.id : null,
+                created_at: savedMessage.created_at || new Date().toISOString()
+            };
+            await appendSingleMessageToUI(renderedMessage, contact);
+            updateChatContactPreview(renderedMessage, content || '[Attachment]', contact);
             input.value = '';
             ['mediaUrl', 'messageType', 'fileName', 'fileSize'].forEach((key) => delete input.dataset[key]);
             input.placeholder = 'Message...';
