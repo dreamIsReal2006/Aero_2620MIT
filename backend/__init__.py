@@ -4,7 +4,8 @@ from pathlib import Path
 from flask import Flask, abort, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 
 db = SQLAlchemy()  # creates database object
 
@@ -25,11 +26,32 @@ def create_app():
     app.config["SECRET_KEY"] = os.environ.get(
         "AERO_SECRET_KEY", "development-only-change-this-secret"
     )
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
+    database_uri = os.environ.get(
         "AERO_DATABASE",
         "postgresql://postgres.tamzlryggksxcofwnho:Aero2620Pass!@"
         "aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres",
     )
+    if database_uri.startswith(("postgresql://", "postgresql+")):
+        probe_engine = create_engine(
+            database_uri,
+            connect_args={"connect_timeout": 3},
+        )
+        try:
+            with probe_engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+        except OperationalError as error:
+            fallback_path = (base_dir / "aero-fallback.db").resolve()
+            database_uri = os.environ.get(
+                "AERO_DATABASE_FALLBACK",
+                f"sqlite:///{fallback_path.as_posix()}",
+            )
+            app.logger.warning(
+                "Supabase PostgreSQL is unavailable; using local fallback database: %s",
+                error.__class__.__name__,
+            )
+        finally:
+            probe_engine.dispose()
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_uri
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
         "pool_pre_ping": True,
