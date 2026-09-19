@@ -1,4 +1,10 @@
 (() => {
+    const supabaseConfig = window.AeroConfig || {};
+    const supabaseFactory = window.supabase?.createClient;
+    window.supabaseClient = supabaseFactory && supabaseConfig.SUPABASE_ANON_KEY && !supabaseConfig.SUPABASE_ANON_KEY.startsWith('YOUR_')
+        ? supabaseFactory(supabaseConfig.SUPABASE_URL, supabaseConfig.SUPABASE_ANON_KEY)
+        : null;
+
     const apiBase = window.AeroConfig.API_BASE_URL;
     const escapeText = (value) => String(value || '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));
     const renderMessageText = (value) => escapeText(value).replace(

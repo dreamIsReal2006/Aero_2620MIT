@@ -4,7 +4,8 @@
     window.AeroConfig = Object.freeze({
         API_ORIGIN: productionApiOrigin,
         API_BASE_URL: `${productionApiOrigin}/api`,
-        SUPABASE_URL: 'https://tamzlrygqskxscofwnho.supabase.co'
+        SUPABASE_URL: 'https://tamzlrygqskxscofwnho.supabase.co',
+        SUPABASE_ANON_KEY: 'YOUR_SUPABASE_ANON_KEY'
     });
 
     const nativeFetch = window.fetch.bind(window);

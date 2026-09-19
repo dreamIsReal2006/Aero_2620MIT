@@ -790,7 +790,6 @@ let notificationItems = [];
 let notificationTab = 'all';
 let notificationUnreadCount = null;
 let chatUnreadCount = null;
-let chatContactsPollTimer = null;
 const chatMessageSnapshots = new Map();
 const notificationSound = new Audio('assets/audio/notification.mp3');
 notificationSound.preload = 'auto';
@@ -905,9 +904,63 @@ function setupNotificationDrawer() {
 }
 
 let activeChatUser = null;
-let chatPollTimer = null;
 let chatContactCache = [];
 let chatGroupCache = [];
+let chatRealtimeChannel = null;
+
+function isActiveChatMessage(message, contact) {
+    if (!message || !contact) return false;
+    if (contact.is_group) return Number(message.group_id) === Number(contact.group_id || contact.id);
+    return !message.group_id
+        && Number(message.sender_id) === Number(contact.id)
+        && Number(message.recipient_id) === Number(JSON.parse(localStorage.getItem('aero_user') || '{}').id);
+}
+
+function appendRealtimeChatMessage(message) {
+    const contact = activeChatUser || window.activeChatUser;
+    const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
+    const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
+    if (!box || !isActiveChatMessage(message, contact) || box.querySelector(`[data-message-id="${message.id}"]`)) return;
+    const content = escapeHtml(message.content || '');
+    const mediaUrl = message.media_url ? (String(message.media_url).startsWith('http') ? message.media_url : `${API_ORIGIN}${message.media_url}`) : '';
+    const media = mediaUrl && message.type === 'image'
+        ? `<img src="${escapeHtml(mediaUrl)}" class="chat-gif-media" alt="Attached image" loading="lazy">`
+        : mediaUrl && message.type === 'video'
+            ? `<video class="chat-inline-video" src="${escapeHtml(mediaUrl)}" controls preload="metadata"></video>`
+            : '';
+    const node = document.createElement('div');
+    node.className = `chat-message ${Number(message.sender_id) === Number(currentUser.id) ? 'mine' : ''}`;
+    node.dataset.messageId = message.id;
+    node.innerHTML = `${contact.is_group && Number(message.sender_id) !== Number(currentUser.id) ? '<small class="chat-group-sender">New message</small>' : ''}<div class="chat-bubble-content">${media}${content}</div><div class="chat-message-meta"><time>${escapeHtml(window.AeroI18n?.formatChatTimestamp?.(message.created_at) || '')}</time></div>`;
+    box.appendChild(node);
+    box.scrollTop = box.scrollHeight;
+}
+
+function setupChatRealtime() {
+    const client = window.supabaseClient;
+    const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
+    if (!client || !currentUser.id) return;
+    if (chatRealtimeChannel) client.removeChannel(chatRealtimeChannel);
+    chatRealtimeChannel = client.channel(`aero-messages-${currentUser.id}`)
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `recipient_id=eq.${currentUser.id}`
+        }, ({ new: message }) => {
+            if (isActiveChatMessage(message, activeChatUser || window.activeChatUser)) {
+                appendRealtimeChatMessage(message);
+                markConversationRead(activeChatUser || window.activeChatUser).catch(() => {});
+            } else {
+                loadUnreadChatCount().catch(() => {});
+                loadChatContacts().catch(() => {});
+            }
+        })
+        .subscribe((status) => {
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.error('[Aero chat realtime error]', status);
+        });
+}
+    window.setupChatRealtime = setupChatRealtime;
 
 async function loadShortVideos() {
     const feed = document.getElementById('video-feed');
@@ -1029,8 +1082,6 @@ async function selectChatGroup(group) {
     document.getElementById('chat-inline-alert')?.classList.add('hidden');
     await markConversationRead(activeChatUser);
     await loadChatMessages();
-    window.clearInterval(chatPollTimer);
-    chatPollTimer = window.setInterval(loadChatMessages, 5000);
 }
 
 async function selectChatContact(contact) {
@@ -1084,8 +1135,6 @@ async function selectChatContact(contact) {
     }
     await loadChatContacts();
     await loadUnreadChatCount();
-    window.clearInterval(chatPollTimer);
-    chatPollTimer = window.setInterval(loadChatMessages, 5000);
 }
 
 async function loadChatMessages() {
@@ -1140,10 +1189,9 @@ function setupMediaAndChat() {
     if (localStorage.getItem('aero_token')) {
         loadChatContacts();
         loadUnreadChatCount().catch(() => {});
-        chatContactsPollTimer = window.setInterval(loadChatContacts, 5000);
-        window.setInterval(() => loadUnreadChatCount().catch(() => {}), 5000);
+        setupChatRealtime();
     }
-    document.getElementById('close-chat-drawer')?.addEventListener('click', () => { document.getElementById('view-chat').classList.add('hidden'); window.clearInterval(chatPollTimer); });
+    document.getElementById('close-chat-drawer')?.addEventListener('click', () => { document.getElementById('view-chat').classList.add('hidden'); });
     document.getElementById('chat-contact-search')?.addEventListener('input', (event) => document.querySelectorAll('.chat-contact').forEach((item) => item.classList.toggle('hidden', !item.textContent.toLowerCase().includes(event.target.value.toLowerCase()))));
     const newGroupModal = document.getElementById('chat-new-group-modal');
     const membersModal = document.getElementById('chat-group-members-modal');
@@ -1300,7 +1348,7 @@ function setupMediaAndChat() {
             box.scrollTop = box.scrollHeight;
         }
         const response = await fetch(`${API_BASE}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: JSON.stringify(contact.is_group ? { group_id: contact.group_id || contact.id, content, media_url: mediaUrl, type: messageType, file_name: input.dataset.fileName || '', file_size: input.dataset.fileSize || 0 } : { user_id: contact.id, recipient_id: contact.id, content, media_url: mediaUrl, type: messageType, file_name: input.dataset.fileName || '', file_size: input.dataset.fileSize || 0 }) });
-        if (response.ok) { input.value = ''; ['mediaUrl', 'messageType', 'fileName', 'fileSize'].forEach((key) => delete input.dataset[key]); input.placeholder = 'Message...'; await loadChatMessages(); }
+        if (response.ok) { input.value = ''; ['mediaUrl', 'messageType', 'fileName', 'fileSize'].forEach((key) => delete input.dataset[key]); input.placeholder = 'Message...'; }
     });
     document.getElementById('chat-form')?.addEventListener('dragover', (event) => event.preventDefault());
     document.getElementById('chat-form')?.addEventListener('drop', (event) => { event.preventDefault(); const file = event.dataTransfer.files?.[0]; if (file) window.selectChatAttachment(file); });
@@ -2519,6 +2567,9 @@ const AeroAPI = {
         document.getElementById('nav-username').textContent = user.username || 'User';
         syncCurrentUserAvatars(user);
         this.renderFeed();
+        window.setupChatRealtime?.();
+        loadChatContacts().catch(() => {});
+        loadUnreadChatCount().catch(() => {});
 
         window.setTimeout(() => {
             authOverlay.classList.add('hidden');
