@@ -125,6 +125,7 @@ function createAvatarElement(username, avatarUrl, className = 'post-avatar', isO
     image.src = avatarUrl.startsWith('http') ? avatarUrl : `${API_ORIGIN}${avatarUrl}`;
     image.alt = '';
     image.loading = 'lazy';
+    image.decoding = 'async';
     image.onerror = () => {
         avatar.textContent = name.charAt(0).toUpperCase();
         avatar.classList.remove('has-image');
@@ -133,6 +134,22 @@ function createAvatarElement(username, avatarUrl, className = 'post-avatar', isO
     avatar.classList.add('has-image');
     return avatar;
 }
+
+function getAvatarUrl(user = {}) {
+    const value = String(user.avatar_url || user.avatarUrl || user.avatar || '').trim();
+    if (!value || value.startsWith('letter:')) return '';
+    return value.startsWith('http') ? value : `${API_ORIGIN}${value}`;
+}
+
+function renderAvatarMarkup(user = {}, className = 'avatar', sizeClass = '') {
+    const username = String(user.username || user.name || user.display_name || 'User');
+    const avatarValue = String(user.avatar_url || user.avatarUrl || user.avatar || '').trim();
+    const fallback = avatarValue.startsWith('letter:') ? avatarValue.slice(7, 8).toUpperCase() : username.charAt(0).toUpperCase();
+    const url = getAvatarUrl(user);
+    return `<span class="${escapeHtml(`${className} ${sizeClass}`.trim())}" aria-hidden="true">${url ? `<img src="${escapeHtml(url)}" alt="@${escapeHtml(username)}" loading="lazy" decoding="async" onerror="this.remove();this.parentElement.textContent='${escapeHtml(fallback || 'U')}'">` : escapeHtml(fallback || 'U')}</span>`;
+}
+
+window.AeroAvatar = { getUrl: getAvatarUrl, markup: renderAvatarMarkup };
 
 function getCurrentViewerRole(user = null) {
     const viewer = user || JSON.parse(localStorage.getItem('aero_user') || '{}');
@@ -205,11 +222,21 @@ async function updatePresence() {
 }
 
 function setupPresenceHeartbeat() {
+    let presenceTimer = 0;
     updatePresence();
-    window.setInterval(updatePresence, 30000);
+    const startPresenceTimer = () => {
+        window.clearInterval(presenceTimer);
+        presenceTimer = window.setInterval(updatePresence, 30000);
+    };
+    startPresenceTimer();
     window.addEventListener('focus', updatePresence);
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') updatePresence();
+        if (document.visibilityState === 'visible') {
+            updatePresence();
+            startPresenceTimer();
+        } else {
+            window.clearInterval(presenceTimer);
+        }
     });
 }
 
@@ -337,9 +364,10 @@ function renderSearchPageResults(payload = { users: [], posts: [] }, tab = 'all'
         if (item.kind === 'user') {
             const username = item.username || 'Unknown user';
             const email = item.email || 'Member';
+            const avatar = renderAvatarMarkup(item, 'search-page-avatar');
             return `
                 <article class="search-page-card search-user-card" data-navigate="/profile/${encodeURIComponent(username)}" tabindex="0" role="button" aria-label="Open profile for ${escapeHtml(username)}">
-                    <div class="search-page-avatar">${escapeHtml(username).slice(0, 1).toUpperCase()}</div>
+                    ${avatar}
                     <div class="search-page-copy">
                         <div class="search-page-title">${highlightMatch(username, query)}</div>
                         <div class="search-page-meta">${highlightMatch(email, query)}</div>
@@ -894,6 +922,7 @@ async function loadNotifications(markRead = true) {
 }
 
 function setupNotificationDrawer() {
+    let notificationTimer = 0;
     setupNotificationSoundUnlock();
     const button = document.getElementById('notification-dock-btn');
     button?.addEventListener('click', () => {
@@ -910,7 +939,20 @@ function setupNotificationDrawer() {
     }));
     if (localStorage.getItem('aero_token')) {
         loadNotifications(false);
-        window.setInterval(() => loadNotifications(false), 5000);
+        const startNotificationTimer = () => {
+            window.clearInterval(notificationTimer);
+            notificationTimer = window.setInterval(() => {
+                if (!document.hidden) loadNotifications(false);
+            }, 5000);
+        };
+        startNotificationTimer();
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) window.clearInterval(notificationTimer);
+            else {
+                loadNotifications(false);
+                startNotificationTimer();
+            }
+        });
     }
 }
 
@@ -1461,13 +1503,10 @@ function setupMediaAndChat() {
 
 function createBookmarkAvatarMarkup(post, authorName) {
     authorName = String(authorName || 'User');
-    const avatarUrl = post.author_avatar || post.avatar_url || post.user?.avatar_url || '';
-    if (avatarUrl) {
-        const normalizedUrl = avatarUrl.startsWith('http') ? avatarUrl : `${API_ORIGIN}${avatarUrl}`;
-        const fallback = escapeHtml(authorName.trim().charAt(0).toUpperCase() || 'U');
-        return `<img src="${escapeHtml(normalizedUrl)}" alt="@${escapeHtml(authorName)}" onerror="this.outerHTML='<span>${fallback}</span>'">`;
-    }
-    return `<span>${escapeHtml(authorName.trim().charAt(0).toUpperCase() || 'U')}</span>`;
+    return renderAvatarMarkup({
+        username: authorName,
+        avatar_url: post.avatar_url || post.author_avatar || post.user?.avatar_url || ''
+    }, 'post-avatar');
 }
 
 function createBookmarkItemMarkup(post) {
@@ -2112,14 +2151,30 @@ const AeroAPI = {
                 overlay.classList.remove('hidden');
                 document.getElementById('confirm-delete-btn')?.focus();
             };
-            const addMenuItem = (label, iconPath, action, danger = false) => {
+            const addMenuItem = (label, iconPath, action, danger = false, translationKey = '') => {
                 const item = document.createElement('button');
                 item.type = 'button';
                 item.className = 'menu-item';
+                const rawLabel = label;
+                if (translationKey) {
+                    item.dataset.i18n = translationKey;
+                    label = window.AeroI18n?.translateValue(translationKey) || label;
+                }
                 item.appendChild(createIcon(iconPath, label));
-                item.append(` ${label}`);
+                const labelNode = document.createElement('span');
+                labelNode.className = 'menu-item-label';
+                if (translationKey) labelNode.dataset.i18nText = '';
+                labelNode.textContent = label;
+                item.append(' ', labelNode);
+                const context = rawLabel.match(/\s@.+$/)?.[0];
+                if (context) {
+                    const contextNode = document.createElement('span');
+                    contextNode.className = 'menu-item-context';
+                    contextNode.textContent = context;
+                    item.append(contextNode);
+                }
                 item.classList.toggle('danger', danger);
-                if (label === 'Bookmark Post' || label === 'Remove Bookmark') {
+                if (translationKey === 'post.bookmark' || translationKey === 'post.remove_bookmark' || label === 'Bookmark Post' || label === 'Remove Bookmark') {
                     item.classList.add('bookmark-toggle-btn');
                     item.classList.toggle('is-bookmarked', Boolean(post.is_bookmarked));
                 }
@@ -2154,8 +2209,8 @@ const AeroAPI = {
                         await loadBookmarksDrawer();
                     }
                 } catch (error) { showNotice(error.message, 'error'); }
-            });
-            addMenuItem('Copy Link', '<path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"></path><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1"></path>', () => copyPostLink(post.id));
+            }, false, post.is_bookmarked ? 'post.remove_bookmark' : 'post.bookmark');
+            addMenuItem('Copy Link', '<path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"></path><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1"></path>', () => copyPostLink(post.id), false, 'post.copy_link');
             addMenuItem('Not Interested', '<path d="M4 4l16 16M20 4 4 20"></path>', async () => {
                 postEl.classList.add('post-removing');
                 try {
@@ -2165,7 +2220,7 @@ const AeroAPI = {
                     postEl.classList.remove('post-removing');
                     showNotice(error.message, 'error');
                 }
-            });
+            }, false, 'post.not_interested');
             const separator = document.createElement('div');
             separator.className = 'post-menu-separator';
             optionsMenu.appendChild(separator);
@@ -2175,10 +2230,10 @@ const AeroAPI = {
                         const result = await this.toggleFollow(post.user_id, { username: post.username, name: post.username, avatar: post.avatar_url });
                         showNotice(result.is_following ? `Following @${post.username}.` : `Unfollowed @${post.username}.`, 'success');
                     } catch (error) { showNotice(error.message, 'error'); }
-                });
+                }, false, post.is_following ? 'post.unfollow' : 'post.follow');
             }
             if (isAdmin || isOwnPost) addMenuItem(isAdmin && !isOwnPost ? 'Delete Post (Admin)' : 'Delete Post', '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3"></path>', openDeleteModal, true);
-            addMenuItem('Report Post', '<path d="M5 21V4m0 0c4-3 7 3 14 0v10c-7 3-10-3-14 0"></path>', () => this.showReportModal(post.id), true);
+            addMenuItem('Report Post', '<path d="M5 21V4m0 0c4-3 7 3 14 0v10c-7 3-10-3-14 0"></path>', () => this.showReportModal(post.id), true, 'post.report');
             const menuWrapper = document.createElement('div');
             menuWrapper.className = 'post-menu-wrapper';
             moreButton.addEventListener('click', event => {
@@ -2991,6 +3046,38 @@ function setupPostScrollBehavior() {
     }, { passive: true });
 }
 
+function prepareImages(root = document) {
+    if (root.matches?.('img')) {
+        root.decoding = 'async';
+        if (!root.loading && root.getBoundingClientRect().top > window.innerHeight) root.loading = 'lazy';
+    }
+    root.querySelectorAll?.('img').forEach((image) => {
+        image.decoding = 'async';
+        if (!image.loading && image.getBoundingClientRect().top > window.innerHeight) image.loading = 'lazy';
+    });
+}
+
+function setupPageVisibilitySaver() {
+    const setHiddenState = (isHidden) => {
+        document.documentElement.classList.toggle('page-hidden', isHidden);
+        document.querySelectorAll('video, audio').forEach((media) => {
+            if (isHidden) {
+                media.dataset.wasPlaying = media.paused ? 'false' : 'true';
+                media.pause();
+            } else if (media.dataset.wasPlaying === 'true') {
+                media.play().catch(() => {});
+                delete media.dataset.wasPlaying;
+            }
+        });
+    };
+    document.addEventListener('visibilitychange', () => setHiddenState(document.hidden));
+    prepareImages();
+    const observer = new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) prepareImages(node);
+    })));
+    observer.observe(document.body, { childList: true, subtree: true });
+}
+
 // Page event handlers
 document.addEventListener('DOMContentLoaded', () => {
     AeroAPI.initAppState();
@@ -3001,6 +3088,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSearchPage();
     setupCreatePostExperience();
     setupPostScrollBehavior();
+    setupPageVisibilitySaver();
 
     // Sign in and sign up toggle
     const toSignUpBtn = document.getElementById('to-signup-btn');

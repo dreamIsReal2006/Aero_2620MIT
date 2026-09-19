@@ -94,7 +94,7 @@ def search(current_user):
         (User.is_private.is_(False)) | User.id.in_(followed_ids),
     ).distinct().order_by(Post.created_at.desc()).limit(5).all()
     return jsonify({
-        "users": [{"id": user.id, "username": user.username, "email": user.email} for user in users],
+        "users": [{"id": user.id, "username": user.username, "email": user.email, "avatar_url": user.avatar_url or ""} for user in users],
         "posts": [{"id": post.id, "content": post.content, "username": post.author.username} for post in posts],
     })
 

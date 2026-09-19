@@ -126,7 +126,6 @@ html {
     filter: blur(80px);
     opacity: 0.65;
     animation: floatAround 18s infinite alternate ease-in-out;
-    will-change: transform;
 }
 
 .glow-1 {
@@ -3084,8 +3083,8 @@ body.dark-mode .comment-composer input::placeholder {
 .post-dropdown-menu,
 .post-menu {
     position: absolute;
-    top: 0 !important;
-    right: 0;
+    top: 36px !important;
+    right: 12px !important;
     z-index: 5;
     min-width: 220px;
     padding: 4px;
@@ -4436,6 +4435,105 @@ html.dark-mode .mobile-nav-drawer,
     }
 }
 
+/* Unified avatar geometry across feed, profile, chat, history, bookmarks, search, and comments. */
+.avatar-container,
+.user-avatar-wrapper,
+.avatar-box,
+.avatar,
+.user-avatar,
+.user-avatar-nav,
+.post-avatar,
+.compose-trigger-avatar,
+.profile-avatar-wrap,
+.profile-avatar,
+.profile-avatar-empty,
+.history-avatar,
+.bookmark-item-avatar,
+.comment-avatar-wrap,
+.comment-avatar,
+.comment-composer-avatar,
+.comment-avatar,
+.search-page-avatar,
+.notification-avatar,
+.share-user-avatar,
+.short-author-avatar,
+.video-author-avatar,
+.chat-contact-avatar,
+.chat-active-avatar,
+.chat-shared-post-avatar,
+.admin-target-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden !important;
+    flex-shrink: 0;
+    border-radius: 50% !important;
+    vertical-align: middle;
+}
+
+img.avatar,
+img.user-avatar,
+img.profile-img,
+.avatar img,
+.user-avatar img,
+.post-avatar img,
+.compose-trigger-avatar img,
+.profile-avatar-wrap img,
+.profile-avatar img,
+.history-avatar img,
+.bookmark-item-avatar img,
+.comment-avatar-wrap img,
+.comment-avatar img,
+.comment-composer-avatar img,
+.search-page-avatar img,
+.notification-avatar img,
+.share-user-avatar img,
+.short-author-avatar img,
+.video-author-avatar img,
+.chat-contact-avatar img,
+.chat-active-avatar img,
+.chat-shared-post-avatar img,
+.admin-target-avatar img {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0;
+    min-height: 0;
+    object-fit: cover !important;
+    object-position: center !important;
+    border-radius: 50% !important;
+}
+
+.profile-avatar-wrap,
+.profile-avatar,
+.profile-avatar-empty {
+    aspect-ratio: 1;
+}
+
+.history-avatar,
+.bookmark-item-avatar,
+.comment-avatar-wrap,
+.comment-avatar,
+.comment-composer-avatar,
+.search-page-avatar,
+.notification-avatar,
+.share-user-avatar,
+.short-author-avatar,
+.video-author-avatar,
+.chat-contact-avatar,
+.chat-active-avatar,
+.chat-shared-post-avatar {
+    position: relative;
+}
+
+.history-avatar-fallback {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+}
+
 /* Final navigation positioning overrides. */
 .fab-new-post,
 #global-fab-btn,
@@ -5083,7 +5181,6 @@ body[data-viewer-role="moderator"] .role-badge.moderator {
 .chat-wrapper,
 .post-card {
     transform: translateZ(0);
-    will-change: transform;
 }
 
 .aero-glass-panel,
@@ -5103,12 +5200,31 @@ body[data-viewer-role="moderator"] .role-badge.moderator {
     contain-intrinsic-size: 0 100px;
 }
 
+/* Paint containment clips absolutely positioned menus; keep card menus inside the card instead. */
+.post-card {
+    contain: layout style;
+    overflow: visible !important;
+}
+
+.post-card .post-menu-wrapper,
+.post-card .post-dropdown-menu,
+.post-card .post-menu {
+    overflow: visible;
+}
+
 .is-scrolling .glow-ball,
 .is-scrolling .glass-overlay,
 .is-scrolling [class*="float"],
 .is-scrolling [class*="pulse"] {
     animation-play-state: paused !important;
     transition: none !important;
+}
+
+.page-hidden .glow-ball,
+.page-hidden .glass-overlay,
+.page-hidden [class*="float"],
+.page-hidden [class*="pulse"] {
+    animation-play-state: paused !important;
 }
 
 .shorts-container {
@@ -5118,6 +5234,22 @@ body[data-viewer-role="moderator"] .role-badge.moderator {
     scroll-snap-type: y mandatory;
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+.shorts-container::-webkit-scrollbar,
+.shorts-feed::-webkit-scrollbar,
+#shorts-feed::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+.shorts-feed,
+#shorts-feed {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
 }
 
 .shorts-stage,

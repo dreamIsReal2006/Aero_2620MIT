@@ -28,6 +28,7 @@
 
     function avatarMarkup(post) {
         const username = post.username || 'User';
+        if (window.AeroAvatar?.markup) return window.AeroAvatar.markup(post, 'history-avatar');
         const avatarUrl = String(post.avatar_url || '');
         if (!avatarUrl) return `<span>${escapeHtml(username.charAt(0).toUpperCase() || 'U')}</span>`;
         const normalizedUrl = avatarUrl.startsWith('http') ? avatarUrl : `${window.AeroConfig.API_ORIGIN}${avatarUrl}`;

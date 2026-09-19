@@ -244,8 +244,8 @@
             fab.style.setProperty('display', isChat ? 'none' : 'flex', 'important');
         }
         fab.innerHTML = view === 'shorts'
-            ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg><span class="fab-label">Video</span>'
-            : '<i class="lucide-plus" aria-hidden="true"></i><span class="fab-label">New Post</span>';
+            ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg><span class="fab-label" data-i18n="common.new_video">Video</span>'
+            : '<i class="lucide-plus" aria-hidden="true"></i><span class="fab-label" data-i18n="common.new_post">New Post</span>';
         fab.setAttribute('aria-label', view === 'shorts' ? 'Upload Short Video' : 'Create a new post');
     }
 

@@ -3,7 +3,11 @@
     const originalTitle = document.title;
     const translations = {
         en: {
-            'author': 'Author', 'author_badge': 'Author'
+            'author': 'Author', 'author_badge': 'Author',
+            'post.bookmark': 'Bookmark Post', 'post.remove_bookmark': 'Remove Bookmark',
+            'post.copy_link': 'Copy Link', 'post.not_interested': 'Not Interested',
+            'post.follow': 'Follow', 'post.unfollow': 'Unfollow', 'post.report': 'Report Post',
+            'common.new_post': 'New Post', 'common.new_video': 'Video'
         },
         zh: {
             'Settings': '设置', 'Back': '返回', 'Account': '账户', 'Appearance': '外观', 'Languages': '语言',
@@ -33,7 +37,11 @@
             'No posts yet.': '暂无帖子。', 'No results found': '未找到结果', 'Loading...': '加载中...',
             'Post options': '帖子选项', 'Like post': '点赞帖子', 'Comment on post': '评论帖子', 'Share post': '分享帖子',
             'Add a comment...': '添加评论...', 'Write a comment...': '写下评论...', 'GIF': 'GIF', 'New message': '新消息',
-            'author': '作者', 'author_badge': '作者'
+            'author': '作者', 'author_badge': '作者',
+            'post.bookmark': '收藏帖子', 'post.remove_bookmark': '取消收藏',
+            'post.copy_link': '复制链接', 'post.not_interested': '不感兴趣',
+            'post.follow': '关注', 'post.unfollow': '取消关注', 'post.report': '举报帖子',
+            'common.new_post': '发布新帖', 'common.new_video': '视频'
         }
     };
     const originalText = new WeakMap();
@@ -79,7 +87,11 @@
         }
         if (node.nodeType !== Node.ELEMENT_NODE || ['SCRIPT', 'STYLE'].includes(node.tagName)) return;
         const translationKey = node.getAttribute('data-i18n');
-        if (translationKey) node.textContent = translateValue(translationKey);
+        if (translationKey) {
+            const labelNode = node.querySelector('[data-i18n-text]');
+            if (labelNode) labelNode.textContent = translateValue(translationKey);
+            else node.textContent = translateValue(translationKey);
+        }
         ['placeholder', 'title', 'aria-label'].forEach((attribute) => {
             const value = node.getAttribute(attribute);
             if (value && !originalAttributes.has(node)) originalAttributes.set(node, {});
