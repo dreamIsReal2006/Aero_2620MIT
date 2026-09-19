@@ -2391,6 +2391,7 @@ html.dark-mode .shorts-empty-upload, body.dark-mode .shorts-empty-upload { borde
 .chat-contact:hover { background: var(--accent-light-fill); }
 .chat-contact span:last-child { display: grid; min-width: 0; gap: 2px; }
 .chat-contact small { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-contact time { color: var(--text-tertiary, var(--text-secondary)); font-size: .72rem; }
 .chat-contact.unread::after { content: ''; flex: 0 0 7px; width: 7px; height: 7px; border-radius: 50%; background: #ff3b30; }
 .chat-panel { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; min-height: 0; }
 .chat-active-header { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--border-subtle); font-weight: 700; }

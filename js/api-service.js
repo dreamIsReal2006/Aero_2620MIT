@@ -77,12 +77,23 @@ document.addEventListener('click', async (event) => {
 });
 
 function formatRelativeTime(timestamp) {
-    const normalizedTimestamp = typeof timestamp === 'string' && timestamp && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(timestamp)
-        ? `${timestamp}Z`
-        : timestamp;
-    const elapsedSeconds = Math.max(0, (Date.now() - new Date(normalizedTimestamp).getTime()) / 1000);
+    if (timestamp === null || timestamp === undefined || timestamp === '') return 'Just now';
+    let date;
+    if (typeof timestamp === 'number' || (typeof timestamp === 'string' && /^\d+(?:\.\d+)?$/.test(timestamp.trim()))) {
+        const numericTimestamp = Number(timestamp);
+        date = new Date(numericTimestamp < 1e12 ? numericTimestamp * 1000 : numericTimestamp);
+    } else {
+        const timestampString = String(timestamp).trim();
+        const normalizedTimestamp = /[zZ]|[+-]\d{2}:?\d{2}$/.test(timestampString)
+            ? timestampString
+            : `${timestampString}Z`;
+        date = new Date(normalizedTimestamp);
+    }
+    const dateValue = date.getTime();
+    if (Number.isNaN(dateValue)) return 'Just now';
+    const elapsedSeconds = Math.max(0, (Date.now() - dateValue) / 1000);
     const isChinese = window.AeroI18n?.getLanguage?.() === 'zh';
-    if (elapsedSeconds < 60) return isChinese ? '刚刚' : 'just now';
+    if (elapsedSeconds < 60) return isChinese ? '刚刚' : 'Just now';
     const minutes = Math.floor(elapsedSeconds / 60);
     if (minutes < 60) return isChinese ? `${minutes}分钟` : `${minutes}m ago`;
     const hours = Math.floor(minutes / 60);
@@ -993,6 +1004,8 @@ function updateChatContactPreview(message, preview) {
     if (!item) return;
     const summary = item.querySelector('small');
     if (summary) summary.textContent = preview;
+    const timestamp = item.querySelector('time');
+    if (timestamp) timestamp.textContent = formatRelativeTime(message.created_at);
     item.dataset.latestMessageAt = message.created_at || '';
     item.classList.toggle('unread', !(activeChatUser && (message.group_id ? activeChatUser.is_group && Number(activeChatUser.id) === Number(message.group_id) : !activeChatUser.is_group && Number(activeChatUser.id) === Number(message.sender_id))));
 }
@@ -1404,7 +1417,13 @@ function setupMediaAndChat() {
         }
         const encryptedContent = await encryptChatContent(content, contact);
         const response = await fetch(`${API_BASE}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: JSON.stringify(contact.is_group ? { group_id: contact.group_id || contact.id, content: encryptedContent, media_url: mediaUrl, type: messageType, file_name: input.dataset.fileName || '', file_size: input.dataset.fileSize || 0 } : { user_id: contact.id, recipient_id: contact.id, content: encryptedContent, media_url: mediaUrl, type: messageType, file_name: input.dataset.fileName || '', file_size: input.dataset.fileSize || 0 }) });
-        if (response.ok) { input.value = ''; ['mediaUrl', 'messageType', 'fileName', 'fileSize'].forEach((key) => delete input.dataset[key]); input.placeholder = 'Message...'; }
+        if (response.ok) {
+            input.value = '';
+            ['mediaUrl', 'messageType', 'fileName', 'fileSize'].forEach((key) => delete input.dataset[key]);
+            input.placeholder = 'Message...';
+            await markConversationRead(contact).catch(() => {});
+            await loadUnreadChatCount().catch(() => {});
+        }
     });
     document.getElementById('chat-form')?.addEventListener('dragover', (event) => event.preventDefault());
     document.getElementById('chat-form')?.addEventListener('drop', (event) => { event.preventDefault(); const file = event.dataTransfer.files?.[0]; if (file) window.selectChatAttachment(file); });
