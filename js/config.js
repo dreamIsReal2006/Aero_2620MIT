@@ -3,7 +3,8 @@
 
     window.AeroConfig = Object.freeze({
         API_ORIGIN: productionApiOrigin,
-        API_BASE_URL: `${productionApiOrigin}/api`
+        API_BASE_URL: `${productionApiOrigin}/api`,
+        SUPABASE_URL: 'https://tamzlrygqskxscofwnho.supabase.co'
     });
 
     const nativeFetch = window.fetch.bind(window);

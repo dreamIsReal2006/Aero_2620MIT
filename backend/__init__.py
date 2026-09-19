@@ -25,16 +25,16 @@ def create_app():
     app.config["SECRET_KEY"] = os.environ.get(
         "AERO_SECRET_KEY", "development-only-change-this-secret"
     )
-    database_setting = os.environ.get("AERO_DATABASE", "aero.db")
-    if "://" not in database_setting:
-        database_path = Path(database_setting)
-        if not database_path.is_absolute():
-            database_path = base_dir / database_path
-        database_setting = str(database_path.resolve())
-    app.config["SQLALCHEMY_DATABASE_URI"] = (
-        database_setting if "://" in database_setting else f"sqlite:///{database_setting}"
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
+        "AERO_DATABASE",
+        "postgresql://postgres.tamzlrygqskxscofwnho:Aero2620Pass!@"
+        "aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres",
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_pre_ping": True,
+        "pool_recycle": 1800,
+    }
     app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
     app.config["MAIL_SERVER"] = os.environ.get("AERO_MAIL_SERVER", "smtp.gmail.com")
     app.config["MAIL_PORT"] = int(os.environ.get("AERO_MAIL_PORT", "587"))
@@ -147,112 +147,8 @@ def create_app():
     app.register_blueprint(notification_bp)
 
     with app.app_context():
+        db.session.execute(text("SELECT 1"))
         db.create_all()
-        if db.engine.dialect.name == "sqlite":
-            post_columns = {
-                column[1]
-                for column in db.session.execute(text("PRAGMA table_info(posts)"))
-            }
-            if "parent_id" not in post_columns:
-                db.session.execute(text("ALTER TABLE posts ADD COLUMN parent_id INTEGER"))
-            if "type" not in post_columns:
-                db.session.execute(text("ALTER TABLE posts ADD COLUMN type VARCHAR(12) NOT NULL DEFAULT 'original'"))
-            message_columns = {
-                column[1]
-                for column in db.session.execute(text("PRAGMA table_info(messages)"))
-            }
-            if "is_read" not in message_columns:
-                db.session.execute(text("ALTER TABLE messages ADD COLUMN is_read BOOLEAN NOT NULL DEFAULT 0"))
-            if "file_name" not in message_columns:
-                db.session.execute(text("ALTER TABLE messages ADD COLUMN file_name VARCHAR(255) NOT NULL DEFAULT ''"))
-            if "file_size" not in message_columns:
-                db.session.execute(text("ALTER TABLE messages ADD COLUMN file_size INTEGER NOT NULL DEFAULT 0"))
-            if "post_id" not in message_columns:
-                db.session.execute(text("ALTER TABLE messages ADD COLUMN post_id INTEGER"))
-            if "group_id" not in message_columns:
-                db.session.execute(text("ALTER TABLE messages ADD COLUMN group_id INTEGER"))
-            columns = {
-                column[1]
-                for column in db.session.execute(text("PRAGMA table_info(users)"))
-            }
-            if "is_admin" not in columns:
-                db.session.execute(text(
-                    "ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"
-                ))
-            if "is_banned" not in columns:
-                db.session.execute(text(
-                    "ALTER TABLE users ADD COLUMN is_banned BOOLEAN NOT NULL DEFAULT 0"
-                ))
-            if "ban_count" not in columns:
-                db.session.execute(text(
-                    "ALTER TABLE users ADD COLUMN ban_count INTEGER NOT NULL DEFAULT 0"
-                ))
-            if "role" not in columns:
-                db.session.execute(text(
-                    "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'"
-                ))
-            db.session.execute(text(
-                "UPDATE users SET role = 'admin' WHERE is_admin = 1"
-            ))
-            db.session.execute(text(
-                "UPDATE users SET role = 'user' WHERE role NOT IN ('admin', 'moderator', 'user') OR role IS NULL"
-            ))
-            if "display_name" not in columns:
-                db.session.execute(text(
-                    "ALTER TABLE users ADD COLUMN display_name VARCHAR(80) NOT NULL DEFAULT ''"
-                ))
-            follow_columns = {
-                column[1]
-                for column in db.session.execute(text("PRAGMA table_info(follows)"))
-            }
-            if "status" not in follow_columns:
-                db.session.execute(text(
-                    "ALTER TABLE follows ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'approved'"
-                ))
-            if "bio" not in columns:
-                db.session.execute(text(
-                    "ALTER TABLE users ADD COLUMN bio VARCHAR(150) NOT NULL DEFAULT ''"
-                ))
-            if "avatar_url" not in columns:
-                db.session.execute(text(
-                    "ALTER TABLE users ADD COLUMN avatar_url VARCHAR(500) NOT NULL DEFAULT ''"
-                ))
-            if "is_private" not in columns:
-                db.session.execute(text(
-                    "ALTER TABLE users ADD COLUMN is_private BOOLEAN NOT NULL DEFAULT 0"
-                ))
-            if "show_online_status" not in columns:
-                db.session.execute(text(
-                    "ALTER TABLE users ADD COLUMN show_online_status BOOLEAN NOT NULL DEFAULT 1"
-                ))
-            if "last_seen_at" not in columns:
-                db.session.execute(text(
-                    "ALTER TABLE users ADD COLUMN last_seen_at DATETIME"
-                ))
-            for column_name in ("push_notifications", "notify_likes", "notify_comments"):
-                if column_name not in columns:
-                    db.session.execute(text(
-                        f"ALTER TABLE users ADD COLUMN {column_name} BOOLEAN NOT NULL DEFAULT 1"
-                    ))
-            comment_columns = {
-                column[1]
-                for column in db.session.execute(text("PRAGMA table_info(comments)"))
-            }
-            if "image_url" not in comment_columns:
-                db.session.execute(text(
-                    "ALTER TABLE comments ADD COLUMN image_url VARCHAR(500) NOT NULL DEFAULT ''"
-                ))
-            message_columns = {column[1] for column in db.session.execute(text("PRAGMA table_info(messages)"))}
-            if "media_url" not in message_columns:
-                db.session.execute(text("ALTER TABLE messages ADD COLUMN media_url VARCHAR(500) NOT NULL DEFAULT ''"))
-            if "type" not in message_columns:
-                db.session.execute(text("ALTER TABLE messages ADD COLUMN type VARCHAR(20) NOT NULL DEFAULT 'text'"))
-            video_comment_columns = {column[1] for column in db.session.execute(text("PRAGMA table_info(video_comments)"))}
-            if "media_url" not in video_comment_columns:
-                db.session.execute(text("ALTER TABLE video_comments ADD COLUMN media_url VARCHAR(500) NOT NULL DEFAULT ''"))
-            if "type" not in video_comment_columns:
-                db.session.execute(text("ALTER TABLE video_comments ADD COLUMN type VARCHAR(20) NOT NULL DEFAULT 'text'"))
-            db.session.commit()
 
     from backend.admin import admin_bp
     from backend.admin import routes as admin_routes
