@@ -47,9 +47,6 @@
         const avatarElement = document.getElementById('chat-active-avatar');
         if (!header || !avatarElement) return;
         if (nameElement) nameElement.textContent = `@${name}`;
-        const blockButton = document.getElementById('chat-block-btn');
-        blockButton?.classList.toggle('hidden', !contact?.id);
-        if (blockButton) blockButton.textContent = 'Block';
         const muteButton = document.getElementById('chat-mute-btn');
         muteButton?.classList.toggle('hidden', !contact?.id);
         if (muteButton) {
@@ -115,7 +112,7 @@
         list.prepend(button);
     };
 
-    window.selectChatContact = async function selectChatContact(contact) {
+    window.legacySelectChatContact = async function legacySelectChatContact(contact) {
         if (!contact) return;
         window.activeChatUser = contact;
         document.getElementById('view-chat')?.classList.add('chat-contact-open');
@@ -152,17 +149,6 @@
             if (response.ok) button.closest('.chat-message')?.remove();
             else window.showNotice?.('Unable to delete message.', 'error');
         }));
-        const blockButton = document.getElementById('chat-block-btn');
-        if (blockButton) blockButton.onclick = async () => {
-            if (!window.activeChatUser?.id) return;
-            const contact = window.activeChatUser;
-            const blocked = blockButton.classList.contains('is-blocked');
-            const toggle = async () => {
-                const response = await fetch(`${apiBase}/chat/contacts/${contact.id}/block`, { method: blocked ? 'DELETE' : 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
-                if (response.ok) { blockButton.classList.toggle('is-blocked', !blocked); blockButton.textContent = blocked ? 'Block' : 'Unblock'; box.replaceChildren(); window.showNotice?.(blocked ? 'User unblocked.' : 'You have blocked this user.', 'success'); }
-            };
-            if (blocked) await toggle(); else window.openChatBlockConfirmation?.(contact, toggle);
-        };
         box.scrollTop = box.scrollHeight;
         document.getElementById('view-chat')?.classList.remove('hidden');
     };

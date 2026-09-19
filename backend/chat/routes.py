@@ -45,6 +45,7 @@ def _group_payload(group, current_user_id):
         "owner_id": group.owner_id,
         "member_count": ChatGroupMember.query.filter_by(group_id=group.id).count(),
         "latest_message": latest.content if latest else "",
+        "latest_message_at": f"{latest.created_at.isoformat()}Z" if latest else "",
         "unread_count": unread_count,
         "is_owner": group.owner_id == current_user_id,
     }
@@ -146,6 +147,7 @@ def get_contacts(current_user):
         ).order_by(Message.created_at.desc()).first()
         item = _user_payload(user, current_user.id)
         item["latest_message"] = latest.content if latest else ""
+        item["latest_message_at"] = f"{latest.created_at.isoformat()}Z" if latest else ""
         item["unread_count"] = Message.query.filter_by(
             sender_id=user.id, recipient_id=current_user.id, is_read=False
         ).count()

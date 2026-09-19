@@ -907,6 +907,55 @@ let activeChatUser = null;
 let chatContactCache = [];
 let chatGroupCache = [];
 let chatRealtimeChannel = null;
+const chatGroupUnreadCounts = new Map();
+const CHAT_CIPHER_PREFIX = 'AERO_E2EE_V1:';
+
+function chatConversationKeyId(conversation) {
+    const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
+    if (conversation?.is_group) return `group:${conversation.group_id || conversation.id}`;
+    return `direct:${[currentUser.id, conversation?.id].map(Number).sort((a, b) => a - b).join(':')}`;
+}
+
+function bytesToBase64(bytes) {
+    let binary = '';
+    bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+    return btoa(binary);
+}
+
+function base64ToBytes(value) {
+    return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+}
+
+async function getChatEncryptionKey(conversation) {
+    if (!window.crypto?.subtle || !conversation) return null;
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`aero-chat:${chatConversationKeyId(conversation)}`));
+    return crypto.subtle.importKey('raw', digest, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+async function encryptChatContent(content, conversation) {
+    const key = await getChatEncryptionKey(conversation);
+    if (!key || !content) return content;
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(content));
+    return `${CHAT_CIPHER_PREFIX}${bytesToBase64(iv)}.${bytesToBase64(new Uint8Array(encrypted))}`;
+}
+
+async function decryptChatContent(content, conversation) {
+    if (!content || !String(content).startsWith(CHAT_CIPHER_PREFIX)) return content || '';
+    try {
+        const key = await getChatEncryptionKey(conversation);
+        if (!key) return '[Encrypted message]';
+        const [iv, ciphertext] = String(content).slice(CHAT_CIPHER_PREFIX.length).split('.');
+        const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64ToBytes(iv) }, key, base64ToBytes(ciphertext));
+        return new TextDecoder().decode(decrypted);
+    } catch (error) {
+        return '[Unable to decrypt message]';
+    }
+}
+
+async function decryptChatPreview(content, conversation) {
+    return decryptChatContent(content, conversation);
+}
 
 function isActiveChatMessage(message, contact) {
     if (!message || !contact) return false;
@@ -916,12 +965,12 @@ function isActiveChatMessage(message, contact) {
         && Number(message.recipient_id) === Number(JSON.parse(localStorage.getItem('aero_user') || '{}').id);
 }
 
-function appendRealtimeChatMessage(message) {
+async function appendRealtimeChatMessage(message) {
     const contact = activeChatUser || window.activeChatUser;
     const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
     const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
     if (!box || !isActiveChatMessage(message, contact) || box.querySelector(`[data-message-id="${message.id}"]`)) return;
-    const content = escapeHtml(message.content || '');
+    const content = escapeHtml(await decryptChatContent(message.content, contact));
     const mediaUrl = message.media_url ? (String(message.media_url).startsWith('http') ? message.media_url : `${API_ORIGIN}${message.media_url}`) : '';
     const media = mediaUrl && message.type === 'image'
         ? `<img src="${escapeHtml(mediaUrl)}" class="chat-gif-media" alt="Attached image" loading="lazy">`
@@ -936,6 +985,22 @@ function appendRealtimeChatMessage(message) {
     box.scrollTop = box.scrollHeight;
 }
 
+function updateChatContactPreview(message, preview) {
+    const selector = message.group_id
+        ? `.chat-contact[data-group-id="${CSS.escape(String(message.group_id))}"]`
+        : `.chat-contact[data-user-id="${CSS.escape(String(message.sender_id))}"]`;
+    const item = document.querySelector(selector);
+    if (!item) return;
+    const summary = item.querySelector('small');
+    if (summary) summary.textContent = preview;
+    item.dataset.latestMessageAt = message.created_at || '';
+    item.classList.toggle('unread', !(activeChatUser && (message.group_id ? activeChatUser.is_group && Number(activeChatUser.id) === Number(message.group_id) : !activeChatUser.is_group && Number(activeChatUser.id) === Number(message.sender_id))));
+}
+
+function getLocalGroupUnreadCount() {
+    return [...chatGroupUnreadCounts.values()].reduce((total, count) => total + count, 0);
+}
+
 function setupChatRealtime() {
     const client = window.supabaseClient;
     const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
@@ -945,13 +1010,23 @@ function setupChatRealtime() {
         .on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
-            table: 'messages',
-            filter: `recipient_id=eq.${currentUser.id}`
+            table: 'messages'
         }, ({ new: message }) => {
+            if (Number(message.sender_id) === Number(currentUser.id)) return;
             if (isActiveChatMessage(message, activeChatUser || window.activeChatUser)) {
-                appendRealtimeChatMessage(message);
+                appendRealtimeChatMessage(message).then(async () => {
+                    updateChatContactPreview(message, await decryptChatContent(message.content, activeChatUser || window.activeChatUser));
+                }).catch(() => {});
                 markConversationRead(activeChatUser || window.activeChatUser).catch(() => {});
             } else {
+                const isIncoming = Number(message.sender_id) !== Number(currentUser.id)
+                    && (message.group_id || Number(message.recipient_id) === Number(currentUser.id));
+                if (isIncoming && message.group_id) {
+                    const groupId = String(message.group_id);
+                    chatGroupUnreadCounts.set(groupId, (chatGroupUnreadCounts.get(groupId) || 0) + 1);
+                    updateDockBadge('chat-dock-btn', (chatUnreadCount || 0) + getLocalGroupUnreadCount());
+                }
+                decryptChatPreview(message.content, message.group_id ? { id: message.group_id, group_id: message.group_id, is_group: true } : { id: message.sender_id }).then((preview) => updateChatContactPreview(message, preview)).catch(() => {});
                 loadUnreadChatCount().catch(() => {});
                 loadChatContacts().catch(() => {});
             }
@@ -1001,10 +1076,18 @@ async function loadChatContacts() {
         const avatar = avatarUrl
             ? `<img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy" onerror="this.remove()">`
             : escapeHtml(avatarText || 'U');
-        return `<button type="button" class="chat-contact ${contact.unread_count ? 'unread' : ''}" data-user-id="${contact.id}"><span class="chat-contact-avatar ${contact.is_online ? 'is-online' : ''}">${avatar}</span><span><strong>@${escapeHtml(contact.username)}</strong><small>${escapeHtml(contact.latest_message || 'Start a conversation')}</small></span></button>`;
+        return `<button type="button" class="chat-contact ${contact.unread_count ? 'unread' : ''}" data-user-id="${contact.id}"><span class="chat-contact-avatar ${contact.is_online ? 'is-online' : ''}">${avatar}</span><span><strong>@${escapeHtml(contact.username)}</strong><small>${escapeHtml(contact.latest_message || 'Start a conversation')}</small><time>${escapeHtml(formatRelativeTime(contact.latest_message_at))}</time></span></button>`;
     }).join('');
-    const groupMarkup = (chatGroupCache || []).map((group) => `<button type="button" class="chat-contact chat-group-contact" data-group-id="${group.group_id}"><span class="chat-contact-avatar">${escapeHtml((group.name || 'G').slice(0, 1).toUpperCase())}</span><span><strong>${escapeHtml(group.name)}</strong><small>${escapeHtml(group.latest_message || `${group.member_count} members`)}</small></span></button>`).join('');
+    const groupMarkup = (chatGroupCache || []).map((group) => `<button type="button" class="chat-contact chat-group-contact" data-group-id="${group.group_id}"><span class="chat-contact-avatar">${escapeHtml((group.name || 'G').slice(0, 1).toUpperCase())}</span><span><strong>${escapeHtml(group.name)}</strong><small>${escapeHtml(group.latest_message || `${group.member_count} members`)}</small><time>${escapeHtml(formatRelativeTime(group.latest_message_at))}</time></span></button>`).join('');
     list.innerHTML = `${groupMarkup}${contactMarkup}` || '<div class="bookmarks-empty">No contacts yet.</div>';
+    await Promise.all([...list.querySelectorAll('.chat-contact')].map(async (item) => {
+        const isGroup = item.classList.contains('chat-group-contact');
+        const conversationId = isGroup ? item.dataset.groupId : item.dataset.userId;
+        const source = (isGroup ? chatGroupCache : chatContactCache).find((entry) => String(isGroup ? entry.group_id : entry.id) === String(conversationId));
+        const preview = await decryptChatPreview(source?.latest_message, isGroup ? { id: conversationId, group_id: conversationId, is_group: true } : { id: conversationId });
+        const summary = item.querySelector('small');
+        if (summary && preview) summary.textContent = preview;
+    }));
     list.querySelectorAll('.chat-group-contact').forEach((item) => item.addEventListener('click', () => selectChatGroup(chatGroupCache.find((group) => String(group.group_id) === item.dataset.groupId))));
     list.querySelectorAll('.chat-contact:not(.chat-group-contact)').forEach((item) => item.addEventListener('click', () => selectChatContact(chatContactCache.find((contact) => String(contact.id) === item.dataset.userId))));
 }
@@ -1017,11 +1100,12 @@ async function loadUnreadChatCount() {
     const unreadCount = Number(data.unread_count) || 0;
     if (chatUnreadCount !== null && unreadCount > chatUnreadCount) playNotificationSound();
     chatUnreadCount = unreadCount;
-    updateDockBadge('chat-dock-btn', unreadCount);
+    updateDockBadge('chat-dock-btn', unreadCount + getLocalGroupUnreadCount());
 }
 
 async function markConversationRead(conversation) {
     if (!conversation) return;
+    if (conversation.is_group) chatGroupUnreadCounts.delete(String(conversation.group_id || conversation.id));
     const payload = conversation.is_group
         ? { group_id: conversation.group_id || conversation.id }
         : { sender_id: conversation.id };
@@ -1035,7 +1119,7 @@ async function markConversationRead(conversation) {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || 'Unable to mark messages as read');
-    updateDockBadge('chat-dock-btn', data.unread_count || 0);
+    updateDockBadge('chat-dock-btn', (data.unread_count || 0) + getLocalGroupUnreadCount());
     chatUnreadCount = Number(data.unread_count) || 0;
 }
 
@@ -1077,9 +1161,7 @@ async function selectChatGroup(group) {
         activeAvatar.textContent = String(group.name || 'G').slice(0, 1).toUpperCase();
     }
     groupInfo?.classList.remove('hidden');
-    document.getElementById('chat-block-btn')?.classList.add('hidden');
     document.getElementById('chat-mute-btn')?.classList.add('hidden');
-    document.getElementById('chat-inline-alert')?.classList.add('hidden');
     await markConversationRead(activeChatUser);
     await loadChatMessages();
 }
@@ -1113,22 +1195,7 @@ async function selectChatContact(contact) {
         }
     }
     await loadChatMessages();
-    const blockButton = document.getElementById('chat-block-btn');
     const muteButton = document.getElementById('chat-mute-btn');
-    if (blockButton) {
-        blockButton.classList.remove('hidden');
-        blockButton.classList.remove('is-blocked');
-        blockButton.textContent = 'Block';
-        const blockResponse = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
-        const blockData = await blockResponse.json().catch(() => ({}));
-        blockButton.classList.toggle('is-blocked', Boolean(blockData.blocked));
-        blockButton.textContent = blockData.blocked ? 'Unblock' : 'Block';
-        const chatInput = document.getElementById('chat-input');
-        const chatAlert = document.getElementById('chat-inline-alert');
-        if (chatInput) chatInput.disabled = Boolean(blockData.blocked);
-        chatAlert?.classList.toggle('hidden', !blockData.blocked);
-        if (chatAlert && blockData.blocked) chatAlert.textContent = 'You have blocked this user.';
-    }
     if (muteButton) {
         muteButton.classList.remove('hidden');
         setMuteButtonState(muteButton, Boolean(contact.is_muted), false);
@@ -1136,6 +1203,8 @@ async function selectChatContact(contact) {
     await loadChatContacts();
     await loadUnreadChatCount();
 }
+
+window.selectChatContact = selectChatContact;
 
 async function loadChatMessages() {
     const contact = activeChatUser || window.activeChatUser;
@@ -1154,6 +1223,10 @@ async function loadChatMessages() {
     }
     chatMessageSnapshots.set(snapshotKey, messageIds);
     const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
+    const displayMessages = await Promise.all((messages || []).map(async (message) => ({
+        ...message,
+        content: await decryptChatContent(message.content, contact)
+    })));
     const formatBytes = (value) => { const size = Number(value) || 0; if (size < 1024) return `${size} B`; if (size < 1048576) return `${Math.round(size / 1024)} KB`; return `${(size / 1048576).toFixed(1)} MB`; };
     const mediaMarkup = (message) => {
         const url = message.media_url ? (String(message.media_url).startsWith('http') ? message.media_url : `${API_ORIGIN}${message.media_url}`) : '';
@@ -1171,7 +1244,7 @@ async function loadChatMessages() {
         return `<a class="chat-shared-post" href="/#post-${post.id}"><span class="chat-shared-post-author"><span class="chat-shared-post-avatar">${post.avatar_url ? `<img src="${escapeHtml(String(post.avatar_url).startsWith('http') ? post.avatar_url : `${API_ORIGIN}${post.avatar_url}`)}" alt="">` : escapeHtml((post.username || 'U').charAt(0).toUpperCase())}</span><strong>@${escapeHtml(post.username || 'User')}</strong></span>${image}<span class="chat-shared-post-text">${escapeHtml(post.content || 'Shared post')}</span></a>`;
     };
     const renderMessageText = (value) => escapeHtml(value).replace(/(https?:\/\/[^\s<]+|\/#post-\d+)/g, '<a class="chat-message-link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-    box.innerHTML = (messages || []).map((message) => `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}">${contact.is_group && message.sender_id !== currentUser.id ? `<small class="chat-group-sender">@${escapeHtml(message.sender_username || 'User')}</small>` : ''}<div class="chat-bubble-content">${message.shared_post ? sharedPostMarkup(message.shared_post) : mediaMarkup(message)}${message.type === 'post_share' ? '' : (message.content ? renderMessageText(message.content) : '')}</div><div class="chat-message-meta"><time>${escapeHtml(window.AeroI18n?.formatChatTimestamp?.(message.created_at) || '')}</time>${message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : ''}</div></div>`).join('');
+    box.innerHTML = displayMessages.map((message) => `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}">${contact.is_group && message.sender_id !== currentUser.id ? `<small class="chat-group-sender">@${escapeHtml(message.sender_username || 'User')}</small>` : ''}<div class="chat-bubble-content">${message.shared_post ? sharedPostMarkup(message.shared_post) : mediaMarkup(message)}${message.type === 'post_share' ? '' : (message.content ? renderMessageText(message.content) : '')}</div><div class="chat-message-meta"><time>${escapeHtml(window.AeroI18n?.formatChatTimestamp?.(message.created_at) || '')}</time>${message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : ''}</div></div>`).join('');
     box.querySelectorAll('[data-lightbox-src]').forEach((item) => item.addEventListener('click', () => { const lightbox = document.getElementById('chat-lightbox'); const image = document.getElementById('chat-lightbox-image'); image.src = item.dataset.lightboxSrc; lightbox.classList.remove('hidden'); }));
     box.querySelectorAll('[data-delete-message]').forEach((button) => button.addEventListener('click', async () => { const response = await fetch(`${API_BASE}/chat/messages/${button.dataset.deleteMessage}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }); if (response.ok) button.closest('.chat-message')?.remove(); }));
     box.scrollTop = box.scrollHeight;
@@ -1274,25 +1347,7 @@ function setupMediaAndChat() {
     const attachButton = document.getElementById('chat-attach-btn');
     const fileInput = document.getElementById('chat-file-input');
     const attachmentMenu = document.getElementById('chat-attachment-menu');
-    const inlineAlert = document.getElementById('chat-inline-alert');
-    const blockButton = document.getElementById('chat-block-btn');
     const muteButton = document.getElementById('chat-mute-btn');
-    const setBlockedState = (blocked) => { blockButton?.classList.toggle('is-blocked', blocked); if (blockButton) blockButton.textContent = blocked ? 'Unblock' : 'Block'; const input = getChatInput(); if (input) input.disabled = blocked; inlineAlert?.classList.toggle('hidden', !blocked); if (inlineAlert) inlineAlert.textContent = blocked ? 'You have blocked this user.' : ''; };
-    const blockModal = document.getElementById('chat-block-confirm-modal');
-    const blockModalBody = document.getElementById('chat-block-confirm-body');
-    let blockModalPending = null;
-    const closeBlockModal = () => { blockModal?.classList.remove('is-open'); window.setTimeout(() => blockModal?.classList.add('hidden'), 200); blockModalPending = null; };
-    window.openChatBlockConfirmation = (contact, onConfirm) => {
-        blockModalPending = { contact, onConfirm };
-        if (blockModalBody) blockModalBody.textContent = `Are you sure you want to block @${contact.username}? You will no longer receive messages from this account.`;
-        blockModal?.classList.remove('hidden');
-        requestAnimationFrame(() => blockModal?.classList.add('is-open'));
-    };
-    document.getElementById('chat-block-cancel')?.addEventListener('click', closeBlockModal);
-    blockModal?.addEventListener('click', (event) => { if (event.target === blockModal) closeBlockModal(); });
-    document.getElementById('chat-block-confirm')?.addEventListener('click', async () => { const pending = blockModalPending; if (!pending) return; const confirmButton = document.getElementById('chat-block-confirm'); confirmButton.disabled = true; try { await pending.onConfirm(); closeBlockModal(); } finally { confirmButton.disabled = false; } });
-    const refreshBlockState = async (contact) => { const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }); const data = await response.json().catch(() => ({})); setBlockedState(response.ok && Boolean(data.blocked)); };
-    blockButton?.addEventListener('click', async () => { const contact = activeChatUser || window.activeChatUser; if (!contact) return; const blocked = blockButton.classList.contains('is-blocked'); const toggle = async () => { const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, { method: blocked ? 'DELETE' : 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }); if (response.ok) { setBlockedState(!blocked); window.showNotice?.(blocked ? 'User unblocked.' : 'You have blocked this user.', 'success'); } }; if (blocked) await toggle(); else window.openChatBlockConfirmation?.(contact, toggle); });
     muteButton?.addEventListener('click', async () => {
         const contact = activeChatUser || window.activeChatUser;
         if (!contact) return;
@@ -1347,7 +1402,8 @@ function setupMediaAndChat() {
             box.appendChild(message);
             box.scrollTop = box.scrollHeight;
         }
-        const response = await fetch(`${API_BASE}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: JSON.stringify(contact.is_group ? { group_id: contact.group_id || contact.id, content, media_url: mediaUrl, type: messageType, file_name: input.dataset.fileName || '', file_size: input.dataset.fileSize || 0 } : { user_id: contact.id, recipient_id: contact.id, content, media_url: mediaUrl, type: messageType, file_name: input.dataset.fileName || '', file_size: input.dataset.fileSize || 0 }) });
+        const encryptedContent = await encryptChatContent(content, contact);
+        const response = await fetch(`${API_BASE}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: JSON.stringify(contact.is_group ? { group_id: contact.group_id || contact.id, content: encryptedContent, media_url: mediaUrl, type: messageType, file_name: input.dataset.fileName || '', file_size: input.dataset.fileSize || 0 } : { user_id: contact.id, recipient_id: contact.id, content: encryptedContent, media_url: mediaUrl, type: messageType, file_name: input.dataset.fileName || '', file_size: input.dataset.fileSize || 0 }) });
         if (response.ok) { input.value = ''; ['mediaUrl', 'messageType', 'fileName', 'fileSize'].forEach((key) => delete input.dataset[key]); input.placeholder = 'Message...'; }
     });
     document.getElementById('chat-form')?.addEventListener('dragover', (event) => event.preventDefault());
