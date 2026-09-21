@@ -1,5 +1,5 @@
 (function configureAeroApi() {
-    const productionApiOrigin = 'https://goh.pythonanywhere.com';
+    const productionApiOrigin = 'https://aero-backend.onrender.com';
 
     window.AeroConfig = Object.freeze({
         API_ORIGIN: productionApiOrigin,
