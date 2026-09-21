@@ -7,8 +7,12 @@ Mini It Project 2620 G04
 Set the database to the Supabase transaction pooler on port `6543`:
 
 ```env
-AERO_DATABASE=postgresql://postgres.[REF]:[PASS]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require
+DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require
 ```
+
+The backend requires PostgreSQL through the Supabase transaction pooler. It does
+not fall back to a local SQLite database when PostgreSQL is unavailable; a
+connection failure is logged and startup stops.
 
 The backend uses `pool_pre_ping=true`, `pool_recycle=280`, and `pool_size=10` for PostgreSQL. Start it locally with `uvicorn main:app --host 0.0.0.0 --port 8000`, or deploy with the included `Procfile` command: `gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000`.
 

@@ -1,11 +1,14 @@
+import logging
 import os
 from pathlib import Path
 
 from flask import Flask, abort, g, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import create_engine, text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy import text
+
+
+logger = logging.getLogger(__name__)
 
 db = SQLAlchemy()  # creates database object
 
@@ -27,32 +30,17 @@ def create_app():
         "AERO_SECRET_KEY", "development-only-change-this-secret"
     )
     database_uri = os.environ.get(
-        "AERO_DATABASE",
-        "postgresql://postgres.[REF]:[PASS]@"
-        "aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require",
+        "DATABASE_URL",
+        os.environ.get(
+            "AERO_DATABASE",
+            "postgresql://postgres.tamzlrygqskxscofwnho:KaiYao0694%40@"
+            "aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require",
+        ),
     )
-    if database_uri.startswith(("postgresql://", "postgresql+")) and "6543" not in database_uri:
-        raise RuntimeError("AERO_DATABASE must use the Supabase transaction pooler on port 6543")
-    if database_uri.startswith(("postgresql://", "postgresql+")):
-        probe_engine = create_engine(
-            database_uri,
-            connect_args={"connect_timeout": 3},
-        )
-        try:
-            with probe_engine.connect() as connection:
-                connection.execute(text("SELECT 1"))
-        except OperationalError as error:
-            fallback_path = (base_dir / "aero-fallback.db").resolve()
-            database_uri = os.environ.get(
-                "AERO_DATABASE_FALLBACK",
-                f"sqlite:///{fallback_path.as_posix()}",
-            )
-            app.logger.warning(
-                "Supabase PostgreSQL is unavailable; using local fallback database: %s",
-                error.__class__.__name__,
-            )
-        finally:
-            probe_engine.dispose()
+    if not database_uri.startswith(("postgresql://", "postgresql+")):
+        raise RuntimeError("DATABASE_URL must point to the Supabase PostgreSQL database")
+    if "6543" not in database_uri:
+        raise RuntimeError("DATABASE_URL must use the Supabase transaction pooler on port 6543")
     app.config["SQLALCHEMY_DATABASE_URI"] = database_uri
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
@@ -77,7 +65,7 @@ def create_app():
     app.config["UPLOAD_FOLDER"] = str(upload_folder.resolve())
     Path(app.config["UPLOAD_FOLDER"]).mkdir(parents=True, exist_ok=True)
     required_origins = [
-        "https://aero-g04.netlify.app",
+        "https://aero-group4.netlify.app",
         r"https://.*\.netlify\.app",
         "https://goh.pythonanywhere.com",
     ]
@@ -174,9 +162,16 @@ def create_app():
 
     app.register_blueprint(notification_bp)
 
-    with app.app_context():
-        db.session.execute(text("SELECT 1"))
-        db.create_all()
+    try:
+        with app.app_context():
+            db.session.execute(text("SELECT 1"))
+            db.create_all()
+    except Exception:
+        logger.error(
+            "Supabase PostgreSQL connection or schema initialization failed",
+            exc_info=True,
+        )
+        raise
 
     from backend.admin import admin_bp
     from backend.admin import routes as admin_routes

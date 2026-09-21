@@ -21,9 +21,8 @@ allowed_origins = [
     if origin.strip()
 ]
 allowed_origins.extend([
-    "https://aero-g04.netlify.app",
+    "https://aero-group4.netlify.app",
     "https://goh.pythonanywhere.com",
-    "http://localhost:3000",
 ])
 
 app = FastAPI(title="Aero API", version="1.0.0")
