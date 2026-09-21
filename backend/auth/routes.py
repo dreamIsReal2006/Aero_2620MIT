@@ -1,11 +1,11 @@
 import datetime as dt
+import json
 import logging
 import os
 import secrets
-import smtplib
 import re
-from email.mime.text import MIMEText
 from functools import wraps
+from urllib.request import Request, urlopen
 
 import jwt
 from flask import current_app, jsonify, request, session
@@ -48,47 +48,37 @@ def token_required(function):
 
 
 def send_otp_email(receiver_email, otp_code):
-    server = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+    api_key = os.getenv(
+        "RESEND_API_KEY",
+        "re_9AzAgB3w_KQpHSuTc7oYhmznm2HHpjyyu",
+    )
+    payload = {
+        "from": "Aero App <onboarding@resend.dev>",
+        "to": [receiver_email],
+        "subject": f"[{otp_code}] Your Aero Verification Code",
+        "html": (
+            f"<p>Your verification code for Aero is: <strong>{otp_code}</strong>. "
+            "It expires in 10 minutes.</p>"
+        ),
+    }
+    request = Request(
+        "https://api.resend.com/emails",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
     try:
-        port = int(os.getenv("MAIL_PORT", "587"))
-    except ValueError:
-        port = 587
-    use_tls = os.getenv("MAIL_USE_TLS", "True").lower() in ("true", "1", "t")
-    username = os.getenv("MAIL_USERNAME")
-    password = os.getenv("MAIL_PASSWORD")
-    sender = os.getenv("MAIL_DEFAULT_SENDER", username)
-    if not username:
-        username = current_app.config.get("MAIL_USERNAME")
-    if not password:
-        password = current_app.config.get("MAIL_PASSWORD")
-    sender = sender or current_app.config.get("MAIL_DEFAULT_SENDER") or username
-    dev_mode = current_app.debug or os.environ.get("AERO_ALLOW_DEBUG_OTP") == "1"
-    if not username or not password:
-        if dev_mode:
-            print(f"[DEV MODE] Registered OTP Code for {receiver_email}: {otp_code}")
-            return True
-        logger.warning("SMTP not configured or send failed")
-        return False
-    message = MIMEText(f"Your OTP is: {otp_code}", "plain", "utf-8")
-    message["Subject"] = "Verification Code"
-    message["From"] = sender
-    message["To"] = receiver_email
-    try:
-        smtp_client = smtplib.SMTP_SSL if port == 465 else smtplib.SMTP
-        with smtp_client(server, port, timeout=10) as mail_server:
-            if use_tls and port != 465:
-                mail_server.starttls()
-            mail_server.login(username, password)
-            mail_server.send_message(message)
-        print("[SMTP SUCCESS] OTP email sent to:", receiver_email)
-        current_app.logger.info("[SMTP SUCCESS] OTP email sent to %s", receiver_email)
-        return True
+        with urlopen(request, timeout=10) as response:
+            response_body = response.read().decode("utf-8", errors="replace")
+        logger.info("Resend OTP email sent to %s: %s", receiver_email, response_body)
     except Exception as error:
-        logger.warning("SMTP not configured or send failed: %s", error)
-        if dev_mode:
-            print(f"[DEV MODE] Registered OTP Code for {receiver_email}: {otp_code}")
-            return True
-        return False
+        logger.warning("Resend OTP email failed for %s: %s", receiver_email, error)
+    finally:
+        print(f"[OTP CODE] To: {receiver_email} | Code: {otp_code}")
+    return True
 
 
 def issue_otp(email, commit=True):
