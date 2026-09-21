@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('aero_token');
     const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
-    const apiBase = `${window.AeroConfig.API_BASE_URL}/admin`;
+    const apiBase = window.AeroConfig.ADMIN_API_BASE || `${window.AeroConfig.API_ORIGIN}/api/admin`;
     if (!token || (user.is_admin !== true && !['admin', 'moderator'].includes(user.role))) {
         window.location.href = 'index.html';
         return;

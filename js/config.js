@@ -1,5 +1,5 @@
 (function configureAeroApi() {
-    const productionApiOrigin = 'https://GOH.pythonanywhere.com';
+    const productionApiOrigin = 'https://goh.pythonanywhere.com';
 
     window.AeroConfig = Object.freeze({
         API_ORIGIN: productionApiOrigin,

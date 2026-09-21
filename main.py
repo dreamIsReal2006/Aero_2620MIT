@@ -22,7 +22,7 @@ allowed_origins = [
 ]
 allowed_origins.extend([
     "https://aero-g04.netlify.app",
-    "https://GOH.pythonanywhere.com",
+    "https://goh.pythonanywhere.com",
     "http://localhost:3000",
 ])
 

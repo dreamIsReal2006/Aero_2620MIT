@@ -79,7 +79,7 @@ def create_app():
     required_origins = [
         "https://aero-g04.netlify.app",
         r"https://.*\.netlify\.app",
-        "https://GOH.pythonanywhere.com",
+        "https://goh.pythonanywhere.com",
     ]
     configured_origins = [
         origin.strip()
