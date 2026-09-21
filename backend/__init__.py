@@ -28,9 +28,11 @@ def create_app():
     )
     database_uri = os.environ.get(
         "AERO_DATABASE",
-        "postgresql://postgres.tamzlryggksxcofwnho:Aero2620Pass!@"
-        "aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres",
+        "postgresql://postgres.[REF]:[PASS]@"
+        "aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require",
     )
+    if database_uri.startswith(("postgresql://", "postgresql+")) and "6543" not in database_uri:
+        raise RuntimeError("AERO_DATABASE must use the Supabase transaction pooler on port 6543")
     if database_uri.startswith(("postgresql://", "postgresql+")):
         probe_engine = create_engine(
             database_uri,
@@ -55,7 +57,11 @@ def create_app():
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
         "pool_pre_ping": True,
-        "pool_recycle": 300,
+        "pool_recycle": 280,
+        "pool_size": 10,
+    } if database_uri.startswith(("postgresql://", "postgresql+")) else {
+        "pool_pre_ping": True,
+        "pool_recycle": 280,
     }
     app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
     app.config["MAIL_SERVER"] = os.environ.get("AERO_MAIL_SERVER", "smtp.gmail.com")
