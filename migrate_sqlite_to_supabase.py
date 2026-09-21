@@ -85,24 +85,39 @@ def get_target_tables(connection) -> set[str]:
         return {row[0] for row in cursor.fetchall()}
 
 
-def get_target_columns(connection, table_name: str) -> set[str]:
+def get_target_columns(connection, table_name: str) -> dict[str, str]:
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT column_name
+            SELECT column_name, data_type
             FROM information_schema.columns
             WHERE table_schema = 'public' AND table_name = %s
             """,
             (table_name,),
         )
-        return {row[0] for row in cursor.fetchall()}
+        return {row[0]: row[1] for row in cursor.fetchall()}
+
+
+def convert_boolean_value(value):
+    """Convert SQLite's common 0/1 boolean representation to Python bool."""
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in (0, 1):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"0", "false"}:
+            return False
+        if normalized in {"1", "true"}:
+            return True
+    return value
 
 
 def migrate_table(
     sqlite_connection: sqlite3.Connection,
     postgres_connection,
     table_name: str,
-    target_columns: set[str],
+    target_columns: dict[str, str],
 ) -> int:
     source_columns = get_source_columns(sqlite_connection, table_name)
     columns = [column for column in source_columns if column in target_columns]
@@ -116,6 +131,19 @@ def migrate_table(
     ).fetchall()
     if not rows:
         return 0
+
+    boolean_indexes = {
+        index
+        for index, column in enumerate(columns)
+        if target_columns[column] == "boolean"
+    }
+    rows = [
+        tuple(
+            convert_boolean_value(value) if index in boolean_indexes else value
+            for index, value in enumerate(row)
+        )
+        for row in rows
+    ]
 
     insert_statement = sql.SQL("INSERT INTO {} ({}) VALUES %s ON CONFLICT DO NOTHING").format(
         sql.Identifier(table_name),
