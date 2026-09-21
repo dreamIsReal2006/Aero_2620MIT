@@ -39,8 +39,6 @@ def create_app():
     )
     if not database_uri.startswith(("postgresql://", "postgresql+")):
         raise RuntimeError("DATABASE_URL must point to the Supabase PostgreSQL database")
-    if "5432" not in database_uri:
-        raise RuntimeError("DATABASE_URL must use the Supabase PostgreSQL port 5432")
     app.config["SQLALCHEMY_DATABASE_URI"] = database_uri
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
