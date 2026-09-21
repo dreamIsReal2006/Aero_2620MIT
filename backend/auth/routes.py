@@ -1,8 +1,8 @@
 import datetime as dt
+import logging
 import os
 import secrets
 import smtplib
-import traceback
 import re
 from email.mime.text import MIMEText
 from functools import wraps
@@ -14,6 +14,9 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from backend import db
 from backend.auth import auth_bp
 from backend.models import AppealTicket, Comment, Follow, Like, OTPCode, Post, Report, User
+
+
+logger = logging.getLogger(__name__)
 
 
 def make_token(user):
@@ -64,7 +67,7 @@ def send_otp_email(receiver_email, otp_code):
         if dev_mode:
             print(f"[DEV MODE] Registered OTP Code for {receiver_email}: {otp_code}")
             return True
-        current_app.logger.error("SMTP is not configured; OTP email was not sent")
+        logger.warning("SMTP not configured or send failed")
         return False
     message = MIMEText(f"Your OTP is: {otp_code}", "plain", "utf-8")
     message["Subject"] = "Verification Code"
@@ -81,14 +84,7 @@ def send_otp_email(receiver_email, otp_code):
         current_app.logger.info("[SMTP SUCCESS] OTP email sent to %s", receiver_email)
         return True
     except Exception as error:
-        print("========== [SMTP ERROR DEBUG] ==========")
-        traceback.print_exc()
-        print("========================================")
-        if isinstance(error, smtplib.SMTPAuthenticationError):
-            print("[SMTP ERROR] Authentication failed: check MAIL_PASSWORD is a Gmail App Password.", error)
-        else:
-            print("[SMTP ERROR] OTP email delivery failed:", str(error))
-        current_app.logger.error("[SMTP ERROR] OTP delivery failed: %s", error)
+        logger.warning("SMTP not configured or send failed: %s", error)
         if dev_mode:
             print(f"[DEV MODE] Registered OTP Code for {receiver_email}: {otp_code}")
             return True
@@ -146,10 +142,9 @@ def signup():
         user.set_password(password)
         db.session.add(user)
         db.session.flush()
-        if not issue_otp(email, commit=False):
-            raise RuntimeError("OTP email could not be sent. Check SMTP configuration")
+        issue_otp(email, commit=False)
         db.session.commit()
-        return jsonify({"message": "Verification code sent to your email"}), 200
+        return jsonify({"message": "Verification code generated. Check your email if delivery succeeds."}), 200
     except RuntimeError as error:
         db.session.rollback()
         db.session.query(OTPCode).filter_by(email=email).delete()
@@ -166,9 +161,8 @@ def resend_otp():
     user = User.query.filter_by(email=email).first()
     if not user or user.active:
         return jsonify({"message": "Invalid verification code request"}), 400
-    if not issue_otp(email):
-        return jsonify({"message": "OTP email could not be sent. Check SMTP configuration"}), 502
-    return jsonify({"message": "A new verification code has been sent"}), 200
+    issue_otp(email)
+    return jsonify({"message": "A new verification code was generated. Check your email if delivery succeeds."}), 200
 
 
 @auth_bp.post("/verify-otp")
@@ -206,9 +200,7 @@ def forgot_password():
     if not user or not user.active:
         return jsonify({"message": "If the account exists, a reset code has been sent"}), 200
     session["password_reset_email"] = user.email
-    if not issue_otp(user.email):
-        session.pop("password_reset_email", None)
-        return jsonify({"message": "Reset code could not be sent. Check SMTP configuration"}), 502
+    issue_otp(user.email)
     return jsonify({"message": "Reset code sent"}), 200
 
 
