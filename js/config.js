@@ -4,6 +4,7 @@
     window.AeroConfig = Object.freeze({
         API_ORIGIN: productionApiOrigin,
         API_BASE_URL: `${productionApiOrigin}/api`,
+        ADMIN_API_BASE: `${productionApiOrigin}/api/admin`,
         SUPABASE_URL: 'https://tamzlrygqskxscofwnho.supabase.co',
         SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhbXpscnlncXNreHNjb2Z3bmhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3NTk0NTEsImV4cCI6MjEwNTMzNTQ1MX0.mW5t54xtg5-TNh71h3wCZSPY9rnPHXW64I8PGaaL9fU'
     });

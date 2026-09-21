@@ -1,6 +1,6 @@
 const API_BASE = window.AeroConfig.API_BASE_URL;
 const API_ORIGIN = window.AeroConfig.API_ORIGIN;
-const ADMIN_API_BASE = `${API_BASE}/admin`;
+const ADMIN_API_BASE = window.AeroConfig.ADMIN_API_BASE || `${API_ORIGIN}/api/admin`;
 const DEFAULT_ADMIN_STATS = { total_users: 0, total_posts: 0, pending_reports: 0 };
 
 const HDR_MEDIA_QUERY = '(dynamic-range: high)';
