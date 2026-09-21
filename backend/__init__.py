@@ -34,13 +34,13 @@ def create_app():
         os.environ.get(
             "AERO_DATABASE",
             "postgresql://postgres.tamzlrygqskxscofwnho:KaiYao0694%40@"
-            "aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require",
+            "aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require",
         ),
     )
     if not database_uri.startswith(("postgresql://", "postgresql+")):
         raise RuntimeError("DATABASE_URL must point to the Supabase PostgreSQL database")
-    if "6543" not in database_uri:
-        raise RuntimeError("DATABASE_URL must use the Supabase transaction pooler on port 6543")
+    if "5432" not in database_uri:
+        raise RuntimeError("DATABASE_URL must use the Supabase PostgreSQL port 5432")
     app.config["SQLALCHEMY_DATABASE_URI"] = database_uri
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
