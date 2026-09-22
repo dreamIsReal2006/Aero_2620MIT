@@ -52,9 +52,8 @@ def send_otp_email(receiver_email, otp_code):
     username = os.getenv("MAIL_USERNAME")
     password = os.getenv("MAIL_PASSWORD")
     sender = os.getenv("MAIL_DEFAULT_SENDER") or username
-    use_tls = os.getenv("MAIL_USE_TLS", "True").strip().lower() in {"1", "true", "yes", "on"}
     try:
-        port = int(os.getenv("MAIL_PORT", "587"))
+        port = int(os.getenv("MAIL_PORT", "465"))
     except ValueError:
         logger.error("Invalid MAIL_PORT; expected an integer")
         return False
@@ -80,11 +79,7 @@ def send_otp_email(receiver_email, otp_code):
     message["From"] = sender
     message["To"] = receiver_email
     try:
-        with smtplib.SMTP(server, port, timeout=10) as mail_server:
-            mail_server.ehlo()
-            if use_tls:
-                mail_server.starttls()
-                mail_server.ehlo()
+        with smtplib.SMTP_SSL(server, port, timeout=10) as mail_server:
             mail_server.login(username, password)
             mail_server.send_message(message)
         logger.info("OTP email sent to %s", receiver_email)
