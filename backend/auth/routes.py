@@ -48,10 +48,7 @@ def token_required(function):
 
 
 def send_otp_email(receiver_email, otp_code):
-    api_key = os.getenv(
-        "RESEND_API_KEY",
-        "re_9AzAgB3w_KQpHSuTc7oYhmznm2HHpjyyu",
-    )
+    api_key = os.getenv("RESEND_API_KEY")
     payload = {
         "from": "Aero App <onboarding@resend.dev>",
         "to": [receiver_email],
