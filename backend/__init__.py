@@ -2,7 +2,7 @@ import logging
 import os
 from pathlib import Path
 
-from flask import Flask, abort, g, jsonify, request, send_from_directory
+from flask import Flask, g, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
@@ -20,11 +20,6 @@ def create_app():
         static_folder=str(base_dir),
         static_url_path="",
     )
-
-    @app.before_request
-    def block_legacy_admin_page():
-        if request.method != "OPTIONS" and request.path in {"/admin", "/admin.html"}:
-            abort(404)
 
     app.config["SECRET_KEY"] = os.environ.get(
         "AERO_SECRET_KEY", "development-only-change-this-secret"
@@ -157,6 +152,15 @@ def create_app():
         with app.app_context():
             db.session.execute(text("SELECT 1"))
             db.create_all()
+            db.session.execute(text(
+                "UPDATE users SET role = 'admin' "
+                "WHERE is_admin IS TRUE AND role <> 'admin'"
+            ))
+            db.session.execute(text(
+                "UPDATE users SET is_admin = TRUE "
+                "WHERE role = 'admin' AND is_admin IS NOT TRUE"
+            ))
+            db.session.commit()
     except Exception:
         logger.error(
             "Supabase PostgreSQL connection or schema initialization failed",
@@ -166,15 +170,10 @@ def create_app():
 
     from backend.admin import admin_bp
     from backend.admin import routes as admin_routes
-    from backend.admin.decorators import require_role, login_required
-
     app.register_blueprint(admin_bp)
 
-    admin_page_path = "/admin.html"
-
-    @app.get(admin_page_path)
-    @login_required
-    @require_role(["admin", "moderator"])
+    @app.get("/admin")
+    @app.get("/admin.html")
     def admin_dashboard():
         return send_from_directory(base_dir, "admin.html")
 

@@ -20,6 +20,13 @@ from backend.models import AppealTicket, Comment, Follow, Like, OTPCode, Post, R
 logger = logging.getLogger(__name__)
 
 
+def effective_user_role(user):
+    """Return the role used by API consumers when legacy fields disagree."""
+    if bool(user.is_admin) or user.role == "admin":
+        return "admin"
+    return user.role if user.role in {"moderator", "user"} else "user"
+
+
 def make_token(user):
     return jwt.encode(
         {"user_id": user.id, "username": user.username,
@@ -185,12 +192,13 @@ def verify_otp():
     db.session.delete(otp)
     db.session.commit()
     session["user_id"] = user.id
+    role = effective_user_role(user)
     return jsonify({"token": make_token(user), "user": {
         "id": user.id, "username": user.username, "display_name": user.display_name or user.username, "email": user.email,
         "bio": user.bio or "", "avatar_url": user.avatar_url or "",
-        "role": user.role if user.role in {"admin", "moderator", "user"} else "user",
-        "is_moderator": user.role == "moderator",
-        "is_admin": user.is_admin, "is_banned": user.is_banned,
+        "role": role,
+        "is_moderator": role == "moderator",
+        "is_admin": role == "admin", "is_banned": user.is_banned,
         "is_private": user.is_private, "show_online_status": user.show_online_status,
     }}), 200
 
@@ -259,12 +267,13 @@ def signin():
     if user.is_banned:
         return jsonify({"message": "Account suspended", "suspended": True, "username": user.username}), 403
     session["user_id"] = user.id
+    role = effective_user_role(user)
     return jsonify({"token": make_token(user), "user": {
         "id": user.id, "username": user.username, "display_name": user.display_name or user.username, "email": user.email,
         "bio": user.bio or "", "avatar_url": user.avatar_url or "",
-        "role": user.role if user.role in {"admin", "moderator", "user"} else "user",
-        "is_moderator": user.role == "moderator",
-        "is_admin": user.is_admin, "is_banned": user.is_banned,
+        "role": role,
+        "is_moderator": role == "moderator",
+        "is_admin": role == "admin", "is_banned": user.is_banned,
         "is_private": user.is_private, "show_online_status": user.show_online_status,
     }}), 200
 
