@@ -1,11 +1,11 @@
 import datetime as dt
-import json
 import logging
 import os
 import secrets
 import re
+import smtplib
+from email.mime.text import MIMEText
 from functools import wraps
-from urllib.request import Request, urlopen
 
 import jwt
 from flask import current_app, jsonify, request, session
@@ -48,34 +48,50 @@ def token_required(function):
 
 
 def send_otp_email(receiver_email, otp_code):
-    api_key = os.getenv("RESEND_API_KEY")
-    payload = {
-        "from": "Aero App <onboarding@resend.dev>",
-        "to": [receiver_email],
-        "subject": f"[{otp_code}] Your Aero Verification Code",
-        "html": (
-            f"<p>Your verification code for Aero is: <strong>{otp_code}</strong>. "
-            "It expires in 10 minutes.</p>"
-        ),
-    }
-    request = Request(
-        "https://api.resend.com/emails",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
+    server = os.getenv("MAIL_SERVER")
+    username = os.getenv("MAIL_USERNAME")
+    password = os.getenv("MAIL_PASSWORD")
+    sender = os.getenv("MAIL_DEFAULT_SENDER") or username
+    use_tls = os.getenv("MAIL_USE_TLS", "True").strip().lower() in {"1", "true", "yes", "on"}
     try:
-        with urlopen(request, timeout=10) as response:
-            response_body = response.read().decode("utf-8", errors="replace")
-        logger.info("Resend OTP email sent to %s: %s", receiver_email, response_body)
+        port = int(os.getenv("MAIL_PORT", "587"))
+    except ValueError:
+        logger.error("Invalid MAIL_PORT; expected an integer")
+        return False
+
+    if not server or not username or not password or not sender:
+        logger.warning("SMTP is not configured; OTP email was not sent")
+        return False
+
+    message = MIMEText(
+        f"""
+        <html>
+          <body>
+            <p>Your Aero verification code is:</p>
+            <p><strong style="font-size: 24px;">{otp_code}</strong></p>
+            <p>This code expires in 10 minutes. Please do not share it with anyone.</p>
+          </body>
+        </html>
+        """,
+        "html",
+        "utf-8",
+    )
+    message["Subject"] = "Your Aero Verification Code"
+    message["From"] = sender
+    message["To"] = receiver_email
+    try:
+        with smtplib.SMTP(server, port, timeout=10) as mail_server:
+            mail_server.ehlo()
+            if use_tls:
+                mail_server.starttls()
+                mail_server.ehlo()
+            mail_server.login(username, password)
+            mail_server.send_message(message)
+        logger.info("OTP email sent to %s", receiver_email)
+        return True
     except Exception as error:
-        logger.warning("Resend OTP email failed for %s: %s", receiver_email, error)
-    finally:
-        print(f"[OTP CODE] To: {receiver_email} | Code: {otp_code}")
-    return True
+        logger.warning("OTP email send failed for %s: %s", receiver_email, error)
+        return False
 
 
 def issue_otp(email, commit=True):
