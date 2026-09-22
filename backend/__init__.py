@@ -170,6 +170,7 @@ def create_app():
 
     from backend.admin import admin_bp
     from backend.admin import routes as admin_routes
+    from backend.admin.decorators import login_required, require_role
     app.register_blueprint(admin_bp)
 
     @app.get("/admin")
