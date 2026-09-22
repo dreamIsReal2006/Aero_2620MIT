@@ -1,11 +1,12 @@
 import datetime as dt
+import json
 import logging
 import os
 import secrets
 import re
-import smtplib
-from email.mime.text import MIMEText
 from functools import wraps
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 
 import jwt
 from flask import current_app, jsonify, request, session
@@ -47,46 +48,50 @@ def token_required(function):
     return decorated
 
 
-def send_otp_email(receiver_email, otp_code):
-    server = os.getenv("MAIL_SERVER")
-    username = os.getenv("MAIL_USERNAME")
-    password = os.getenv("MAIL_PASSWORD")
-    sender = os.getenv("MAIL_DEFAULT_SENDER") or username
-    try:
-        port = int(os.getenv("MAIL_PORT", "465"))
-    except ValueError:
-        logger.error("Invalid MAIL_PORT; expected an integer")
+def send_otp_via_sendgrid(to_email, otp_code):
+    api_key = os.getenv("SENDGRID_API_KEY")
+    sender = os.getenv("MAIL_DEFAULT_SENDER", "kaiyaowu3@gmail.com")
+    if not api_key:
+        logger.error("[SENDGRID ERROR] SENDGRID_API_KEY is not configured")
         return False
 
-    if not server or not username or not password or not sender:
-        logger.warning("SMTP is not configured; OTP email was not sent")
-        return False
-
-    message = MIMEText(
-        f"""
-        <html>
-          <body>
-            <p>Your Aero verification code is:</p>
-            <p><strong style="font-size: 24px;">{otp_code}</strong></p>
-            <p>This code expires in 10 minutes. Please do not share it with anyone.</p>
-          </body>
-        </html>
-        """,
-        "html",
-        "utf-8",
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": sender},
+        "subject": "Your Aero Verification Code",
+        "content": [{
+            "type": "text/html",
+            "value": (
+                "<html><body>"
+                "<p>Your Aero verification code is:</p>"
+                f'<p><strong style="font-size: 24px;">{otp_code}</strong></p>'
+                "<p>This code expires in 10 minutes. Please do not share it with anyone.</p>"
+                "</body></html>"
+            ),
+        }],
+    }
+    request = urllib_request.Request(
+        "https://api.sendgrid.com/v3/mail/send",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
     )
-    message["Subject"] = "Your Aero Verification Code"
-    message["From"] = sender
-    message["To"] = receiver_email
     try:
-        with smtplib.SMTP_SSL(server, port, timeout=10) as mail_server:
-            mail_server.login(username, password)
-            mail_server.send_message(message)
-        logger.info("OTP email sent to %s", receiver_email)
-        return True
+        with urllib_request.urlopen(request, timeout=10) as response:
+            status_code = response.getcode()
+        if status_code in (200, 202):
+            logger.info("[SENDGRID SUCCESS] OTP email sent to %s", to_email)
+            return True
+        logger.error("[SENDGRID ERROR] Unexpected HTTP status %s for %s", status_code, to_email)
+    except urllib_error.HTTPError as error:
+        logger.error("[SENDGRID ERROR] HTTP %s while sending OTP to %s: %s", error.code, to_email, error.reason)
     except Exception as error:
-        logger.warning("OTP email send failed for %s: %s", receiver_email, error)
+        logger.error("[SENDGRID ERROR] Failed to send OTP to %s: %s", to_email, error)
         return False
+    return False
 
 
 def issue_otp(email, commit=True):
@@ -98,7 +103,7 @@ def issue_otp(email, commit=True):
     db.session.add(otp)
     if commit:
         db.session.commit()
-    return send_otp_email(email, code)
+    return send_otp_via_sendgrid(email, code)
 
 
 @auth_bp.get("/test")

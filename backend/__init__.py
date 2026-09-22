@@ -50,13 +50,6 @@ def create_app():
         "pool_recycle": 280,
     }
     app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
-    app.config["MAIL_SERVER"] = os.environ.get("AERO_MAIL_SERVER", "smtp.gmail.com")
-    app.config["MAIL_PORT"] = int(os.environ.get("AERO_MAIL_PORT", "587"))
-    app.config["MAIL_USERNAME"] = os.environ.get("AERO_MAIL_USERNAME")
-    app.config["MAIL_PASSWORD"] = os.environ.get("AERO_MAIL_PASSWORD")
-    app.config["MAIL_DEFAULT_SENDER"] = os.environ.get(
-        "AERO_MAIL_DEFAULT_SENDER", app.config["MAIL_USERNAME"]
-    )
     upload_folder = Path(os.environ.get("AERO_UPLOAD_DIR", "uploads"))
     if not upload_folder.is_absolute():
         upload_folder = base_dir / upload_folder
