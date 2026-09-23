@@ -39,7 +39,46 @@ class Post(db.Model):
     parent_id = db.Column(db.Integer, db.ForeignKey("posts.id"), nullable=True, index=True)
     type = db.Column(db.String(12), nullable=False, default="original", index=True)
 
-    parent = db.relationship("Post", remote_side=[id], backref=db.backref("reposts", lazy=True))
+    parent = db.relationship(
+        "Post",
+        remote_side=[id],
+        backref=db.backref(
+            "reposts",
+            lazy=True,
+            cascade="all, delete-orphan",
+        ),
+    )
+
+    comments = db.relationship(
+        "Comment",
+        backref="post",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
+    likes = db.relationship(
+        "Like",
+        backref="post",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
+    interactions = db.relationship(
+        "UserInteraction",
+        backref="post",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
+    notifications = db.relationship(
+        "Notification",
+        backref="post",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
+    messages = db.relationship(
+        "Message",
+        backref="post",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
 
     author = db.relationship(
         "User",

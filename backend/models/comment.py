@@ -52,5 +52,6 @@ class Comment(db.Model):
             "parent",
             remote_side=[id]
         ),
+        cascade="all, delete-orphan",
         lazy=True
     )

@@ -10,7 +10,18 @@ from werkzeug.utils import secure_filename
 from backend import db
 from backend.auth.routes import token_required
 from backend.feed import feed_bp
-from backend.models import Comment, Follow, Like, Message, Notification, Post, User, UserInteraction
+from backend.models import (
+    Comment,
+    CommentLike,
+    Follow,
+    Like,
+    Message,
+    Notification,
+    Post,
+    Report,
+    User,
+    UserInteraction,
+)
 from backend.mentions import add_mention_notifications
 from backend.privacy import visible_author_ids as get_visible_author_ids
 from backend.presence import is_user_online
@@ -199,6 +210,23 @@ def delete_post(current_user, post_id):
         post = None
     if not post:
         return jsonify({"message": "You are not authorized to delete this post"}), 403
+
+    comment_ids = [
+        comment.id
+        for comment in Comment.query.filter_by(post_id=post.id).all()
+    ]
+    if comment_ids:
+        CommentLike.query.filter(CommentLike.comment_id.in_(comment_ids)).delete(
+            synchronize_session=False
+        )
+    UserInteraction.query.filter_by(post_id=post.id).delete(synchronize_session=False)
+    Like.query.filter_by(post_id=post.id).delete(synchronize_session=False)
+    Notification.query.filter_by(post_id=post.id).delete(synchronize_session=False)
+    Message.query.filter_by(post_id=post.id).delete(synchronize_session=False)
+    Report.query.filter(
+        Report.target_type == "post",
+        Report.target_id == post.id,
+    ).delete(synchronize_session=False)
     db.session.delete(post)
     db.session.commit()
     return jsonify({"message": "Post deleted successfully"})
