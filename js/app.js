@@ -306,7 +306,7 @@
             let profileUserId = userId == null ? currentUserId : Number(userId);
             if (sharedUsername && !/^\d+$/.test(sharedUsername)) {
                 const profileResponse = await fetch(`${apiBase}/users/profile?username=${encodeURIComponent(sharedUsername)}`, {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+                    headers: window.AeroAuthHeaders?.() || {}
                 });
                 const profilePayload = await profileResponse.json().catch(() => ({}));
                 if (!profileResponse.ok || !profilePayload.user?.id) throw new Error(profilePayload.message || 'Profile not found');
@@ -315,7 +315,7 @@
                 profileUserId = Number(sharedUsername);
             }
             const response = await fetch(`${apiBase}/${profileUserId && profileUserId !== currentUserId ? `users/${profileUserId}` : 'users/me'}`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+                headers: window.AeroAuthHeaders?.() || {}
             });
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(payload.message || 'Unable to load profile');
@@ -324,7 +324,7 @@
             let posts = Array.isArray(payload.posts) ? payload.posts : [];
             if (profileUserId && profileUserId !== currentUserId) {
                 const postsResponse = await fetch(`${apiBase}/posts?author_id=${profileUserId}`, {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+                    headers: window.AeroAuthHeaders?.() || {}
                 });
                 const authorPosts = await postsResponse.json().catch(() => []);
                 const authorPostItems = Array.isArray(authorPosts) ? authorPosts : authorPosts.posts;
@@ -392,6 +392,7 @@
                     }
                 });
                 header.querySelector('.profile-message-btn')?.addEventListener('click', () => {
+                    if (!window.requireAuth?.(null, 'Please sign in before starting a chat.')) return;
                     window.switchView('chat');
                     window.loadChatContacts?.();
                     window.selectChatContact?.({ id: profileUserId, username: user.username, avatar_url: user.avatar_url, is_online: user.is_online });
@@ -537,6 +538,7 @@
             }
             const dockButton = event.target.closest('#home-nav-btn, #video-dock-btn, #chat-dock-btn');
             if (dockButton) {
+                if (dockButton.id === 'chat-dock-btn' && !window.requireAuth?.(null, 'Please sign in before opening chat.')) return;
                 const view = dockButton.id === 'home-nav-btn' ? 'main' : dockButton.id === 'video-dock-btn' ? 'shorts' : 'chat';
                 navigate(view);
                 return;

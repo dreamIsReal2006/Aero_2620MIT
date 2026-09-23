@@ -5,7 +5,7 @@ from flask import jsonify, request
 from sqlalchemy import func
 
 from backend import db
-from backend.auth.routes import token_required
+from backend.auth.routes import optional_token, token_required
 from backend.models import Comment, Follow, Notification, Post, Report, User, Video, VideoLike
 from backend.presence import is_user_online
 
@@ -131,11 +131,11 @@ def get_profile(current_user, user_id):
             "id": user.id,
             "username": user.username,
             "display_name": user.display_name or user.username,
-            "email": user.email,
+            "email": user.email if current_user else None,
             "bio": user.bio or "",
             "avatar_url": user.avatar_url or "",
             "role": user.role if user.role in {"admin", "moderator", "user"} else "user",
-            "is_online": is_user_online(user, current_user.id),
+            "is_online": is_user_online(user, current_user.id if current_user else None),
             "created_at": user.created_at.isoformat(),
         },
         "followers_count": followers_count,
@@ -145,7 +145,7 @@ def get_profile(current_user, user_id):
 
 
 @social_bp.get("/users/profile")
-@token_required
+@optional_token
 def get_profile_by_username(current_user):
     username = str(request.args.get("username", "")).strip()
     if not username:
@@ -157,7 +157,7 @@ def get_profile_by_username(current_user):
     followers_count = Follow.query.filter_by(following_id=user.id, status="approved").count()
     following_count = Follow.query.filter_by(follower_id=user.id, status="approved").count()
     allowed = can_view_user_content(current_user, user)
-    is_following = Follow.query.filter_by(
+    is_following = current_user and Follow.query.filter_by(
         follower_id=current_user.id,
         following_id=user.id,
         status="approved",
@@ -167,11 +167,11 @@ def get_profile_by_username(current_user):
             "id": user.id,
             "username": user.username,
             "display_name": user.display_name or user.username,
-            "email": user.email,
+            "email": user.email if current_user else None,
             "bio": user.bio or "",
             "avatar_url": user.avatar_url or "",
             "role": user.role if user.role in {"admin", "moderator", "user"} else "user",
-            "is_online": is_user_online(user, current_user.id),
+            "is_online": is_user_online(user, current_user.id if current_user else None),
             "created_at": user.created_at.isoformat(),
         },
         "is_following": is_following,
@@ -182,7 +182,7 @@ def get_profile_by_username(current_user):
 
 
 @social_bp.get("/users/<int:user_id>")
-@token_required
+@optional_token
 def get_user_profile(current_user, user_id):
     user = db.session.get(User, user_id)
     if not user:
@@ -193,7 +193,7 @@ def get_user_profile(current_user, user_id):
     allowed = can_view_user_content(current_user, user)
     limit, offset = _post_pagination()
     posts = Post.query.filter_by(user_id=user_id).order_by(Post.created_at.desc()).limit(limit).offset(offset).all() if allowed else []
-    is_following = Follow.query.filter_by(
+    is_following = current_user and Follow.query.filter_by(
         follower_id=current_user.id,
         following_id=user_id,
         status="approved",

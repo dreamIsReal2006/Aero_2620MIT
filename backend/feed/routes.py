@@ -12,7 +12,7 @@ from sqlalchemy.orm import contains_eager, load_only
 from werkzeug.utils import secure_filename
 
 from backend import db
-from backend.auth.routes import token_required
+from backend.auth.routes import optional_token, token_required
 from backend.feed import feed_bp
 from backend.models import (
     Comment,
@@ -197,14 +197,14 @@ def search(current_user):
 
 
 @feed_bp.get("/posts")
-@token_required
+@optional_token
 def get_posts(current_user):
     requested_limit = request.args.get("limit", 10, type=int) or 10
     limit = min(max(requested_limit, 1), 15)
     cursor = _decode_post_cursor(request.args.get("cursor", ""))
     feed_type = str(request.args.get("feed_type", "for_you")).strip().lower()
     author_id = request.args.get("author_id", type=int)
-    cache_key = (current_user.id, feed_type, author_id, request.args.get("cursor", ""), limit)
+    cache_key = (current_user.id if current_user else None, feed_type, author_id, request.args.get("cursor", ""), limit)
     cached = _cached_posts(cache_key)
     if cached is not None:
         return jsonify(cached)
@@ -213,12 +213,12 @@ def get_posts(current_user):
         post_id for (post_id,) in db.session.query(UserInteraction.post_id).filter_by(
             user_id=current_user.id, type="not_interested"
         ).all()
-    }
+    } if current_user else set()
     followed_ids = {
         following_id for (following_id,) in db.session.query(Follow.following_id).filter_by(
             follower_id=current_user.id, status="approved"
         ).all()
-    }
+    } if current_user else set()
 
     like_counts = db.session.query(
         Like.post_id.label("post_id"),
@@ -283,14 +283,14 @@ def get_posts(current_user):
         post_id for (post_id,) in db.session.query(Like.post_id).filter(
             Like.user_id == current_user.id, Like.post_id.in_(post_ids)
         ).all()
-    } if post_ids else set()
+    } if current_user and post_ids else set()
     bookmarked_ids = {
         post_id for (post_id,) in db.session.query(UserInteraction.post_id).filter(
             UserInteraction.user_id == current_user.id,
             UserInteraction.type == "bookmark",
             UserInteraction.post_id.in_(post_ids),
         ).all()
-    } if post_ids else set()
+    } if current_user and post_ids else set()
     posts = [
         optimized_post_payload(
             post,

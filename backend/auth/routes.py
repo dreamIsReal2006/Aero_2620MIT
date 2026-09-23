@@ -55,6 +55,28 @@ def token_required(function):
     return decorated
 
 
+def optional_token(function):
+    @wraps(function)
+    def decorated(*args, **kwargs):
+        authorization = request.headers.get("Authorization", "")
+        if not authorization:
+            return function(None, *args, **kwargs)
+        if not authorization.startswith("Bearer "):
+            return jsonify({"message": "Token is invalid or expired"}), 401
+        try:
+            payload = jwt.decode(
+                authorization[7:].strip(), current_app.config["SECRET_KEY"],
+                algorithms=["HS256"]
+            )
+            user = db.session.get(User, payload["user_id"])
+            if not user or not user.active:
+                raise jwt.InvalidTokenError
+        except (jwt.InvalidTokenError, KeyError, ValueError):
+            return jsonify({"message": "Token is invalid or expired"}), 401
+        return function(user, *args, **kwargs)
+    return decorated
+
+
 def send_otp_via_sendgrid(to_email, otp_code):
     api_key = os.getenv("SENDGRID_API_KEY")
     sender = os.getenv("MAIL_DEFAULT_SENDER", "kaiyaowu3@gmail.com")

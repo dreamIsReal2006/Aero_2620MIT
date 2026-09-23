@@ -3,6 +3,37 @@ const API_ORIGIN = window.AeroConfig.API_ORIGIN;
 const ADMIN_API_BASE = window.AeroConfig.ADMIN_API_BASE || `${API_ORIGIN}/api/admin`;
 const DEFAULT_ADMIN_STATS = { total_users: 0, total_posts: 0, pending_reports: 0 };
 
+function authHeaders(extra = {}) {
+    const token = localStorage.getItem('aero_token');
+    return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
+}
+
+function isLoggedIn() {
+    return Boolean(localStorage.getItem('aero_token'));
+}
+
+function showLoginModal(message = 'Please sign in to unlock this feature.') {
+    const overlay = document.getElementById('auth-overlay');
+    const mainApp = document.getElementById('main-app');
+    if (overlay) overlay.classList.remove('hidden');
+    if (mainApp) mainApp.classList.remove('hidden');
+    window.showNotice?.(message, 'info');
+    document.getElementById('signin-username')?.focus();
+}
+
+function requireAuth(action, message = 'Please sign in to unlock this feature.') {
+    if (!isLoggedIn()) {
+        showLoginModal(message);
+        return false;
+    }
+    return typeof action === 'function' ? action() : true;
+}
+
+window.isLoggedIn = isLoggedIn;
+window.requireAuth = requireAuth;
+window.showLoginModal = showLoginModal;
+window.AeroAuthHeaders = authHeaders;
+
 const HDR_MEDIA_QUERY = '(dynamic-range: high)';
 
 function isHDRSupported() {
@@ -206,6 +237,9 @@ function syncCurrentUserAvatars(user = {}) {
 function renderHeaderNav(user = {}) {
     syncViewerRole(user);
     const adminLink = document.getElementById('admin-dashboard-link');
+    const guest = !isLoggedIn();
+    document.getElementById('guest-signin-btn')?.classList.toggle('hidden', !guest);
+    document.getElementById('user-avatar-btn')?.classList.toggle('hidden', guest);
     if (!adminLink) return;
     const isAdmin = user.is_admin === true || user.role === 'admin';
     const isModerator = user.role === 'moderator' || user.is_moderator === true;
@@ -1943,7 +1977,7 @@ const AeroAPI = {
             const params = new URLSearchParams({ feed_type: type, limit: '10' });
             if (cursor) params.set('cursor', cursor);
             const res = await fetch(`${API_BASE}/posts?${params.toString()}`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+                headers: authHeaders()
             });
             const payload = await res.json();
             return Array.isArray(payload) ? { posts: payload, next_cursor: null, has_more: false } : payload;
@@ -1984,6 +2018,7 @@ const AeroAPI = {
     },
 
     async deletePost(postId) {
+        if (!requireAuth(null, 'Please sign in before deleting a post.')) return null;
         const res = await fetch(`${API_BASE}/posts/${postId}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
@@ -2000,6 +2035,7 @@ const AeroAPI = {
     },
 
     async submitReport(targetId, reason, targetType = 'post') {
+        if (!requireAuth(null, 'Please sign in before reporting a post.')) return null;
         const res = await fetch(`${API_BASE}/reports`, {
             method: 'POST',
             headers: {
@@ -2125,6 +2161,7 @@ const AeroAPI = {
     },
 
     async likePost(postId) {
+        if (!requireAuth(null, 'Please sign in before liking a post.')) return null;
         const res = await fetch(`${API_ORIGIN}/interact/posts/${postId}/like`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
@@ -2135,6 +2172,7 @@ const AeroAPI = {
     },
 
     async cancelLikePost(postId) {
+        if (!requireAuth(null, 'Please sign in before changing a like.')) return null;
         const res = await fetch(`${API_ORIGIN}/interact/posts/${postId}/like`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
@@ -2145,6 +2183,7 @@ const AeroAPI = {
     },
 
     async toggleFollow(userId, userMeta = {}) {
+        if (!requireAuth(null, 'Please sign in before following someone.')) return null;
         const res = await fetch(`${API_BASE}/social/follow/${userId}`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
@@ -2174,6 +2213,7 @@ const AeroAPI = {
     },
 
     async toggleBookmark(postId) {
+        if (!requireAuth(null, 'Please sign in before saving a post.')) return null;
         const res = await fetch(`${API_BASE}/posts/${postId}/bookmark`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
@@ -2227,7 +2267,7 @@ const AeroAPI = {
 
     async getComments(postId) {
         const res = await fetch(`${API_ORIGIN}/interact/posts/${postId}/comments`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+            headers: authHeaders()
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || data.message || 'Unable to load comments');
@@ -2235,6 +2275,7 @@ const AeroAPI = {
     },
 
     async sendComment(postId, content, parentId = null, imageUrl = '') {
+        if (!requireAuth(null, 'Please sign in before commenting.')) return null;
         const res = await fetch(`${API_ORIGIN}/interact/posts/${postId}/comments`, {
             method: 'POST',
             headers: {
@@ -2249,6 +2290,7 @@ const AeroAPI = {
     },
 
     async toggleCommentLike(commentId, liked) {
+        if (!requireAuth(null, 'Please sign in before liking a comment.')) return null;
         const res = await fetch(`${API_BASE}/comments/${commentId}/like`, {
             method: liked ? 'DELETE' : 'POST',
             headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
@@ -2823,8 +2865,26 @@ const AeroAPI = {
         const logoButton = document.getElementById('aero-logo');
         const bookmarkDockButton = document.getElementById('bookmark-dock-btn');
         const bookmarkCloseButton = document.getElementById('close-bookmarks-drawer');
+        const introPage = document.getElementById('intro-page');
+        const authOverlay = document.getElementById('auth-overlay');
+        const mainApp = document.getElementById('main-app');
+
+        document.querySelectorAll('[data-open-auth]').forEach((button) => button.addEventListener('click', () => {
+            introPage?.classList.add('hidden');
+            authOverlay?.classList.remove('hidden');
+            mainApp?.classList.add('hidden');
+        }));
+        document.getElementById('explore-guest-btn')?.addEventListener('click', async () => {
+            localStorage.setItem('aero_guest_mode', '1');
+            introPage?.classList.add('hidden');
+            authOverlay?.classList.add('hidden');
+            mainApp?.classList.remove('hidden');
+            renderHeaderNav({});
+            await this.renderFeed('for_you');
+        });
 
         bookmarkDockButton?.addEventListener('click', () => {
+            if (!requireAuth(null, 'Please sign in before opening bookmarks.')) return;
             const drawer = document.getElementById('bookmarks-drawer');
             const isHidden = drawer?.classList.contains('hidden');
             setBookmarkDrawerVisibility(Boolean(isHidden));
@@ -2936,10 +2996,9 @@ const AeroAPI = {
         const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
         renderHeaderNav(user);
         
-        const authOverlay = document.getElementById('auth-overlay');
-        const mainApp = document.getElementById('main-app');
-
         if (token && mainApp) {
+            localStorage.removeItem('aero_guest_mode');
+            introPage?.classList.add('hidden');
             window.setFabAuthState?.(true);
             if (authOverlay) authOverlay.classList.add('hidden');
             mainApp.classList.remove('hidden');
@@ -2954,9 +3013,16 @@ const AeroAPI = {
             if (sessionStorage.getItem('aero_profile_onboarding') === '1') {
                 document.getElementById('profile-onboarding-overlay')?.classList.remove('hidden');
             }
+        } else if (localStorage.getItem('aero_guest_mode') === '1' && mainApp) {
+            introPage?.classList.add('hidden');
+            authOverlay?.classList.add('hidden');
+            mainApp.classList.remove('hidden');
+            renderHeaderNav({});
+            await this.renderFeed('for_you');
         } else if (authOverlay) {
             window.setFabAuthState?.(false);
-            authOverlay.classList.remove('hidden');
+            introPage?.classList.remove('hidden');
+            authOverlay.classList.add('hidden');
             if (mainApp) mainApp.classList.add('hidden');
         }
     },
@@ -3244,6 +3310,7 @@ function updateCreatePostState() {
 }
 
 function openCreatePostModal() {
+    if (!requireAuth(null, 'Please sign in before creating a post.')) return;
     const modal = document.getElementById('create-post-modal');
     if (!modal) return;
     const user = JSON.parse(localStorage.getItem('aero_user') || '{}');

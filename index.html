@@ -19,6 +19,35 @@
         <div class="glass-overlay"></div>
     </div>
 
+    <section id="intro-page" class="intro-page" aria-labelledby="intro-title">
+        <header class="intro-nav">
+            <a class="intro-brand" href="index.html" aria-label="Aero home">Aero</a>
+            <nav aria-label="Intro navigation">
+                <a href="#intro-features">Features</a>
+                <a href="#intro-privacy">Privacy</a>
+                <button type="button" class="intro-signin-btn" data-open-auth>Sign In</button>
+            </nav>
+        </header>
+        <div class="intro-hero">
+            <div class="intro-copy">
+                <p class="intro-kicker">A calmer social space</p>
+                <h1 id="intro-title">Stay close to what matters.</h1>
+                <p>Share the moments, conversations, and ideas that make your world feel more connected.</p>
+                <div class="intro-actions">
+                    <button type="button" class="btn btn-primary intro-cta" id="explore-guest-btn">Explore as Guest</button>
+                    <button type="button" class="intro-secondary-cta" data-open-auth>Sign In or Create Account</button>
+                </div>
+            </div>
+            <div class="intro-preview" aria-label="Aero feed preview">
+                <div class="intro-preview-top"><span class="intro-avatar">A</span><span><strong>Aero</strong><small>For You</small></span><span class="intro-live-dot"></span></div>
+                <div class="intro-preview-art"><span>Make room<br>for the good stuff.</span></div>
+                <div class="intro-preview-actions"><span>♡ 248</span><span>◌ 36</span><span>↗ Share</span></div>
+                <div class="intro-preview-note">A thoughtful feed, without the noise.</div>
+            </div>
+        </div>
+        <div class="intro-feature-row" id="intro-features"><span>01 <strong>Connect</strong></span><span id="intro-privacy">02 <strong>Private by design</strong></span><span>03 <strong>Be present</strong></span></div>
+    </section>
+
     <!-- Sign in and sign up pop-up -->
     <div id="auth-overlay" class="auth-overlay">
         <div class="auth-card glass-card aero-glass-panel pop-in">
@@ -173,7 +202,8 @@
 
             <div class="nav-right">
                 <a id="admin-dashboard-link" class="admin-nav-link hidden" href="#">Admin Dashboard</a>
-                <div id="user-avatar-btn" class="user-pill glass-pill" role="button" tabindex="0" aria-label="Open profile">
+                    <button id="guest-signin-btn" class="guest-signin-btn hidden" type="button" data-open-auth>Sign In</button>
+                    <div id="user-avatar-btn" class="user-pill glass-pill" role="button" tabindex="0" aria-label="Open profile">
                     <span id="nav-avatar" class="user-avatar user-avatar-nav" aria-hidden="true">U</span>
                     <span id="nav-username">User</span>
                     <button id="logout-btn" class="logout-sm-btn" aria-label="Sign out" title="Sign out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10"></path><path d="M14 8l4 4-4 4M8 12h10"></path></svg></button>

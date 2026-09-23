@@ -1,7 +1,7 @@
 from flask import jsonify, request
 
 from backend import db
-from backend.auth.routes import token_required
+from backend.auth.routes import optional_token, token_required
 from backend.interact import interact_bp
 from backend.models import Post, Like, Comment, CommentLike, Notification
 from backend.mentions import add_mention_notifications
@@ -256,7 +256,7 @@ def create_reply(current_user, comment_id):
     "/posts/<int:post_id>/comments",
     methods=["GET"]
 )
-@token_required
+@optional_token
 def get_comments(current_user, post_id):
     # Check that the post exists
     post = db.session.get(Post, post_id)
@@ -289,7 +289,7 @@ def get_comments(current_user, post_id):
             "parent_id": comment.parent_id,
             "created_at": f"{comment.created_at.isoformat()}Z",
             "likes_count": CommentLike.query.filter_by(comment_id=comment.id).count(),
-            "is_liked": CommentLike.query.filter_by(
+            "is_liked": current_user and CommentLike.query.filter_by(
                 comment_id=comment.id, user_id=current_user.id
             ).first() is not None,
             "replies": []
