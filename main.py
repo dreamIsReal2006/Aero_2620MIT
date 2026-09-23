@@ -43,6 +43,11 @@ def health():
     return {"status": "ok", "service": "aero"}
 
 
+@router.get("/ping", tags=["system"])
+def ping():
+    return {"status": "ok"}
+
+
 app.include_router(router)
 
 # Keep every existing Flask blueprint and static route reachable at its exact

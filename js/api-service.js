@@ -889,7 +889,7 @@ function renderNotifications() {
         const actor = item.actor || {};
         const icon = item.type === 'like' ? '♥' : item.type === 'comment' ? '●' : item.type === 'follow' ? '●' : '↗';
         const avatarUrl = actor.avatar_url ? (actor.avatar_url.startsWith('http') ? actor.avatar_url : `${API_ORIGIN}${actor.avatar_url}`) : '';
-        const avatar = avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="" onerror="this.remove()">` : escapeHtml((actor.username || 'S').charAt(0).toUpperCase());
+        const avatar = avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : escapeHtml((actor.username || 'S').charAt(0).toUpperCase());
         return `<article class="notification-item" data-post-id="${item.post_id || ''}" tabindex="0"><span class="notification-avatar">${avatar}</span><div class="notification-copy"><strong>@${escapeHtml(actor.username || 'Someone')}</strong><span>${escapeHtml(item.message || `${item.type} your post`)}</span><time>${formatRelativeTime(item.created_at)}</time><p>${escapeHtml(item.post_content || '')}</p></div><span class="notification-type-icon">${icon}</span></article>`;
     }).join('') : '<div class="bookmarks-empty">No notifications yet.</div>';
     list.querySelectorAll('.notification-item').forEach((item) => item.addEventListener('click', () => {

@@ -2,7 +2,7 @@ import logging
 import os
 from pathlib import Path
 
-from flask import Flask, g, jsonify, send_from_directory
+from flask import Flask, g, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
@@ -45,11 +45,6 @@ def create_app():
         "pool_recycle": 280,
     }
     app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
-    upload_folder = Path(os.environ.get("AERO_UPLOAD_DIR", "uploads"))
-    if not upload_folder.is_absolute():
-        upload_folder = base_dir / upload_folder
-    app.config["UPLOAD_FOLDER"] = str(upload_folder.resolve())
-    Path(app.config["UPLOAD_FOLDER"]).mkdir(parents=True, exist_ok=True)
     required_origins = [
         "https://aero-group4.netlify.app",
         r"https://.*\.netlify\.app",
@@ -69,6 +64,16 @@ def create_app():
     )
 
     db.init_app(app)  # connects SQLAlchemy to Flask
+
+    @app.after_request
+    def add_static_cache_headers(response):
+        if not request.path.startswith("/api/"):
+            response.headers.setdefault("Cache-Control", "public, max-age=3600")
+        return response
+
+    @app.get("/api/ping")
+    def ping():
+        return jsonify({"status": "ok"})
 
     from backend.models import (
         User,

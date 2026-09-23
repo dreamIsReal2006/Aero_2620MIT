@@ -1,8 +1,7 @@
 import json
-import uuid
 from pathlib import Path
 
-from flask import current_app, jsonify, request, send_from_directory
+from flask import jsonify, request
 from werkzeug.utils import secure_filename
 
 from backend import db
@@ -10,6 +9,7 @@ from backend.auth.routes import token_required
 from backend.chat import chat_bp
 from backend.models import Block, ChatGroup, ChatGroupMember, Follow, Message, Mute, Note, Post, User
 from backend.presence import is_user_online
+from backend.storage import upload_file_to_supabase
 
 CHAT_UPLOAD_TYPES = {
     "image/": "image", "video/": "video",
@@ -216,6 +216,9 @@ def get_notes(current_user):
 @chat_bp.get("/chat/messages")
 @token_required
 def get_messages(current_user):
+    page = max(request.args.get("page", 1, type=int) or 1, 1)
+    limit = min(max(request.args.get("limit", 20, type=int) or 20, 1), 100)
+    offset = (page - 1) * limit
     try:
         group_id = int(request.args.get("group_id", "0"))
     except ValueError:
@@ -224,7 +227,9 @@ def get_messages(current_user):
         group = db.session.get(ChatGroup, group_id)
         if not group or not _group_member(group_id, current_user.id):
             return jsonify({"message": "Group not found"}), 404
-        messages = Message.query.filter_by(group_id=group_id).order_by(Message.created_at.asc()).limit(200).all()
+        messages = Message.query.filter_by(group_id=group_id).order_by(
+            Message.created_at.desc()
+        ).limit(limit).offset(offset).all()
         recipient_id = None
     else:
         recipient_id = None
@@ -244,13 +249,13 @@ def get_messages(current_user):
                 ((Message.sender_id == user_id) & (Message.recipient_id == current_user.id))
             ),
             Message.group_id.is_(None),
-        ).order_by(Message.created_at.asc()).limit(200).all()
+        ).order_by(Message.created_at.desc()).limit(limit).offset(offset).all()
         Message.query.filter_by(sender_id=user_id, recipient_id=current_user.id, is_read=False).update(
             {Message.is_read: True}, synchronize_session=False
         )
     db.session.commit()
     payload = []
-    for message in messages:
+    for message in reversed(messages):
         shared_post = None
         if message.type in {"post_share", "shared_post"} and message.post_id:
             post = db.session.get(Post, message.post_id)
@@ -297,9 +302,11 @@ def upload_chat_attachment(current_user):
     if request.content_length and request.content_length > 50 * 1024 * 1024:
         return jsonify({"message": "Attachments must be 50 MB or smaller"}), 413
     extension = Path(secure_filename(file.filename)).suffix.lower()[:10]
-    filename = f"chat-{uuid.uuid4().hex}{extension}"
-    file.save(Path(current_app.config["UPLOAD_FOLDER"]) / filename)
-    return jsonify({"url": f"/uploads/{filename}", "type": attachment_type, "file_name": file.filename, "file_size": request.content_length or 0}), 201
+    try:
+        public_url = upload_file_to_supabase(file, "chat")
+    except (RuntimeError, ValueError) as error:
+        return jsonify({"message": str(error)}), 500
+    return jsonify({"url": public_url, "type": attachment_type, "file_name": file.filename, "file_size": request.content_length or 0}), 201
 
 
 @chat_bp.post("/chat/contacts/<int:user_id>/block")

@@ -42,6 +42,7 @@
                 const image = document.createElement('img');
                 image.src = avatarValue.url;
                 image.alt = '';
+                image.loading = 'lazy';
                 avatar.appendChild(image);
             } else avatar.textContent = avatarValue.letter;
         }
@@ -173,6 +174,7 @@
             if (profileEditorFile) {
                 const formData = new FormData();
                 formData.append('file', profileEditorFile);
+                formData.append('folder', 'profile');
                 const uploadResponse = await fetch(`${profileApiBase()}/uploads`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: formData });
                 const uploadData = await uploadResponse.json().catch(() => ({}));
                 if (!uploadResponse.ok) throw new Error(uploadData.message || 'Unable to upload avatar');

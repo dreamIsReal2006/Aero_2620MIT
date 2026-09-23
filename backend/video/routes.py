@@ -1,12 +1,11 @@
-from pathlib import Path
-
-from flask import current_app, jsonify, request
+from flask import jsonify, request
 from werkzeug.utils import secure_filename
 
 from backend.auth.routes import token_required
 from backend.video import video_bp
 from backend.models import Follow, Video, VideoComment, VideoLike
 from backend import db
+from backend.storage import upload_file_to_supabase
 
 
 @video_bp.get("/videos")
@@ -50,12 +49,13 @@ def upload_short(current_user):
     extension = Path(secure_filename(video_file.filename)).suffix.lower()
     if extension not in {".mp4", ".webm", ".mov", ".m4v"} or not (video_file.mimetype or "").startswith("video/"):
         return jsonify({"success": False, "message": "Only MP4, WEBM, MOV, and M4V videos are supported"}), 400
-    filename = f"short_{current_user.id}_{__import__('uuid').uuid4().hex}{extension}"
-    destination = Path(current_app.config["UPLOAD_FOLDER"]) / filename
-    video_file.save(destination)
+    try:
+        public_url = upload_file_to_supabase(video_file, "shorts")
+    except (RuntimeError, ValueError) as error:
+        return jsonify({"success": False, "message": str(error)}), 500
     return jsonify({
         "success": True,
-        "video_url": f"/uploads/{filename}",
+        "video_url": public_url,
         "hdr_candidate": extension in {".mp4", ".webm", ".mov", ".m4v"},
         "original_preserved": True,
     }), 201

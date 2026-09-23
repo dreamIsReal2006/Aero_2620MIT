@@ -8,6 +8,12 @@ from backend import db
 from backend.auth.routes import token_required
 from backend.models import Comment, Follow, Notification, Post, Report, User, Video, VideoLike
 from backend.presence import is_user_online
+
+
+def _post_pagination():
+    page = max(request.args.get("page", 1, type=int) or 1, 1)
+    limit = min(max(request.args.get("limit", 20, type=int) or 20, 1), 100)
+    return limit, (page - 1) * limit
 from backend.privacy import can_view_user_content
 from backend.social import social_bp
 
@@ -117,7 +123,9 @@ def get_profile(current_user, user_id):
 
     followers_count = Follow.query.filter_by(following_id=user_id, status="approved").count()
     following_count = Follow.query.filter_by(follower_id=user_id, status="approved").count()
-    posts = Post.query.filter_by(user_id=user_id).order_by(Post.created_at.desc()).all() if can_view_user_content(current_user, user) else []
+    limit, offset = _post_pagination()
+    posts = Post.query.filter_by(user_id=user_id).order_by(Post.created_at.desc()).limit(limit).offset(offset).all() if can_view_user_content(current_user, user) else []
+    limit, offset = _post_pagination()
     return jsonify({
         "user": {
             "id": user.id,
@@ -169,7 +177,7 @@ def get_profile_by_username(current_user):
         "is_following": is_following,
         "followers_count": followers_count,
         "following_count": following_count,
-        "posts": [serialize_post(post) for post in Post.query.filter_by(user_id=user.id).order_by(Post.created_at.desc()).all()] if allowed else [],
+        "posts": [serialize_post(post) for post in Post.query.filter_by(user_id=user.id).order_by(Post.created_at.desc()).limit(limit).offset(offset).all()] if allowed else [],
     }), 200
 
 
@@ -183,7 +191,8 @@ def get_user_profile(current_user, user_id):
     followers_count = Follow.query.filter_by(following_id=user_id, status="approved").count()
     following_count = Follow.query.filter_by(follower_id=user_id, status="approved").count()
     allowed = can_view_user_content(current_user, user)
-    posts = Post.query.filter_by(user_id=user_id).order_by(Post.created_at.desc()).all() if allowed else []
+    limit, offset = _post_pagination()
+    posts = Post.query.filter_by(user_id=user_id).order_by(Post.created_at.desc()).limit(limit).offset(offset).all() if allowed else []
     is_following = Follow.query.filter_by(
         follower_id=current_user.id,
         following_id=user_id,
@@ -219,10 +228,11 @@ def get_user_content(current_user, user_id):
         return jsonify({"type": "posts", "items": []}), 200
 
     content_type = str(request.args.get("type", "posts")).strip().lower()
+    limit, offset = _post_pagination()
     if content_type == "posts":
-        items = [serialize_post(post) for post in Post.query.filter_by(user_id=user_id, type="original").order_by(Post.created_at.desc()).all()]
+        items = [serialize_post(post) for post in Post.query.filter_by(user_id=user_id, type="original").order_by(Post.created_at.desc()).limit(limit).offset(offset).all()]
     elif content_type == "reposts":
-        items = [serialize_post(post) for post in Post.query.filter_by(user_id=user_id).filter(Post.type.in_(["repost", "quote"])).order_by(Post.created_at.desc()).all()]
+        items = [serialize_post(post) for post in Post.query.filter_by(user_id=user_id).filter(Post.type.in_(["repost", "quote"])).order_by(Post.created_at.desc()).limit(limit).offset(offset).all()]
     elif content_type == "replies":
         items = []
         for comment in Comment.query.filter_by(user_id=user_id).order_by(Comment.created_at.desc()).all():
@@ -309,7 +319,8 @@ def update_my_profile(current_user):
 def get_my_profile(current_user):
     followers_count = Follow.query.filter_by(following_id=current_user.id, status="approved").count()
     following_count = Follow.query.filter_by(follower_id=current_user.id, status="approved").count()
-    posts = Post.query.filter_by(user_id=current_user.id).order_by(Post.created_at.desc()).all()
+    limit, offset = _post_pagination()
+    posts = Post.query.filter_by(user_id=current_user.id).order_by(Post.created_at.desc()).limit(limit).offset(offset).all()
     return jsonify({
         "user": {
             "id": current_user.id,

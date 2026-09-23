@@ -1,10 +1,9 @@
 import json
 import datetime as dt
 import math
-import uuid
 from pathlib import Path
 
-from flask import current_app, jsonify, request, send_from_directory
+from flask import jsonify, request
 from sqlalchemy import or_
 from werkzeug.utils import secure_filename
 
@@ -15,6 +14,7 @@ from backend.models import Comment, Follow, Like, Message, Notification, Post, U
 from backend.mentions import add_mention_notifications
 from backend.privacy import visible_author_ids as get_visible_author_ids
 from backend.presence import is_user_online
+from backend.storage import upload_file_to_supabase
 
 ALLOWED_MEDIA_TYPES = {
     "jpg": "image/", "jpeg": "image/", "png": "image/", "webp": "image/", "gif": "image/",
@@ -77,6 +77,12 @@ def visible_posts_query(current_user):
     )
 
 
+def _pagination():
+    page = max(request.args.get("page", 1, type=int) or 1, 1)
+    limit = min(max(request.args.get("limit", 20, type=int) or 20, 1), 100)
+    return page, limit, (page - 1) * limit
+
+
 @feed_bp.get("/search")
 @token_required
 def search(current_user):
@@ -102,6 +108,7 @@ def search(current_user):
 @feed_bp.get("/posts")
 @token_required
 def get_posts(current_user):
+    _, limit, offset = _pagination()
     feed_type = str(request.args.get("feed_type", "for_you")).strip().lower()
     excluded_ids = {
         interaction.post_id
@@ -113,7 +120,9 @@ def get_posts(current_user):
     followed_ids = [follow.following_id for follow in Follow.query.filter_by(
         follower_id=current_user.id, status="approved"
     ).all()]
-    queried_posts = visible_posts_query(current_user).distinct().order_by(Post.created_at.desc()).all()
+    queried_posts = visible_posts_query(current_user).distinct().order_by(
+        Post.created_at.desc()
+    ).limit(limit).offset(offset).all()
     unique_posts = {post.id: post for post in queried_posts}
     posts = [
         post_payload(post, current_user.id)
@@ -142,19 +151,17 @@ def upload_media(current_user):
     expected_mime = ALLOWED_MEDIA_TYPES.get(extension)
     if not file or not file.filename or not expected_mime or not (file.mimetype or "").startswith(expected_mime):
         return jsonify({"message": "Only JPG, PNG, JPEG, WEBP, MP4, WEBM, or MOV media are supported"}), 400
-    filename = f"{uuid.uuid4().hex}.{extension}"
-    file.save(Path(current_app.config["UPLOAD_FOLDER"]) / filename)
+    try:
+        folder = request.form.get("folder", "posts")
+        public_url = upload_file_to_supabase(file, folder)
+    except (RuntimeError, ValueError) as error:
+        return jsonify({"message": str(error)}), 500
     return jsonify({
-        "url": f"/uploads/{filename}",
+        "url": public_url,
         "media_kind": "video" if extension in HDR_VIDEO_EXTENSIONS else "image",
         "hdr_candidate": extension in HDR_IMAGE_EXTENSIONS or extension in HDR_VIDEO_EXTENSIONS,
         "original_preserved": True,
     }), 201
-
-
-@feed_bp.get("/uploads/<path:filename>")
-def uploaded_file(filename):
-    return send_from_directory(current_app.config["UPLOAD_FOLDER"], filename)
 
 
 @feed_bp.post("/posts")
@@ -234,17 +241,18 @@ def repost_post(current_user, post_id):
 @feed_bp.get("/posts/bookmarked")
 @token_required
 def get_bookmarked_posts(current_user):
+    _, limit, offset = _pagination()
     bookmarked_ids = [
         interaction.post_id
         for interaction in UserInteraction.query.filter_by(
             user_id=current_user.id, type="bookmark"
-        ).order_by(UserInteraction.id.desc()).all()
+        ).order_by(UserInteraction.id.desc()).limit(limit).offset(offset).all()
     ]
     if not bookmarked_ids:
         return jsonify([]), 200
     posts = visible_posts_query(current_user).filter(
         Post.id.in_(set(bookmarked_ids))
-    ).distinct().order_by(Post.created_at.desc()).all()
+    ).distinct().order_by(Post.created_at.desc()).limit(limit).offset(offset).all()
     return jsonify([post_payload(post, current_user.id) for post in posts]), 200
 
 
@@ -277,10 +285,11 @@ def bookmark_post(current_user, post_id):
 @feed_bp.get("/bookmarks")
 @token_required
 def get_bookmarks(current_user):
+    _, limit, offset = _pagination()
     interactions = UserInteraction.query.filter_by(
         user_id=current_user.id,
         type="bookmark",
-    ).all()
+    ).order_by(UserInteraction.id.desc()).limit(limit).offset(offset).all()
 
     posts = []
 
