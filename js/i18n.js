@@ -1,8 +1,9 @@
 (() => {
-    const STORAGE_KEY = 'aero_language';
+    const STORAGE_KEY = 'user_preferred_language';
     const originalTitle = document.title;
     const translations = {
         en: {
+            screenTimeWeekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
             'author': 'Author', 'author_badge': 'Author',
             'post.bookmark': 'Bookmark Post', 'post.remove_bookmark': 'Remove Bookmark',
             'post.copy_link': 'Copy Link', 'post.not_interested': 'Not Interested',
@@ -10,6 +11,7 @@
             'common.new_post': 'New Post', 'common.new_video': 'Video'
         },
         zh: {
+            screenTimeWeekdays: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
             'Settings': '设置', 'Back': '返回', 'Account': '账户', 'Appearance': '外观', 'Languages': '语言',
             'Notifications': '通知', 'Privacy': '隐私', 'Security': '安全', 'Screen Time': '屏幕使用时间',
             'Theme': '主题', 'Light': '浅色', 'Dark': '深色', 'System': '跟随系统', 'App Language': '应用语言',
@@ -47,8 +49,21 @@
     const originalText = new WeakMap();
     const originalAttributes = new WeakMap();
 
+    function normalizeLanguage(language) {
+        return language === 'zh' ? 'zh' : language === 'en' ? 'en' : null;
+    }
+
     function getLanguage() {
-        return localStorage.getItem(STORAGE_KEY) === 'zh' ? 'zh' : 'en';
+        const preferred = normalizeLanguage(localStorage.getItem(STORAGE_KEY));
+        if (preferred) return preferred;
+
+        const detected = String(navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+        localStorage.setItem(STORAGE_KEY, detected);
+        return detected;
+    }
+
+    function getScreenTimeWeekdays() {
+        return [...translations[getLanguage()].screenTimeWeekdays];
     }
 
     function translateValue(value) {
@@ -107,8 +122,10 @@
     }
 
     function applyLanguage(language = getLanguage()) {
-        localStorage.setItem(STORAGE_KEY, language === 'zh' ? 'zh' : 'en');
-        document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
+        const normalizedLanguage = normalizeLanguage(language) || (String(navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en');
+        localStorage.setItem(STORAGE_KEY, normalizedLanguage);
+        localStorage.setItem('aero_language', normalizedLanguage);
+        document.documentElement.lang = normalizedLanguage === 'zh' ? 'zh-CN' : 'en';
         const translatedTitles = {
             'Aero - Settings': 'Aero - 设置',
             'Aero - Liquid Social Platform': 'Aero - 社交平台',
@@ -116,10 +133,10 @@
             'Aero - Verify OTP': 'Aero - 验证邮箱',
             'Account Suspended': '账户已暂停'
         };
-        document.title = language === 'zh' ? (translatedTitles[originalTitle] || originalTitle) : originalTitle;
+        document.title = normalizedLanguage === 'zh' ? (translatedTitles[originalTitle] || originalTitle) : originalTitle;
         document.body?.childNodes.forEach(translateNode);
-        document.querySelectorAll('[data-language-select]').forEach((select) => { select.value = language; });
-        window.dispatchEvent(new CustomEvent('aero:language-change', { detail: { language } }));
+        document.querySelectorAll('[data-language-select]').forEach((select) => { select.value = normalizedLanguage; });
+        window.dispatchEvent(new CustomEvent('aero:language-change', { detail: { language: normalizedLanguage } }));
     }
 
     function setup() {
@@ -129,7 +146,7 @@
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    window.AeroI18n = { getLanguage, applyLanguage, translateValue, formatChatTimestamp };
+    window.AeroI18n = { getLanguage, applyLanguage, translateValue, formatChatTimestamp, getScreenTimeWeekdays };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup);
     else setup();
 })();

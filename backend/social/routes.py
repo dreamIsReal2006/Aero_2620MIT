@@ -147,6 +147,8 @@ def get_profile(current_user, user_id):
 @social_bp.get("/users/profile")
 @optional_token
 def get_profile_by_username(current_user):
+    limit = request.args.get('limit', 10, type=int)
+    offset = request.args.get('offset', 0, type=int)
     username = str(request.args.get("username", "")).strip()
     if not username:
         return jsonify({"message": "A username is required"}), 400

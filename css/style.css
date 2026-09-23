@@ -5461,6 +5461,7 @@ body.dark-mode #share-profile-modal .nfc-share-panel {
     backdrop-filter: blur(12px) !important;
     -webkit-backdrop-filter: blur(12px) !important;
     z-index: 999999 !important;
+    will-change: opacity;
 }
 
 #share-modal-overlay,
@@ -5496,6 +5497,8 @@ body.dark-mode #share-profile-modal .nfc-share-panel {
     border: 1px solid rgba(255, 255, 255, .5) !important;
     box-shadow: 0 20px 50px rgba(0, 0, 0, .15) !important;
     color: #1c1c1e !important;
+    transform: translate3d(0, 0, 0);
+    will-change: transform, opacity;
     scrollbar-width: none !important;
 }
 
@@ -5855,4 +5858,26 @@ body.is-landing-page .mobile-bottom-nav,
 body.is-landing-page .mobile-nav-drawer,
 body.is-landing-page .mobile-nav-backdrop {
     display: none !important;
+}
+
+@media (max-width: 768px) {
+    #share-modal-overlay,
+    #share-post-modal,
+    .post-share-modal-overlay {
+        background: rgba(15, 23, 42, 0.92) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        transition: opacity 0.2s ease;
+    }
+
+    #share-modal-overlay .share-modal,
+    #share-post-modal .modal-content,
+    .post-share-modal-overlay .share-modal-card {
+        animation: shareModalIn 0.2s ease-out both;
+    }
+}
+
+@keyframes shareModalIn {
+    from { opacity: 0; transform: translate3d(0, 12px, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
 }

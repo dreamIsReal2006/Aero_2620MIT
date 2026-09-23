@@ -3188,7 +3188,11 @@ function openShareModal(post) {
                 loadShareUsers();
             }
         });
-        userSearch.addEventListener('input', renderShareUsers);
+        let searchRenderFrame = 0;
+        userSearch.addEventListener('input', () => {
+            cancelAnimationFrame(searchRenderFrame);
+            searchRenderFrame = requestAnimationFrame(renderShareUsers);
+        });
         sendButton.addEventListener('click', () => {
             const recipient = selectedShareUsername;
             if (selectedShareUserId) {

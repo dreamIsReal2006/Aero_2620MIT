@@ -84,7 +84,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const todayClass = day.key === days[days.length - 1].key ? " is-today" : "";
             return `<span class="screen-time-bar${todayClass}" style="height: ${height}%" title="${window.AeroScreenTime.formatDuration(day.milliseconds)}"></span>`;
         }).join("");
-        daysElement.innerHTML = days.map((day) => `<span>${day.date.toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2)}</span>`).join("");
+        const weekdays = window.AeroI18n?.getScreenTimeWeekdays() || ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        daysElement.innerHTML = days.map((day) => `<span>${weekdays[(day.date.getDay() + 6) % 7] || ""}</span>`).join("");
     }
 
     function writeUser(user) {
@@ -346,6 +347,7 @@ document.addEventListener("DOMContentLoaded", () => {
         window.AeroScreenTime?.reset();
         renderScreenTime();
     });
+    window.addEventListener("aero:language-change", renderScreenTime);
     renderScreenTime();
     window.setInterval(renderScreenTime, 15000);
 
