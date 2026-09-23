@@ -292,6 +292,49 @@ def dismiss_report(report_id):
         return failure("Unable to dismiss report", 500)
 
 
+@admin_bp.post("/reports/<int:report_id>/ban-user")
+@login_required
+@require_role(["admin", "moderator"])
+def ban_reported_user(report_id):
+    administrator = current_admin()
+    report = db.session.get(Report, report_id)
+    if not report or report.status != "pending":
+        return failure("Report not found or already processed", 404)
+
+    if report.target_type == "user":
+        user = db.session.get(User, report.target_id)
+    elif report.target_type == "post":
+        post = db.session.get(Post, report.target_id)
+        user = post.author if post else None
+    else:
+        user = None
+    if not user:
+        return failure("Reported user not found", 404)
+    if administrator.id == user.id:
+        return failure("Administrators cannot ban themselves", 400)
+    effective_role = "admin" if administrator.is_admin else administrator.role
+    target_role = "admin" if user.is_admin else user.role
+    if effective_role == "moderator" and target_role in {"admin", "moderator"}:
+        return failure("Insufficient permissions", 403)
+
+    try:
+        if not user.is_banned:
+            user.is_banned = True
+            user.ban_count = (user.ban_count or 0) + 1
+            db.session.add(ModerationLog(
+                moderator_id=administrator.id,
+                user_id=user.id,
+                action="ban",
+                reason="Pending report action",
+            ))
+        report.status = "resolved"
+        db.session.commit()
+        return success({"report_id": report.id, "status": report.status, "user": serialize_user(user)})
+    except Exception:
+        db.session.rollback()
+        return failure("Unable to ban reported user", 500)
+
+
 def _delete_post(post_id):
     post = db.session.get(Post, post_id)
     if not post:

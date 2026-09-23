@@ -178,10 +178,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             const targetUserId = group.target_type === 'user' ? group.target_id : group.target?.user_id;
             if (targetUserId && (isAdminViewer || isModeratorViewer)) {
                 const banButton = document.createElement('button');
-                banButton.className = 'btn admin-action-btn';
+                banButton.className = 'btn admin-action-btn ban-user-btn';
                 banButton.type = 'button';
                 banButton.textContent = 'Ban User';
                 banButton.dataset.userId = String(targetUserId);
+                banButton.dataset.reportIds = row.dataset.reportIds;
                 if (isModeratorViewer && (group.target?.is_admin === true || ['admin', 'moderator'].includes(group.target?.role))) {
                     banButton.disabled = true;
                     banButton.title = 'Insufficient permissions';
@@ -225,7 +226,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     reportsBody?.addEventListener('click', async event => {
         const deleteButton = event.target.closest('.delete-post-btn');
         const dismissButton = event.target.closest('.dismiss-report-btn');
-        const banButton = event.target.closest('[data-user-id]');
+        const banButton = event.target.closest('.ban-user-btn');
         const row = event.target.closest('tr');
         try {
             if (deleteButton) {
@@ -238,8 +239,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 removeRow(row);
             } else if (banButton) {
                 banButton.disabled = true;
-                const result = await request(`/users/${banButton.dataset.userId}/toggle_ban`, { method: 'POST' });
-                banButton.textContent = result.user.is_banned ? 'Unban' : 'Ban User';
+                await Promise.all(banButton.dataset.reportIds.split(',').map(id => request(`/reports/${id}/ban-user`, { method: 'POST' })));
+                removeRow(row);
             } else return;
             await updateStats();
         } catch (error) { showError(error); }
