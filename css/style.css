@@ -1852,22 +1852,25 @@ body.dark-mode .search-shell.is-open .search-bar {
     height: 204px;
     overflow: hidden;
 }
-.dock-scroll-wrapper { display: flex; flex-direction: column; align-items: stretch; gap: 16px; overflow-y: auto; overflow-x: visible; padding: 4px; scroll-behavior: smooth; -ms-overflow-style: none; scrollbar-width: none; }
+.dock-scroll-wrapper { display: flex; flex-direction: column; align-items: center; gap: 12px; overflow-y: auto; overflow-x: visible; width: 100%; padding: 4px; scroll-behavior: smooth; -ms-overflow-style: none; scrollbar-width: none; }
 .dock-scroll-wrapper::-webkit-scrollbar { display: none; }
 
 .dock-left { left: 32px; }
 .dock-right { right: 32px; }
-.dock-left, .dock-right { width: 68px; min-height: 204px; justify-content: flex-start; }
+.dock-left, .dock-right { width: 72px; min-height: 204px; justify-content: flex-start; align-items: center; padding: 12px 8px; }
 
-.dock-btn, .icon-btn {
+.dock-btn, .dock-item, .icon-btn {
     width: 44px;
     height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     aspect-ratio: 1 / 1;
-    margin: 0 auto;
+    margin: 0;
+    padding: 4px;
     border-radius: 50%;
     border: none;
     background: transparent;
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
     color: var(--text-primary);
@@ -1887,9 +1890,11 @@ body.dark-mode .search-shell.is-open .search-bar {
     z-index: 10;
 }
 
-.dock-btn svg, .icon-btn svg, .search-icon svg, .brand-sparkle svg {
+.dock-btn svg, .dock-item svg, .icon-btn svg, .search-icon svg, .brand-sparkle svg {
     width: 20px;
     height: 20px;
+    display: block;
+    margin: auto;
     fill: none;
     stroke: currentColor;
     stroke-width: 1.8;
@@ -2407,7 +2412,20 @@ body.dark-mode .action-bar-capsule {
 }
 .tab-indicator { position: absolute; bottom: 0; left: 0; width: 0; height: 3px; border-radius: 3px; background: var(--accent-primary); transform: translateX(0); transition: transform .3s cubic-bezier(.25, 1, .5, 1), width .3s cubic-bezier(.25, 1, .5, 1); will-change: transform, width; }
 .dock-btn:active { transform: scale(.95); }
-.dock-btn.active { animation: dockActivePulse .3s ease both; box-shadow: 0 0 0 5px var(--accent-light-fill); }
+.dock-btn.active {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50% !important;
+    background: var(--accent-light-fill);
+    box-shadow: inset 0 0 8px rgba(66, 133, 244, 0.3);
+    animation: dockActivePulse .3s ease both;
+}
 @keyframes dockActivePulse { from { transform: scale(.95); } to { transform: scale(1.05); } }
 @media (min-width: 769px) {
     .chat-back-btn,
