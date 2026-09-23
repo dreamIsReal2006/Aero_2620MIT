@@ -5,11 +5,10 @@ import base64
 import threading
 import time
 from pathlib import Path
-from typing import Any, cast
 
 from flask import jsonify, request
 from sqlalchemy import false, func, or_
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import contains_eager, load_only
 from werkzeug.utils import secure_filename
 
 from backend import db
@@ -201,7 +200,7 @@ def search(current_user):
 @token_required
 def get_posts(current_user):
     requested_limit = request.args.get("limit", 10, type=int) or 10
-    limit = min(max(requested_limit, 1), 50)
+    limit = min(max(requested_limit, 1), 15)
     cursor = _decode_post_cursor(request.args.get("cursor", ""))
     feed_type = str(request.args.get("feed_type", "for_you")).strip().lower()
     author_id = request.args.get("author_id", type=int)
@@ -237,7 +236,23 @@ def get_posts(current_user):
     ).subquery()
 
     posts_query = visible_posts_query(current_user).options(
-        joinedload(cast(Any, Post.author))
+        load_only(
+            Post.id,
+            Post.user_id,
+            Post.content,
+            Post.images_json,
+            Post.created_at,
+            Post.parent_id,
+            Post.type,
+        ),
+        contains_eager(Post.author).load_only(
+            User.id,
+            User.username,
+            User.role,
+            User.avatar_url,
+            User.show_online_status,
+            User.last_seen_at,
+        ),
     )
     if excluded_ids:
         posts_query = posts_query.filter(~Post.id.in_(excluded_ids))

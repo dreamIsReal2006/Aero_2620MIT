@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from flask import jsonify, request
+from sqlalchemy.orm import joinedload, load_only
 from werkzeug.utils import secure_filename
 
 from backend import db
@@ -18,6 +19,7 @@ CHAT_UPLOAD_TYPES = {
     "application/msword": "document", "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "document",
     "application/vnd.ms-excel": "document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "document",
 }
+CHAT_MESSAGE_LIMIT = 30
 
 
 def _user_payload(user, viewer_id=None):
@@ -216,9 +218,6 @@ def get_notes(current_user):
 @chat_bp.get("/chat/messages")
 @token_required
 def get_messages(current_user):
-    page = max(request.args.get("page", 1, type=int) or 1, 1)
-    limit = min(max(request.args.get("limit", 20, type=int) or 20, 1), 100)
-    offset = (page - 1) * limit
     try:
         group_id = int(request.args.get("group_id", "0"))
     except ValueError:
@@ -227,9 +226,14 @@ def get_messages(current_user):
         group = db.session.get(ChatGroup, group_id)
         if not group or not _group_member(group_id, current_user.id):
             return jsonify({"message": "Group not found"}), 404
-        messages = Message.query.filter_by(group_id=group_id).order_by(
-            Message.created_at.desc()
-        ).limit(limit).offset(offset).all()
+        messages = Message.query.filter_by(group_id=group_id).options(
+            joinedload(Message.sender).load_only(User.id, User.username),
+            joinedload(Message.post).load_only(
+                Post.id, Post.content, Post.images_json
+            ).joinedload(Post.author).load_only(
+                User.id, User.username, User.avatar_url
+            ),
+        ).order_by(Message.created_at.desc()).limit(CHAT_MESSAGE_LIMIT).all()
         recipient_id = None
     else:
         recipient_id = None
@@ -249,7 +253,14 @@ def get_messages(current_user):
                 ((Message.sender_id == user_id) & (Message.recipient_id == current_user.id))
             ),
             Message.group_id.is_(None),
-        ).order_by(Message.created_at.desc()).limit(limit).offset(offset).all()
+        ).options(
+            joinedload(Message.sender).load_only(User.id, User.username),
+            joinedload(Message.post).load_only(
+                Post.id, Post.content, Post.images_json
+            ).joinedload(Post.author).load_only(
+                User.id, User.username, User.avatar_url
+            ),
+        ).order_by(Message.created_at.desc()).limit(CHAT_MESSAGE_LIMIT).all()
         Message.query.filter_by(sender_id=user_id, recipient_id=current_user.id, is_read=False).update(
             {Message.is_read: True}, synchronize_session=False
         )
@@ -258,7 +269,7 @@ def get_messages(current_user):
     for message in reversed(messages):
         shared_post = None
         if message.type in {"post_share", "shared_post"} and message.post_id:
-            post = db.session.get(Post, message.post_id)
+            post = message.post
             if post:
                 try:
                     images = json.loads(post.images_json or "[]")

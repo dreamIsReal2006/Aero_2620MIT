@@ -34,4 +34,5 @@ class Like(db.Model):
             "post_id",
             name="unique_like"
         ),
+        db.Index("idx_likes_post_id", "post_id"),
     )  # makes sure one user can only like a post once

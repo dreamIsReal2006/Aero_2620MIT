@@ -22,7 +22,7 @@ class Message(db.Model):
 
     __table_args__ = (
         db.Index(
-            "idx_messages_conversation",
+            "idx_messages_chat",
             "sender_id",
             "recipient_id",
             created_at.desc(),

@@ -41,6 +41,10 @@ class Comment(db.Model):
         nullable=True
     )
 
+    __table_args__ = (
+        db.Index("idx_comments_post_id", "post_id"),
+    )
+
     author = db.relationship(
         "User",
         backref="comments"
