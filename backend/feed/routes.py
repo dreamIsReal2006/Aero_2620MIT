@@ -1,6 +1,7 @@
 import json
 import datetime as dt
 import math
+import base64
 import threading
 import time
 from pathlib import Path
@@ -136,6 +137,25 @@ def _pagination():
     return page, limit, (page - 1) * limit
 
 
+def _decode_post_cursor(value):
+    if not value:
+        return None
+    try:
+        decoded = base64.urlsafe_b64decode(str(value).encode()).decode()
+        timestamp, post_id = decoded.rsplit("|", 1)
+        created_at = dt.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        if created_at.tzinfo:
+            created_at = created_at.astimezone(dt.timezone.utc).replace(tzinfo=None)
+        return created_at, int(post_id)
+    except (ValueError, TypeError, UnicodeDecodeError):
+        return None
+
+
+def _encode_post_cursor(post):
+    value = f"{post.created_at.isoformat()}Z|{post.id}"
+    return base64.urlsafe_b64encode(value.encode()).decode().rstrip("=")
+
+
 def _cached_posts(cache_key):
     now = time.monotonic()
     with _post_cache_lock:
@@ -180,10 +200,12 @@ def search(current_user):
 @feed_bp.get("/posts")
 @token_required
 def get_posts(current_user):
-    _, limit, offset = _pagination()
+    requested_limit = request.args.get("limit", 10, type=int) or 10
+    limit = min(max(requested_limit, 1), 50)
+    cursor = _decode_post_cursor(request.args.get("cursor", ""))
     feed_type = str(request.args.get("feed_type", "for_you")).strip().lower()
     author_id = request.args.get("author_id", type=int)
-    cache_key = (current_user.id, feed_type, author_id, request.args.get("page", "1"), limit)
+    cache_key = (current_user.id, feed_type, author_id, request.args.get("cursor", ""), limit)
     cached = _cached_posts(cache_key)
     if cached is not None:
         return jsonify(cached)
@@ -219,6 +241,12 @@ def get_posts(current_user):
     )
     if excluded_ids:
         posts_query = posts_query.filter(~Post.id.in_(excluded_ids))
+    if cursor:
+        cursor_created_at, cursor_id = cursor
+        posts_query = posts_query.filter(
+            (Post.created_at < cursor_created_at) |
+            ((Post.created_at == cursor_created_at) & (Post.id < cursor_id))
+        )
     if author_id is not None:
         posts_query = posts_query.filter(Post.user_id == author_id)
     elif feed_type == "following":
@@ -230,7 +258,10 @@ def get_posts(current_user):
         func.coalesce(like_counts.c.likes_count, 0).label("likes_count"),
         func.coalesce(comment_counts.c.comments_count, 0).label("comments_count"),
         func.coalesce(share_counts.c.share_count, 0).label("share_count"),
-    ).order_by(Post.created_at.desc()).limit(limit).offset(offset).all()
+    ).order_by(Post.created_at.desc(), Post.id.desc()).limit(limit + 1).all()
+
+    has_more = len(rows) > limit
+    rows = rows[:limit]
 
     post_ids = [post.id for post, _, _, _ in rows]
     liked_ids = {
@@ -258,8 +289,10 @@ def get_posts(current_user):
         )
         for post, likes_count, comments_count, share_count in rows
     ]
-    _cache_posts(cache_key, posts)
-    return jsonify(posts)
+    next_cursor = _encode_post_cursor(rows[-1][0]) if has_more and rows else None
+    response = {"posts": posts, "next_cursor": next_cursor, "has_more": has_more}
+    _cache_posts(cache_key, response)
+    return jsonify(response)
 
 
 @feed_bp.post("/uploads")

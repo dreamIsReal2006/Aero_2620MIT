@@ -995,8 +995,15 @@ let chatGroupCache = [];
 let chatRealtimeChannel = null;
 let feedRenderRequestId = 0;
 let appStateInitialized = false;
+const messagesCache = new Map();
+const chatLoadRequests = new Map();
 const chatGroupUnreadCounts = new Map();
 const CHAT_CIPHER_PREFIX = 'AERO_E2EE_V1:';
+let feedCursor = '';
+let feedHasMore = true;
+let feedLoading = false;
+let feedTypeState = 'for_you';
+let feedLoadObserver = null;
 
 function chatConversationKeyId(conversation) {
     const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
@@ -1073,7 +1080,14 @@ async function appendSingleMessageToUI(message, conversation = activeChatUser ||
     node.className = `chat-message ${Number(message.sender_id) === Number(currentUser.id) ? 'mine' : ''}`;
     node.dataset.messageId = message.id;
     const timestamp = window.AeroI18n?.formatChatTimestamp?.(message.created_at) || formatRelativeTime(message.created_at);
-    node.innerHTML = `${contact.is_group && Number(message.sender_id) !== Number(currentUser.id) ? '<small class="chat-group-sender">New message</small>' : ''}<div class="chat-bubble-content message-bubble">${media}${content}</div><div class="chat-message-meta"><time class="message-time">${escapeHtml(timestamp)}</time></div>`;
+    const deliveryStatus = message.status === 'sending'
+        ? '<span class="chat-delivery-status sending">Sending...</span>'
+        : message.status === 'failed'
+            ? '<span class="chat-delivery-status failed">Failed</span>'
+            : '';
+    node.classList.toggle('is-sending', message.status === 'sending');
+    node.classList.toggle('is-failed', message.status === 'failed');
+    node.innerHTML = `${contact.is_group && Number(message.sender_id) !== Number(currentUser.id) ? '<small class="chat-group-sender">New message</small>' : ''}<div class="chat-bubble-content message-bubble">${media}${content}</div><div class="chat-message-meta"><time class="message-time">${escapeHtml(timestamp)}</time>${deliveryStatus}</div>`;
     box.appendChild(node);
     box.scrollTop = box.scrollHeight;
     return true;
@@ -1084,6 +1098,8 @@ window.appendSingleMessageToUI = appendSingleMessageToUI;
 async function appendRealtimeChatMessage(message) {
     const contact = activeChatUser || window.activeChatUser;
     if (!isActiveChatMessage(message, contact)) return false;
+    const cached = messagesCache.get(chatConversationKey(contact));
+    if (cached && !cached.some((item) => String(item.id) === String(message.id))) cached.push(message);
     return appendSingleMessageToUI(message, contact);
 }
 
@@ -1280,8 +1296,11 @@ async function selectChatGroup(group) {
     }
     groupInfo?.classList.remove('hidden');
     document.getElementById('chat-mute-btn')?.classList.add('hidden');
-    await markConversationRead(activeChatUser);
-    await loadChatMessages();
+    const cacheKey = chatConversationKey(activeChatUser);
+    const cachedMessages = messagesCache.get(cacheKey);
+    if (cachedMessages) loadChatMessages({ contact: activeChatUser, messages: cachedMessages });
+    else showChatMessagesSkeleton();
+    loadChatMessages({ contact: activeChatUser });
 }
 
 async function selectChatContact(contact) {
@@ -1290,7 +1309,6 @@ async function selectChatContact(contact) {
     window.activeChatUser = contact;
     document.getElementById('chat-group-info-btn')?.classList.add('hidden');
     setChatContactState(true);
-    await markConversationRead(contact);
     const activeAvatar = document.getElementById('chat-active-avatar');
     const activeName = document.getElementById('chat-active-name');
     if (activeName) activeName.textContent = `@${contact.username}`;
@@ -1312,25 +1330,61 @@ async function selectChatContact(contact) {
                 : (contact.username || 'U').charAt(0).toUpperCase();
         }
     }
-    await loadChatMessages();
+    const cacheKey = chatConversationKey(contact);
+    const cachedMessages = messagesCache.get(cacheKey);
+    if (cachedMessages) {
+        loadChatMessages({ contact, messages: cachedMessages, fromCache: true });
+    } else {
+        showChatMessagesSkeleton();
+    }
+    loadChatMessages({ contact });
     const muteButton = document.getElementById('chat-mute-btn');
     if (muteButton) {
         muteButton.classList.remove('hidden');
         setMuteButtonState(muteButton, Boolean(contact.is_muted), false);
     }
-    await loadChatContacts();
-    await loadUnreadChatCount();
+    loadChatContacts().catch(() => {});
+    loadUnreadChatCount().catch(() => {});
 }
 
 window.selectChatContact = selectChatContact;
 
 async function loadChatMessages() {
-    const contact = activeChatUser || window.activeChatUser;
+    const options = arguments[0] || {};
+    const contact = options.contact || activeChatUser || window.activeChatUser;
     if (!contact) return;
+    const cacheKey = chatConversationKey(contact);
+    if (options.messages) {
+        renderChatMessages(options.messages, contact);
+        return;
+    }
+    if (chatLoadRequests.has(cacheKey)) return chatLoadRequests.get(cacheKey);
     const query = contact.is_group ? `group_id=${contact.group_id || contact.id}` : `contact_id=${contact.id}`;
-    const response = await fetch(`${API_BASE}/chat/messages?${query}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+    const request = (async () => {
+    const response = await fetch(`${API_BASE}/chat/messages?${query}&limit=30`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
     const messages = await response.json();
-    await markConversationRead(contact).catch(() => {});
+    messagesCache.set(cacheKey, Array.isArray(messages) ? messages : []);
+    if (chatConversationKey(activeChatUser || window.activeChatUser) !== cacheKey) return;
+    renderChatMessages(messages, contact);
+    markConversationRead(contact).catch(() => {});
+    })();
+    chatLoadRequests.set(cacheKey, request);
+    try { await request; } finally { chatLoadRequests.delete(cacheKey); }
+}
+
+function chatConversationKey(contact) {
+    return contact?.is_group
+        ? `group:${contact.group_id || contact.id}`
+        : `user:${contact?.id}`;
+}
+
+function showChatMessagesSkeleton() {
+    const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
+    if (!box) return;
+    box.innerHTML = '<div class="chat-messages-skeleton" aria-live="polite"><span></span><span></span><span></span></div>';
+}
+
+async function renderChatMessages(messages, contact) {
     const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
     const snapshotKey = `${contact.is_group ? 'group' : 'user'}:${contact.id}`;
     const previousIds = chatMessageSnapshots.get(snapshotKey);
@@ -1511,26 +1565,91 @@ function setupMediaAndChat() {
         const mediaUrl = input?.dataset.mediaUrl || '';
         const messageType = input?.dataset.messageType || 'text';
         if (!contact || (!content && !mediaUrl)) return;
-        const encryptedContent = await encryptChatContent(content, contact);
-        const response = await fetch(`${API_BASE}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: JSON.stringify(contact.is_group ? { group_id: contact.group_id || contact.id, content: encryptedContent, media_url: mediaUrl, type: messageType, file_name: input.dataset.fileName || '', file_size: input.dataset.fileSize || 0 } : { user_id: contact.id, recipient_id: contact.id, content: encryptedContent, media_url: mediaUrl, type: messageType, file_name: input.dataset.fileName || '', file_size: input.dataset.fileSize || 0 }) });
-        if (response.ok) {
-            const savedMessage = await response.json().catch(() => ({}));
-            const renderedMessage = {
-                ...savedMessage,
-                content: encryptedContent,
-                sender_id: JSON.parse(localStorage.getItem('aero_user') || '{}').id,
-                recipient_id: contact.is_group ? JSON.parse(localStorage.getItem('aero_user') || '{}').id : contact.id,
-                group_id: contact.is_group ? contact.group_id || contact.id : null,
-                created_at: savedMessage.created_at || new Date().toISOString()
-            };
-            await appendSingleMessageToUI(renderedMessage, contact);
-            updateChatContactPreview(renderedMessage, content || '[Attachment]', contact);
-            input.value = '';
-            ['mediaUrl', 'messageType', 'fileName', 'fileSize'].forEach((key) => delete input.dataset[key]);
-            input.placeholder = 'Message...';
-            await markConversationRead(contact).catch(() => {});
-            await loadUnreadChatCount().catch(() => {});
-        }
+        const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
+        const temporaryId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const groupId = contact.is_group ? contact.group_id || contact.id : null;
+        const fileName = input.dataset.fileName || '';
+        const fileSize = input.dataset.fileSize || 0;
+        const temporaryMessage = {
+            id: temporaryId,
+            content,
+            media_url: mediaUrl,
+            type: messageType,
+            file_name: fileName,
+            file_size: fileSize,
+            sender_id: currentUser.id,
+            recipient_id: contact.is_group ? currentUser.id : contact.id,
+            group_id: groupId,
+            created_at: new Date().toISOString(),
+            status: 'sending'
+        };
+        input.value = '';
+        ['mediaUrl', 'messageType', 'fileName', 'fileSize'].forEach((key) => delete input.dataset[key]);
+        input.placeholder = 'Message...';
+        const conversationCache = messagesCache.get(chatConversationKey(contact));
+        if (conversationCache) conversationCache.push(temporaryMessage);
+        await appendSingleMessageToUI(temporaryMessage, contact);
+
+        const temporaryNode = () => document.querySelector(`[data-message-id="${temporaryId}"]`);
+        const requestMessage = async () => {
+            const encryptedContent = await encryptChatContent(content, contact);
+            const body = contact.is_group
+                ? { group_id: groupId, content: encryptedContent, media_url: mediaUrl, type: messageType, file_name: fileName, file_size: fileSize }
+                : { user_id: contact.id, recipient_id: contact.id, content: encryptedContent, media_url: mediaUrl, type: messageType, file_name: fileName, file_size: fileSize };
+            const response = await fetch(`${API_BASE}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` },
+                body: JSON.stringify(body)
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(payload.message || payload.error || 'Unable to send message');
+            return { ...payload, content: encryptedContent };
+        };
+        const sendAndSettle = async () => {
+            try {
+                const savedMessage = await requestMessage();
+                const renderedMessage = {
+                    ...savedMessage,
+                    sender_id: currentUser.id,
+                    recipient_id: contact.is_group ? currentUser.id : contact.id,
+                    group_id: groupId,
+                    created_at: savedMessage.created_at || new Date().toISOString(),
+                    status: 'sent'
+                };
+                const cached = messagesCache.get(chatConversationKey(contact));
+                if (cached) {
+                    const index = cached.findIndex((message) => message.id === temporaryId);
+                    if (index >= 0) cached.splice(index, 1, renderedMessage);
+                    else cached.push(renderedMessage);
+                }
+                temporaryNode()?.remove();
+                await appendSingleMessageToUI(renderedMessage, contact);
+                updateChatContactPreview(renderedMessage, content || '[Attachment]', contact);
+                await markConversationRead(contact).catch(() => {});
+                await loadUnreadChatCount().catch(() => {});
+            } catch (error) {
+                const node = temporaryNode();
+                if (!node) return;
+                node.classList.remove('is-sending');
+                node.classList.add('is-failed');
+                const meta = node.querySelector('.chat-message-meta');
+                if (meta) {
+                    meta.querySelector('.chat-delivery-status')?.remove();
+                    const failed = document.createElement('span');
+                    failed.className = 'chat-delivery-status failed';
+                    failed.textContent = 'Failed, retry';
+                    failed.addEventListener('click', () => {
+                        node.classList.remove('is-failed');
+                        node.classList.add('is-sending');
+                        failed.textContent = 'Sending...';
+                        sendAndSettle();
+                    }, { once: true });
+                    meta.appendChild(failed);
+                }
+                window.showNotice?.(error.message || 'Unable to send message. Tap retry.', 'error');
+            }
+        };
+        sendAndSettle();
     });
     document.getElementById('chat-form')?.addEventListener('dragover', (event) => event.preventDefault());
     document.getElementById('chat-form')?.addEventListener('drop', (event) => { event.preventDefault(); const file = event.dataTransfer.files?.[0]; if (file) window.selectChatAttachment(file); });
@@ -1818,15 +1937,18 @@ const AeroAPI = {
     },
 
     // Post CRUD API
-    async fetchPosts(feedType = 'for_you') {
+    async fetchPosts(feedType = 'for_you', cursor = '') {
         try {
             const type = feedType === 'following' ? 'following' : 'for_you';
-            const res = await fetch(`${API_BASE}/posts?feed_type=${encodeURIComponent(type)}`, {
+            const params = new URLSearchParams({ feed_type: type, limit: '10' });
+            if (cursor) params.set('cursor', cursor);
+            const res = await fetch(`${API_BASE}/posts?${params.toString()}`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
             });
-            return await res.json();
+            const payload = await res.json();
+            return Array.isArray(payload) ? { posts: payload, next_cursor: null, has_more: false } : payload;
         } catch (err) {
-            return [];
+            return { posts: [], next_cursor: null, has_more: false };
         }
     },
 
@@ -2147,14 +2269,28 @@ const AeroAPI = {
     },
 
     // Feed rendering and DOM updates
-    async renderFeed(feedType = 'for_you') {
+    async renderFeed(feedType = 'for_you', append = false) {
         const feedContainer = document.getElementById('posts-feed');
         if (!feedContainer) return;
 
+        if (feedLoading) return;
+        feedLoading = true;
+        if (!append) {
+            feedCursor = '';
+            feedHasMore = true;
+            feedTypeState = feedType;
+            feedLoadObserver?.disconnect();
+            feedContainer.innerHTML = '';
+        } else {
+            document.getElementById('feed-load-sentinel')?.remove();
+        }
         const requestId = ++feedRenderRequestId;
-        feedContainer.innerHTML = '';
-        const posts = await this.fetchPosts(feedType);
+        const payload = await this.fetchPosts(feedType, append ? feedCursor : '');
+        feedLoading = false;
         if (requestId !== feedRenderRequestId) return;
+        const posts = Array.isArray(payload.posts) ? payload.posts : [];
+        feedCursor = payload.next_cursor || '';
+        feedHasMore = Boolean(payload.has_more && feedCursor);
         const uniquePosts = [];
         const seenPostIds = new Set();
         (Array.isArray(posts) ? posts : []).forEach((post) => {
@@ -2164,10 +2300,11 @@ const AeroAPI = {
             uniquePosts.push(post);
         });
 
-        if (uniquePosts.length === 0) {
+        if (uniquePosts.length === 0 && !append) {
             feedContainer.innerHTML = `<div class="post-card glass-card text-center"><p>No posts available yet.</p></div>`;
             return;
         }
+        if (uniquePosts.length === 0) return;
 
         const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
         uniquePosts.forEach(post => {
@@ -2661,6 +2798,22 @@ const AeroAPI = {
             });
             feedContainer.appendChild(postEl);
         });
+        let sentinel = document.getElementById('feed-load-sentinel');
+        if (!sentinel) {
+            sentinel = document.createElement('div');
+            sentinel.id = 'feed-load-sentinel';
+            sentinel.className = 'feed-load-sentinel';
+            sentinel.setAttribute('aria-hidden', 'true');
+            feedContainer.appendChild(sentinel);
+        }
+        sentinel.classList.toggle('hidden', !feedHasMore);
+        if (feedHasMore && 'IntersectionObserver' in window) {
+            feedLoadObserver?.disconnect();
+            feedLoadObserver = new IntersectionObserver((entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) this.renderFeed(feedTypeState, true);
+            }, { rootMargin: '500px 0px' });
+            feedLoadObserver.observe(sentinel);
+        }
     },
 
     async initAppState() {

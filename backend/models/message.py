@@ -19,3 +19,18 @@ class Message(db.Model):
     is_read = db.Column(db.Boolean, default=False, nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
     sender = db.relationship("User", foreign_keys=[sender_id])
+
+    __table_args__ = (
+        db.Index(
+            "idx_messages_conversation",
+            "sender_id",
+            "recipient_id",
+            created_at.desc(),
+        ),
+        db.Index(
+            "idx_messages_reverse_conversation",
+            "recipient_id",
+            "sender_id",
+            created_at.desc(),
+        ),
+    )

@@ -58,7 +58,11 @@
 
     function formatChatTimestamp(timestamp) {
         if (!timestamp) return '';
-        const date = new Date(timestamp);
+        const rawTimestamp = String(timestamp).trim();
+        const normalizedTimestamp = /[zZ]|[+-]\d{2}:?\d{2}$/.test(rawTimestamp)
+            ? rawTimestamp
+            : `${rawTimestamp}Z`;
+        const date = new Date(normalizedTimestamp);
         if (Number.isNaN(date.getTime())) return '';
         const language = getLanguage();
         if (language === 'zh') {

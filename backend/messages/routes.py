@@ -44,6 +44,6 @@ def send_message(current_user):
             "recipient_id": message.recipient_id,
             "content": message.content,
             "is_read": message.is_read,
-            "created_at": message.created_at.isoformat(),
+            "created_at": f"{message.created_at.isoformat()}Z",
         },
     }), 201

@@ -165,6 +165,14 @@ def create_app():
                 "UPDATE users SET is_admin = TRUE "
                 "WHERE role = 'admin' AND is_admin IS NOT TRUE"
             ))
+            db.session.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_messages_conversation "
+                "ON messages (sender_id, recipient_id, created_at DESC)"
+            ))
+            db.session.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_messages_reverse_conversation "
+                "ON messages (recipient_id, sender_id, created_at DESC)"
+            ))
             db.session.commit()
     except Exception:
         logger.error(

@@ -164,6 +164,59 @@ html {
     backdrop-filter: blur(60px);
     -webkit-backdrop-filter: blur(60px);
 }
+
+.chat-delivery-status {
+    margin-left: 8px;
+    font-size: 0.72rem;
+}
+
+.chat-delivery-status.sending {
+    color: var(--text-secondary);
+}
+
+.chat-delivery-status.failed {
+    color: var(--color-danger);
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.chat-message.is-sending {
+    opacity: 0.72;
+}
+
+.chat-messages-skeleton {
+    display: grid;
+    gap: 12px;
+    padding: 20px 12px;
+}
+
+.chat-messages-skeleton span {
+    display: block;
+    width: min(70%, 280px);
+    height: 42px;
+    border-radius: 16px;
+    background: rgba(127, 127, 127, 0.14);
+    animation: chatSkeletonPulse 1.1s ease-in-out infinite alternate;
+}
+
+.chat-messages-skeleton span:nth-child(2) {
+    width: min(52%, 210px);
+    justify-self: end;
+}
+
+.chat-messages-skeleton span:nth-child(3) {
+    width: min(64%, 250px);
+}
+
+.feed-load-sentinel {
+    width: 100%;
+    min-height: 24px;
+}
+
+@keyframes chatSkeletonPulse {
+    from { opacity: 0.45; }
+    to { opacity: 0.9; }
+}
     /* Keep every dialog centered in the viewport, regardless of its insertion parent. */
     .modal-overlay,
     .create-post-overlay,

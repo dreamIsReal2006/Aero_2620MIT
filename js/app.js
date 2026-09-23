@@ -327,7 +327,8 @@
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
                 });
                 const authorPosts = await postsResponse.json().catch(() => []);
-                if (postsResponse.ok && Array.isArray(authorPosts)) posts = authorPosts;
+                const authorPostItems = Array.isArray(authorPosts) ? authorPosts : authorPosts.posts;
+                if (postsResponse.ok && Array.isArray(authorPostItems)) posts = authorPostItems;
             }
             const avatarValue = profileAvatarValue(user);
             const avatar = avatarValue.url;
