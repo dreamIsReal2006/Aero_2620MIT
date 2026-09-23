@@ -301,9 +301,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { row, role } = pendingRoleChange;
         roleModalConfirm.disabled = true;
         try {
-            const response = await fetch(`${apiBase}/users/${row.dataset.userId}/role`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ role }) });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(data.message || 'Unable to update role');
+            await request(`/users/${row.dataset.userId}/role`, { method: 'PATCH', body: { role } });
             row.dataset.role = role;
             row.querySelector('.admin-user-role').textContent = role;
             row.querySelectorAll('.role-segment').forEach(button => button.classList.toggle('is-active', button.dataset.role === role));

@@ -7,6 +7,8 @@ from backend.admin import admin_bp
 from backend.admin.decorators import admin_required, login_required, require_role
 from backend.models import AppealTicket, Comment, Like, ModerationLog, Post, Report, User
 
+VALID_ROLES = {"admin", "moderator", "user"}
+
 
 def success(data=None, status=200):
     return jsonify({"success": True, "data": data}), status
@@ -176,6 +178,30 @@ def demote_user(user_id):
     except Exception:
         db.session.rollback()
         return failure("Unable to revoke administrator permission", 500)
+
+
+@admin_bp.patch("/users/<int:user_id>/role")
+@login_required
+@admin_required
+def update_user_role(user_id):
+    administrator = current_admin()
+    if administrator.id == user_id:
+        return failure("Administrators cannot change their own role", 400)
+    user = db.session.get(User, user_id)
+    if not user:
+        return failure("User not found", 404)
+    data = request.get_json(silent=True) or {}
+    role = str(data.get("role", "")).strip().lower()
+    if role not in VALID_ROLES:
+        return failure("Role must be admin, moderator, or user", 400)
+    try:
+        user.role = role
+        user.is_admin = role == "admin"
+        db.session.commit()
+        return success({"user": serialize_user(user)})
+    except Exception:
+        db.session.rollback()
+        return failure("Unable to update user role", 500)
 
 
 @admin_bp.get("/appeals")
