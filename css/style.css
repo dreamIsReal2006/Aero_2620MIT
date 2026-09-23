@@ -5050,6 +5050,170 @@ body.dark-mode .post-card {
     }
 }
 
+/* Dark theme overrides for the glass UI surfaces. */
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .create-post-modal {
+    background: rgba(15, 23, 42, 0.82) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.38) !important;
+}
+
+html.dark-mode .create-post-modal,
+html[data-theme="dark"] .create-post-modal,
+body.dark-mode .create-post-modal,
+.dark .create-post-modal {
+    background: rgba(15, 23, 42, 0.82) !important;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .create-post-modal .create-post-header h2 {
+    color: #f8fafc;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .create-post-modal .create-post-username,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .create-post-modal .modal-close-btn,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .create-post-modal .media-picker-btn {
+    color: #cbd5e1;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .create-post-modal .create-post-textarea,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .create-post-modal textarea {
+    color: #f8fafc;
+    background: rgba(30, 41, 59, 0.7) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .create-post-modal .create-post-textarea::placeholder,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .create-post-modal textarea::placeholder {
+    color: #94a3b8;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .create-post-modal .create-post-textarea:focus,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .create-post-modal textarea:focus {
+    border-color: rgba(59, 130, 246, 0.5) !important;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.22) !important;
+    background: rgba(30, 41, 59, 0.85) !important;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .notifications-drawer {
+    background: rgba(15, 23, 42, 0.9) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45) !important;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .notification-item {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: #cbd5e1;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .notification-item:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .notification-copy strong {
+    color: #ffffff;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .notification-copy > span,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .notification-copy p {
+    color: #cbd5e1;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .notification-copy time {
+    color: #94a3b8;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .post-dropdown-menu,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .post-menu,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .dropdown-menu,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) #global-post-menu {
+    background: rgba(15, 23, 42, 0.85) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .post-menu button,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .post-dropdown-menu button,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .dropdown-menu button,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .post-menu .menu-item,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .post-dropdown-menu .menu-item,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .dropdown-menu .menu-item {
+    color: #e2e8f0;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .post-menu button:hover,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .post-dropdown-menu button:hover,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .dropdown-menu button:hover,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .post-menu .menu-item:hover,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .post-dropdown-menu .menu-item:hover,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .dropdown-menu .menu-item:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .notice-dialog {
+    background: rgba(30, 41, 59, 0.9) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45) !important;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .notice-copy strong {
+    color: #ffffff;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .notice-copy p {
+    color: #cbd5e1;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .notice-close {
+    color: #cbd5e1;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page {
+    color: #f8fafc;
+    background: #0f172a;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-card,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-header,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-stat-card,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-reports-section {
+    background: rgba(30, 41, 59, 0.6) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28) !important;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page h1,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page h2,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page strong {
+    color: #f8fafc;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-back-link,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-stat-card span,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-eyebrow,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-user-role,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-user-status,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-reports-table th {
+    color: #94a3b8;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-search-field input {
+    color: #ffffff;
+    background: rgba(15, 23, 42, 0.6) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-search-field input::placeholder {
+    color: #94a3b8;
+}
+
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-user-row,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-reports-table td,
+:is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-reports-table th {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
 /* Profile sharing must escape content layout and center over the full viewport. */
 #share-profile-modal {
     position: fixed !important;
@@ -5477,6 +5641,25 @@ body[data-viewer-role="moderator"] .role-badge.moderator {
 .short-card {
     scroll-snap-align: start;
     scroll-snap-stop: always;
+}
+
+/* Highest-priority dark surfaces, after the legacy glass-card overrides. */
+html[data-theme="dark"].dark-mode .create-post-modal,
+html[data-theme="dark"] .create-post-modal,
+body.dark-mode .create-post-modal,
+.dark .create-post-modal {
+    background: rgba(15, 23, 42, 0.82) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.38) !important;
+}
+
+html[data-theme="dark"].dark-mode .admin-page .admin-card,
+html[data-theme="dark"] .admin-page .admin-card,
+body.dark-mode .admin-page .admin-card,
+.dark .admin-page .admin-card {
+    background: rgba(30, 41, 59, 0.6) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28) !important;
 }
 
 .short-playback-indicator {
