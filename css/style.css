@@ -3347,7 +3347,12 @@ body.dark-mode .comment-composer input::placeholder {
     width: min(560px, 100%);
     padding: 22px;
     overflow: hidden;
-    border-radius: 28px;
+    background: rgba(255, 255, 255, 0.75) !important;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
     animation: modalPop 0.32s cubic-bezier(0.22, 1.2, 0.36, 1) both;
 }
 
@@ -3357,11 +3362,55 @@ body.dark-mode .comment-composer input::placeholder {
 .create-post-header,
 .create-post-footer { justify-content: space-between; gap: 12px; }
 .create-post-user { gap: 10px; }
-.create-post-header h2 { font-size: 1.05rem; }
-.create-post-username { color: var(--text-secondary); font-size: 0.8rem; }
-.modal-close-btn { border: 0; color: var(--text-secondary); background: transparent; font-size: 1.7rem; cursor: pointer; }
-.create-post-modal textarea { width: 100%; min-height: 130px; margin: 22px 0 0; padding: 0; border: 0; resize: vertical; color: var(--text-primary); background: transparent; font: inherit; font-size: 1.05rem; outline: none; }
+.create-post-header h2 { color: #1e293b; font-size: 1.05rem; }
+.create-post-username { color: #64748b; font-size: 0.8rem; }
+.modal-close-btn { border: 0; color: #64748b; background: transparent; font-size: 1.7rem; cursor: pointer; }
+.create-post-modal #modal-user-avatar {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important;
+    color: #ffffff;
+}
+.modal-body textarea,
+.create-post-textarea,
+.create-post-modal textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 130px;
+    margin: 22px 0 0;
+    padding: 12px 16px;
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+    border-radius: 14px;
+    resize: none;
+    color: #1c1e21;
+    background: rgba(255, 255, 255, 0.6) !important;
+    font: inherit;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.modal-body textarea:focus,
+.create-post-textarea:focus,
+.create-post-modal textarea:focus {
+    border-color: rgba(0, 122, 255, 0.4) !important;
+    box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1) !important;
+    background: #ffffff !important;
+}
 .create-post-footer { margin-top: 18px; }
+.create-post-modal .media-picker-btn { color: #64748b; }
+.create-post-modal .media-picker-btn:hover { color: #2563eb; }
+.create-post-modal #modal-publish-btn {
+    border: none !important;
+    border-radius: 12px;
+    color: #ffffff !important;
+    background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    font-weight: 600;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.create-post-modal #modal-publish-btn:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+}
 .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .forgot-password-card { position: relative; width: min(360px, calc(100vw - 40px)); padding: 28px 24px 24px; }
