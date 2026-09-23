@@ -786,19 +786,52 @@ button:hover,
     border-color: var(--accent-primary);
 }
 
+body.dark-mode .auth-form input[type="text"],
 body.dark-mode .auth-form input[type="password"],
+body.dark-mode .auth-form input,
+html.dark-mode .auth-form input[type="text"],
 html.dark-mode .auth-form input[type="password"],
-:root[data-theme="dark"] .auth-form input[type="password"] {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.16);
-    color: #ffffff;
+html.dark-mode .auth-form input,
+:root[data-theme="dark"] .auth-form input[type="text"],
+:root[data-theme="dark"] .auth-form input[type="password"],
+:root[data-theme="dark"] .auth-form input {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 10px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transition: all 0.2s ease-in-out;
     -webkit-text-fill-color: #ffffff;
 }
 
-body.dark-mode .auth-form input[type="password"]::placeholder,
-html.dark-mode .auth-form input[type="password"]::placeholder,
-:root[data-theme="dark"] .auth-form input[type="password"]::placeholder {
-    color: rgba(255, 255, 255, 0.62);
+body.dark-mode .auth-form input::placeholder,
+html.dark-mode .auth-form input::placeholder,
+:root[data-theme="dark"] .auth-form input::placeholder {
+    color: rgba(255, 255, 255, 0.45) !important;
+}
+
+body.dark-mode .auth-form input:focus,
+html.dark-mode .auth-form input:focus,
+:root[data-theme="dark"] .auth-form input:focus {
+    background-color: rgba(255, 255, 255, 0.12) !important;
+    border-color: #0a84ff !important;
+    box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.35) !important;
+    outline: none;
+}
+
+body.dark-mode .auth-form input:-webkit-autofill,
+body.dark-mode .auth-form input:-webkit-autofill:hover,
+body.dark-mode .auth-form input:-webkit-autofill:focus,
+html.dark-mode .auth-form input:-webkit-autofill,
+html.dark-mode .auth-form input:-webkit-autofill:hover,
+html.dark-mode .auth-form input:-webkit-autofill:focus,
+:root[data-theme="dark"] .auth-form input:-webkit-autofill,
+:root[data-theme="dark"] .auth-form input:-webkit-autofill:hover,
+:root[data-theme="dark"] .auth-form input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #ffffff !important;
+    -webkit-box-shadow: 0 0 0 1000px rgba(30, 30, 35, 0.95) inset !important;
+    transition: background-color 5000s ease-in-out 0s;
 }
 
 .password-strength { margin-top: 9px; }
