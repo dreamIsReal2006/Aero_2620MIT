@@ -5479,3 +5479,8 @@ body[data-viewer-role="moderator"] .role-badge.moderator {
     .intro-feature-row { display: grid; grid-template-columns: 1fr 1fr; }
     .intro-feature-row span:last-child { grid-column: 1 / -1; }
 }
+body.is-landing-page .mobile-bottom-nav,
+body.is-landing-page .mobile-nav-drawer,
+body.is-landing-page .mobile-nav-backdrop {
+    display: none !important;
+}

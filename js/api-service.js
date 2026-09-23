@@ -3,13 +3,18 @@ const API_ORIGIN = window.AeroConfig.API_ORIGIN;
 const ADMIN_API_BASE = window.AeroConfig.ADMIN_API_BASE || `${API_ORIGIN}/api/admin`;
 const DEFAULT_ADMIN_STATS = { total_users: 0, total_posts: 0, pending_reports: 0 };
 
-function authHeaders(extra = {}) {
+function getAuthToken() {
     const token = localStorage.getItem('aero_token');
+    return token && token !== 'null' && token !== 'undefined' ? token : '';
+}
+
+function authHeaders(extra = {}) {
+    const token = getAuthToken();
     return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
 }
 
 function isLoggedIn() {
-    return Boolean(localStorage.getItem('aero_token'));
+    return Boolean(getAuthToken());
 }
 
 function showLoginModal(message = 'Please sign in to unlock this feature.') {
@@ -29,10 +34,16 @@ function requireAuth(action, message = 'Please sign in to unlock this feature.')
     return typeof action === 'function' ? action() : true;
 }
 
+function syncLandingState(isLanding) {
+    document.body.classList.toggle('is-landing-page', Boolean(isLanding));
+    document.getElementById('mobile-bottom-nav')?.setAttribute('aria-hidden', String(Boolean(isLanding)));
+}
+
 window.isLoggedIn = isLoggedIn;
 window.requireAuth = requireAuth;
 window.showLoginModal = showLoginModal;
 window.AeroAuthHeaders = authHeaders;
+window.syncLandingState = syncLandingState;
 
 const HDR_MEDIA_QUERY = '(dynamic-range: high)';
 
@@ -2870,12 +2881,14 @@ const AeroAPI = {
         const mainApp = document.getElementById('main-app');
 
         document.querySelectorAll('[data-open-auth]').forEach((button) => button.addEventListener('click', () => {
+            syncLandingState(true);
             introPage?.classList.add('hidden');
             authOverlay?.classList.remove('hidden');
             mainApp?.classList.add('hidden');
         }));
         document.getElementById('explore-guest-btn')?.addEventListener('click', async () => {
             localStorage.setItem('aero_guest_mode', '1');
+            syncLandingState(false);
             introPage?.classList.add('hidden');
             authOverlay?.classList.add('hidden');
             mainApp?.classList.remove('hidden');
@@ -2992,12 +3005,13 @@ const AeroAPI = {
                 else button.removeAttribute('aria-current');
             });
         });
-        const token = localStorage.getItem('aero_token');
+        const token = getAuthToken();
         const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
         renderHeaderNav(user);
         
         if (token && mainApp) {
             localStorage.removeItem('aero_guest_mode');
+            syncLandingState(false);
             introPage?.classList.add('hidden');
             window.setFabAuthState?.(true);
             if (authOverlay) authOverlay.classList.add('hidden');
@@ -3014,6 +3028,7 @@ const AeroAPI = {
                 document.getElementById('profile-onboarding-overlay')?.classList.remove('hidden');
             }
         } else if (localStorage.getItem('aero_guest_mode') === '1' && mainApp) {
+            syncLandingState(false);
             introPage?.classList.add('hidden');
             authOverlay?.classList.add('hidden');
             mainApp.classList.remove('hidden');
@@ -3021,6 +3036,7 @@ const AeroAPI = {
             await this.renderFeed('for_you');
         } else if (authOverlay) {
             window.setFabAuthState?.(false);
+            syncLandingState(true);
             introPage?.classList.remove('hidden');
             authOverlay.classList.add('hidden');
             if (mainApp) mainApp.classList.add('hidden');
@@ -3033,6 +3049,7 @@ const AeroAPI = {
         if (!authOverlay || !mainApp) return;
 
         const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
+        syncLandingState(false);
         window.setFabAuthState?.(true);
         renderHeaderNav(user);
         authOverlay.classList.remove('hidden');

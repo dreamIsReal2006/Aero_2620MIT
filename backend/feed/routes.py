@@ -291,10 +291,11 @@ def get_posts(current_user):
             UserInteraction.post_id.in_(post_ids),
         ).all()
     } if current_user and post_ids else set()
+    viewer_id = current_user.id if current_user else None
     posts = [
         optimized_post_payload(
             post,
-            current_user.id,
+            viewer_id,
             int(likes_count),
             int(comments_count),
             int(share_count),
