@@ -24,6 +24,9 @@ def create_app():
     app.config["SECRET_KEY"] = os.environ.get(
         "AERO_SECRET_KEY", "development-only-change-this-secret"
     )
+    app.config["SESSION_COOKIE_SAMESITE"] = "None"
+    app.config["SESSION_COOKIE_SECURE"] = True
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
     database_uri = os.environ.get(
         "DATABASE_URL",
         os.environ.get(

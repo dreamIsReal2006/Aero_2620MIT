@@ -253,8 +253,8 @@ def verify_reset_otp():
 @auth_bp.post("/reset-password")
 def reset_password():
     data = request.get_json(silent=True) or {}
-    email = session.get("password_reset_email")
-    code = str(data.get("code", "")).strip()
+    email = str(data.get("email", session.get("password_reset_email", ""))).strip().lower()
+    code = str(data.get("code", data.get("otp", data.get("token", "")))).strip()
     new_password = str(data.get("new_password", data.get("password", "")))
     otp = db.session.get(OTPCode, email) if email else None
     if not otp or otp.attempts >= 5 or otp.expires_at < dt.datetime.utcnow() or not check_password_hash(otp.code_hash, code):

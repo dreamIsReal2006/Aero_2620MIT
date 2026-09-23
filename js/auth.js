@@ -28,6 +28,7 @@
         const response = await fetch(`${apiBase}${path}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify(body)
         });
         const data = await response.json().catch(() => ({}));
@@ -80,8 +81,14 @@
             event.preventDefault();
             const password = document.getElementById('new-password').value;
             const confirmation = document.getElementById('confirm-new-password').value;
+            const feedback = document.getElementById('forgot-feedback');
             if (password !== confirmation) {
-                document.getElementById('forgot-feedback').textContent = 'Passwords do not match';
+                feedback.textContent = 'Passwords do not match';
+                return;
+            }
+            if (password.length < 8 || password.length > 128 ||
+                !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+                feedback.textContent = 'Password must be 8-128 characters and include uppercase, number, and special character';
                 return;
             }
             try {

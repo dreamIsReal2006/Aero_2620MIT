@@ -4,19 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="js/i18n.js"></script>
+    <script src="js/theme.js"></script>
     <script src="js/config.js"></script>
     <title>Account Suspended</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="light-mode appeal-page">
-    <main class="auth-card glass-card liquid-glass appeal-card">
+    <main class="appeal-container">
         <h1>Account suspended</h1>
-        <div class="appeal-warning" role="alert">Your account is currently suspended. Submit a clear explanation and our moderation team will review it.</div>
-        <form id="appeal-form">
+        <div class="appeal-alert" role="alert">Your account is currently suspended. Submit a clear explanation and our moderation team will review it.</div>
+        <form id="appeal-form" class="appeal-form">
             <label for="appeal-username">Username</label>
             <input id="appeal-username" placeholder="Username" autocomplete="username" required>
             <label for="appeal-content">Why should the suspension be reviewed?</label>
-            <textarea id="appeal-content" placeholder="Explain your appeal" maxlength="2000" required></textarea>
+            <textarea id="appeal-content" class="appeal-textarea" placeholder="Explain your appeal" maxlength="2000" required></textarea>
             <button id="appeal-submit" class="btn btn-primary" type="submit">Submit Appeal</button>
             <p id="appeal-feedback" class="appeal-feedback" aria-live="polite"></p>
         </form>
