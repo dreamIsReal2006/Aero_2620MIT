@@ -164,6 +164,65 @@ html {
     backdrop-filter: blur(60px);
     -webkit-backdrop-filter: blur(60px);
 }
+    /* Keep every dialog centered in the viewport, regardless of its insertion parent. */
+    .modal-overlay,
+    .create-post-overlay,
+    .share-modal-overlay,
+    .report-modal-overlay,
+    .profile-edit-overlay,
+    .admin-post-preview-overlay,
+    .role-confirm-overlay,
+    .chat-confirm-overlay {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        z-index: 10000 !important;
+        padding: 20px !important;
+        background-color: rgba(0, 0, 0, 0.5) !important;
+        box-sizing: border-box;
+    }
+
+    .modal-overlay.hidden,
+    .create-post-overlay.hidden,
+    .share-modal-overlay.hidden,
+    .report-modal-overlay.hidden,
+    .profile-edit-overlay.hidden,
+    .admin-post-preview-overlay.hidden,
+    .role-confirm-overlay.hidden,
+    .chat-confirm-overlay.hidden {
+        display: none !important;
+    }
+
+    .report-modal-overlay:not(.is-open),
+    .share-modal-overlay:not(.is-open) {
+        display: none !important;
+    }
+
+    .modal-overlay > .glass-card,
+    .create-post-overlay > .create-post-modal,
+    .share-modal-overlay > .share-modal,
+    .report-modal-overlay > .report-modal,
+    .profile-edit-overlay > .profile-edit-modal,
+    .admin-post-preview-overlay > .admin-post-preview,
+    .role-confirm-overlay > .role-confirm-panel,
+    .chat-confirm-overlay > .chat-confirm-panel {
+        position: relative !important;
+        top: auto !important;
+        right: auto !important;
+        bottom: auto !important;
+        left: auto !important;
+        margin: 0 !important;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .report-modal-overlay > .report-modal {
+        width: min(440px, 100%);
+    }
 
 @keyframes floatAround {
     0% { transform: translate(0, 0) scale(1) rotate(0deg); }

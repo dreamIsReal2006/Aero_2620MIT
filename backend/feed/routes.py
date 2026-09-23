@@ -1,10 +1,14 @@
 import json
 import datetime as dt
 import math
+import threading
+import time
 from pathlib import Path
+from typing import Any, cast
 
 from flask import jsonify, request
-from sqlalchemy import or_
+from sqlalchemy import false, func, or_
+from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
 
 from backend import db
@@ -35,6 +39,9 @@ ALLOWED_MEDIA_TYPES = {
 
 HDR_IMAGE_EXTENSIONS = {"avif", "heic", "heif"}
 HDR_VIDEO_EXTENSIONS = {"mp4", "webm", "mov", "m4v"}
+POST_CACHE_TTL_SECONDS = 15
+_post_response_cache = {}
+_post_cache_lock = threading.Lock()
 
 
 def post_payload(post, current_user_id=None):
@@ -78,6 +85,41 @@ def post_payload(post, current_user_id=None):
     }
 
 
+def optimized_post_payload(
+    post,
+    current_user_id,
+    likes_count,
+    comments_count,
+    share_count,
+    liked_ids,
+    bookmarked_ids,
+    followed_ids,
+):
+    hours_ago = max(0, (dt.datetime.utcnow() - post.created_at).total_seconds() / 3600)
+    score = (likes_count + comments_count * 3 + share_count * 2) / math.pow(hours_ago + 2, 1.5)
+    return {
+        "id": post.id,
+        "user_id": post.user_id,
+        "username": post.author.username,
+        "role": post.author.role if post.author.role in {"admin", "moderator", "user"} else "user",
+        "avatar_url": post.author.avatar_url or "",
+        "is_online": is_user_online(post.author, current_user_id),
+        "content": post.content,
+        "images": json.loads(post.images_json or "[]"),
+        "likes_count": likes_count,
+        "comments_count": comments_count,
+        "is_liked": post.id in liked_ids,
+        "is_bookmarked": post.id in bookmarked_ids,
+        "is_following": post.user_id in followed_ids,
+        "parent_id": post.parent_id,
+        "type": post.type,
+        "likes": likes_count,
+        "comments": comments_count,
+        "ranking_score": score,
+        "created_at": f"{post.created_at.isoformat()}Z",
+    }
+
+
 def visible_posts_query(current_user):
     author_ids = get_visible_author_ids(current_user)
     return Post.query.join(User).filter(
@@ -90,8 +132,27 @@ def visible_posts_query(current_user):
 
 def _pagination():
     page = max(request.args.get("page", 1, type=int) or 1, 1)
-    limit = min(max(request.args.get("limit", 20, type=int) or 20, 1), 100)
+    limit = min(max(request.args.get("limit", 10, type=int) or 10, 1), 10)
     return page, limit, (page - 1) * limit
+
+
+def _cached_posts(cache_key):
+    now = time.monotonic()
+    with _post_cache_lock:
+        cached = _post_response_cache.get(cache_key)
+        if cached and cached[0] > now:
+            return cached[1]
+        if cached:
+            _post_response_cache.pop(cache_key, None)
+    return None
+
+
+def _cache_posts(cache_key, posts):
+    with _post_cache_lock:
+        if len(_post_response_cache) >= 128:
+            oldest_key = min(_post_response_cache, key=lambda key: _post_response_cache[key][0])
+            _post_response_cache.pop(oldest_key, None)
+        _post_response_cache[cache_key] = (time.monotonic() + POST_CACHE_TTL_SECONDS, posts)
 
 
 @feed_bp.get("/search")
@@ -121,36 +182,83 @@ def search(current_user):
 def get_posts(current_user):
     _, limit, offset = _pagination()
     feed_type = str(request.args.get("feed_type", "for_you")).strip().lower()
+    author_id = request.args.get("author_id", type=int)
+    cache_key = (current_user.id, feed_type, author_id, request.args.get("page", "1"), limit)
+    cached = _cached_posts(cache_key)
+    if cached is not None:
+        return jsonify(cached)
+
     excluded_ids = {
-        interaction.post_id
-        for interaction in UserInteraction.query.filter_by(
+        post_id for (post_id,) in db.session.query(UserInteraction.post_id).filter_by(
             user_id=current_user.id, type="not_interested"
         ).all()
     }
-    author_id = request.args.get("author_id", type=int)
-    followed_ids = [follow.following_id for follow in Follow.query.filter_by(
-        follower_id=current_user.id, status="approved"
-    ).all()]
-    queried_posts = visible_posts_query(current_user).distinct().order_by(
-        Post.created_at.desc()
-    ).limit(limit).offset(offset).all()
-    unique_posts = {post.id: post for post in queried_posts}
-    posts = [
-        post_payload(post, current_user.id)
-        for post in unique_posts.values()
-        if post.id not in excluded_ids and (author_id is None or post.user_id == author_id)
-    ]
+    followed_ids = {
+        following_id for (following_id,) in db.session.query(Follow.following_id).filter_by(
+            follower_id=current_user.id, status="approved"
+        ).all()
+    }
+
+    like_counts = db.session.query(
+        Like.post_id.label("post_id"),
+        func.count(Like.id).label("likes_count"),
+    ).group_by(Like.post_id).subquery()
+    comment_counts = db.session.query(
+        Comment.post_id.label("post_id"),
+        func.count(Comment.id).label("comments_count"),
+    ).group_by(Comment.post_id).subquery()
+    share_counts = db.session.query(
+        UserInteraction.post_id.label("post_id"),
+        func.count(UserInteraction.id).label("share_count"),
+    ).filter(UserInteraction.type.in_(["share", "copy"])).group_by(
+        UserInteraction.post_id
+    ).subquery()
+
+    posts_query = visible_posts_query(current_user).options(
+        joinedload(cast(Any, Post.author))
+    )
+    if excluded_ids:
+        posts_query = posts_query.filter(~Post.id.in_(excluded_ids))
     if author_id is not None:
-        return jsonify(sorted(posts, key=lambda post: post["created_at"], reverse=True))
-    if feed_type == "following":
-        posts = [post for post in posts if post["user_id"] in followed_ids]
-    else:
-        followed_posts = [post for post in posts if post["user_id"] in followed_ids]
-        recommended_posts = [post for post in posts if post["user_id"] not in followed_ids]
-        followed_posts.sort(key=lambda post: post["ranking_score"], reverse=True)
-        recommended_posts.sort(key=lambda post: post["ranking_score"], reverse=True)
-        posts = followed_posts + recommended_posts
-    posts.sort(key=lambda post: post["ranking_score"], reverse=True)
+        posts_query = posts_query.filter(Post.user_id == author_id)
+    elif feed_type == "following":
+        posts_query = posts_query.filter(Post.user_id.in_(followed_ids)) if followed_ids else posts_query.filter(false())
+
+    rows = posts_query.outerjoin(like_counts, like_counts.c.post_id == Post.id).outerjoin(
+        comment_counts, comment_counts.c.post_id == Post.id
+    ).outerjoin(share_counts, share_counts.c.post_id == Post.id).add_columns(
+        func.coalesce(like_counts.c.likes_count, 0).label("likes_count"),
+        func.coalesce(comment_counts.c.comments_count, 0).label("comments_count"),
+        func.coalesce(share_counts.c.share_count, 0).label("share_count"),
+    ).order_by(Post.created_at.desc()).limit(limit).offset(offset).all()
+
+    post_ids = [post.id for post, _, _, _ in rows]
+    liked_ids = {
+        post_id for (post_id,) in db.session.query(Like.post_id).filter(
+            Like.user_id == current_user.id, Like.post_id.in_(post_ids)
+        ).all()
+    } if post_ids else set()
+    bookmarked_ids = {
+        post_id for (post_id,) in db.session.query(UserInteraction.post_id).filter(
+            UserInteraction.user_id == current_user.id,
+            UserInteraction.type == "bookmark",
+            UserInteraction.post_id.in_(post_ids),
+        ).all()
+    } if post_ids else set()
+    posts = [
+        optimized_post_payload(
+            post,
+            current_user.id,
+            int(likes_count),
+            int(comments_count),
+            int(share_count),
+            liked_ids,
+            bookmarked_ids,
+            followed_ids,
+        )
+        for post, likes_count, comments_count, share_count in rows
+    ]
+    _cache_posts(cache_key, posts)
     return jsonify(posts)
 
 
