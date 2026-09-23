@@ -114,7 +114,8 @@ function createAvatarElement(username, avatarUrl, className = 'post-avatar', isO
     avatar.classList.toggle('is-online', Boolean(isOnline));
     avatar.setAttribute('aria-hidden', 'true');
     const name = String(username || 'User');
-    if (!avatarUrl || String(avatarUrl).startsWith('letter:')) {
+    const resolvedAvatarUrl = getUserAvatarUrl({ avatar_url: avatarUrl });
+    if (!resolvedAvatarUrl) {
         avatar.textContent = String(avatarUrl || '').startsWith('letter:')
             ? String(avatarUrl).slice(7, 8).toUpperCase() || name.charAt(0).toUpperCase()
             : name.charAt(0).toUpperCase();
@@ -122,7 +123,7 @@ function createAvatarElement(username, avatarUrl, className = 'post-avatar', isO
     }
 
     const image = document.createElement('img');
-    image.src = avatarUrl.startsWith('http') ? avatarUrl : `${API_ORIGIN}${avatarUrl}`;
+    image.src = resolvedAvatarUrl;
     image.alt = '';
     image.loading = 'lazy';
     image.decoding = 'async';
@@ -136,7 +137,13 @@ function createAvatarElement(username, avatarUrl, className = 'post-avatar', isO
 }
 
 function getAvatarUrl(user = {}) {
-    const value = String(user.avatar_url || user.avatarUrl || user.avatar || '').trim();
+    return getUserAvatarUrl(user);
+}
+
+function getUserAvatarUrl(user = {}) {
+    const value = String(
+        user.avatar_url || user.avatar || user.profile_picture || user.avatarUrl || ''
+    ).trim();
     if (!value || value.startsWith('letter:')) return '';
     return value.startsWith('http') ? value : `${API_ORIGIN}${value}`;
 }
@@ -149,7 +156,8 @@ function renderAvatarMarkup(user = {}, className = 'avatar', sizeClass = '') {
     return `<span class="${escapeHtml(`${className} ${sizeClass}`.trim())}" aria-hidden="true">${url ? `<img src="${escapeHtml(url)}" alt="@${escapeHtml(username)}" loading="lazy" decoding="async" onerror="this.remove();this.parentElement.textContent='${escapeHtml(fallback || 'U')}'">` : escapeHtml(fallback || 'U')}</span>`;
 }
 
-window.AeroAvatar = { getUrl: getAvatarUrl, markup: renderAvatarMarkup };
+window.getUserAvatarUrl = getUserAvatarUrl;
+window.AeroAvatar = { getUrl: getUserAvatarUrl, markup: renderAvatarMarkup };
 
 function getCurrentViewerRole(user = null) {
     const viewer = user || JSON.parse(localStorage.getItem('aero_user') || '{}');
@@ -189,7 +197,7 @@ function syncCurrentUserAvatars(user = {}) {
     avatarTargets.forEach(([id, className]) => {
         const currentAvatar = document.getElementById(id);
         if (!currentAvatar) return;
-        const nextAvatar = createAvatarElement(user.username, user.avatar_url, className);
+        const nextAvatar = createAvatarElement(user.username, getUserAvatarUrl(user), className);
         nextAvatar.id = id;
         currentAvatar.replaceWith(nextAvatar);
     });
@@ -212,6 +220,31 @@ window.addEventListener('aero:user-updated', (event) => {
     syncCurrentUserAvatars(user);
     renderHeaderNav(user);
 });
+
+async function refreshCurrentUser() {
+    const token = localStorage.getItem('aero_token');
+    if (!token) return null;
+    try {
+        const response = await fetch(`${API_BASE}/users/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.user) return null;
+
+        const previous = JSON.parse(localStorage.getItem('aero_user') || '{}');
+        const user = { ...previous, ...payload.user };
+        localStorage.setItem('aero_user', JSON.stringify(user));
+        syncCurrentUserAvatars(user);
+        renderHeaderNav(user);
+        window.dispatchEvent(new CustomEvent('aero:user-updated', { detail: user }));
+        return user;
+    } catch (error) {
+        console.warn('[Aero current user refresh]', error);
+        return null;
+    }
+}
+
+window.refreshCurrentUser = refreshCurrentUser;
 
 async function updatePresence() {
     if (!localStorage.getItem('aero_token')) return;
@@ -960,6 +993,8 @@ let activeChatUser = null;
 let chatContactCache = [];
 let chatGroupCache = [];
 let chatRealtimeChannel = null;
+let feedRenderRequestId = 0;
+let appStateInitialized = false;
 const chatGroupUnreadCounts = new Map();
 const CHAT_CIPHER_PREFIX = 'AERO_E2EE_V1:';
 
@@ -1688,8 +1723,8 @@ const AeroAPI = {
             if (res.ok) {
                 localStorage.setItem('aero_token', data.token);
                 localStorage.setItem('aero_user', JSON.stringify(data.user));
-                renderHeaderNav(data.user);
-                this.transitionToApp();
+                window.location.href = 'index.html?tab=for_you';
+                return;
             } else {
                 if (data.suspended) {
                     sessionStorage.setItem('aero_suspended_username', data.username || username);
@@ -1757,8 +1792,13 @@ const AeroAPI = {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Unable to update profile');
-        localStorage.setItem('aero_user', JSON.stringify(data.user));
-        return data.user;
+        const previous = JSON.parse(localStorage.getItem('aero_user') || '{}');
+        const user = { ...previous, ...data.user };
+        localStorage.setItem('aero_user', JSON.stringify(user));
+        syncCurrentUserAvatars(user);
+        renderHeaderNav(user);
+        window.dispatchEvent(new CustomEvent('aero:user-updated', { detail: user }));
+        return user;
     },
 
     // Resend OTP
@@ -1818,7 +1858,7 @@ const AeroAPI = {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Media upload failed');
-        return `${API_ORIGIN}${data.url}`;
+        return String(data.url || '').startsWith('http') ? data.url : `${API_ORIGIN}${data.url}`;
     },
 
     async deletePost(postId) {
@@ -2111,8 +2151,10 @@ const AeroAPI = {
         const feedContainer = document.getElementById('posts-feed');
         if (!feedContainer) return;
 
+        const requestId = ++feedRenderRequestId;
         feedContainer.innerHTML = '';
         const posts = await this.fetchPosts(feedType);
+        if (requestId !== feedRenderRequestId) return;
         const uniquePosts = [];
         const seenPostIds = new Set();
         (Array.isArray(posts) ? posts : []).forEach((post) => {
@@ -2424,7 +2466,7 @@ const AeroAPI = {
             composer.className = 'comment-composer';
             const composerUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
             composer.innerHTML = '<span class="comment-composer-avatar"></span><div class="comment-input-shell"><input type="text" maxlength="1000" placeholder="Write a comment..." aria-label="Comment text"><button type="button" class="comment-media-btn" aria-label="Add image or GIF" title="Add image or GIF">GIF</button></div><button type="submit" class="comment-send-btn" aria-label="Send comment" title="Send comment"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"></path><path d="M22 2 11 13"></path></svg></button>';
-            composer.querySelector('.comment-composer-avatar').replaceWith(createAvatarElement(composerUser.username, composerUser.avatar_url, 'comment-composer-avatar'));
+            composer.querySelector('.comment-composer-avatar').replaceWith(createAvatarElement(composerUser.username, getUserAvatarUrl(composerUser), 'comment-composer-avatar'));
             commentsPanel.append(commentsList, replyStatus, composer);
             const composerInput = composer.querySelector('input');
             let selectedGifUrl = '';
@@ -2621,7 +2663,9 @@ const AeroAPI = {
         });
     },
 
-    initAppState() {
+    async initAppState() {
+        if (appStateInitialized) return;
+        appStateInitialized = true;
         const homeButton = document.getElementById('home-nav-btn');
         const logoButton = document.getElementById('aero-logo');
         const bookmarkDockButton = document.getElementById('bookmark-dock-btn');
@@ -2748,7 +2792,12 @@ const AeroAPI = {
             mainApp.classList.remove('hidden');
             document.getElementById('nav-username').innerText = user.username || 'User';
             syncCurrentUserAvatars(user);
-            this.renderFeed();
+            const latestUser = await refreshCurrentUser();
+            const initialFeedType = new URLSearchParams(window.location.search).get('tab') === 'following'
+                ? 'following'
+                : 'for_you';
+            if (latestUser) document.getElementById('nav-username').innerText = latestUser.display_name || latestUser.username || 'User';
+            await this.renderFeed(initialFeedType);
             if (sessionStorage.getItem('aero_profile_onboarding') === '1') {
                 document.getElementById('profile-onboarding-overlay')?.classList.remove('hidden');
             }

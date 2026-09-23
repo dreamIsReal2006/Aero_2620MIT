@@ -567,12 +567,13 @@
         document.getElementById('tab-for-you')?.addEventListener('click', () => loadPosts('for_you'));
         document.getElementById('tab-following')?.addEventListener('click', () => loadPosts('following'));
         const routeParams = new URLSearchParams(window.location.search);
+        const initialFeedType = routeParams.get('tab') === 'following' ? 'following' : 'for_you';
         const sharedProfile = (routeParams.get('user') || routeParams.get('profile') || '').trim();
         const legacyProfile = window.location.hash.match(/^#profile\/(\d+)$/);
         if (sharedProfile) navigate('profile', { userId: /^\d+$/.test(sharedProfile) ? Number(sharedProfile) : sharedProfile });
         else if (legacyProfile) navigate('profile', { userId: Number(legacyProfile[1]) });
         else navigate('main');
-        setActiveFeedTab('for_you');
+        setActiveFeedTab(initialFeedType);
         setFabAuthState(Boolean(localStorage.getItem('aero_token')));
         setupScrollPerformance();
         window.addEventListener('resize', syncFabForViewport, { passive: true });
