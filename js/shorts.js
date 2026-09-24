@@ -27,7 +27,7 @@
         const video = videos[currentIndex];
         activeMedia?.pause();
         if (!stage || !video) {
-            if (stage) stage.innerHTML = '<div class="shorts-empty"><div class="shorts-empty-content"><span>No Shorts available yet.</span><button type="button" id="shorts-empty-upload" class="shorts-empty-upload">+ Upload First Video</button></div></div>';
+            if (stage) stage.innerHTML = `<div class="shorts-empty"><div class="shorts-empty-content"><span>${window.AeroI18n?.t('no_shorts') || 'No Shorts available yet.'}</span><button type="button" id="shorts-empty-upload" class="shorts-empty-upload">${window.AeroI18n?.t('upload_first_video') || '+ Upload First Video'}</button></div></div>`;
             return;
         }
         const author = video.author || video.user || {};
@@ -162,13 +162,13 @@
         const input = document.getElementById('shorts-comment-input') || document.getElementById('short-comment-input');
         if (!drawer || !list || !form || !input) return;
         toggleShortsComments(true, drawer);
-        list.innerHTML = '<div class="shorts-empty">Loading comments...</div>';
+        list.innerHTML = `<div class="shorts-empty">${window.AeroI18n?.t('loading_comments') || 'Loading comments...'}</div>`;
         const response = await fetch(`${apiBase}/shorts/${videoId}/comments`, { headers: authHeaders() });
         const comments = await response.json();
         list.innerHTML = (comments || []).map((comment) => {
             const gif = parseGifContent(comment.content, comment.media_url, comment.type);
             return `<div class="short-comment"><strong>@${escapeText(comment.username)}</strong>${gif.text ? `<span>${escapeText(gif.text)}</span>` : ''}${gif.url ? `<img src="${escapeText(gif.url)}" class="comment-gif" alt="GIF" loading="lazy">` : ''}</div>`;
-        }).join('') || '<div class="shorts-empty">No comments yet.</div>';
+        }).join('') || `<div class="shorts-empty">${window.AeroI18n?.t('no_comments') || 'No comments yet.'}</div>`;
         form.onsubmit = async (event) => {
             event.preventDefault();
             const value = input.value.trim();

@@ -227,7 +227,8 @@ function roleBadge(role) {
     const icon = normalized === 'admin'
         ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Z"></path><path d="m9 12 2 2 4-4"></path></svg>'
         : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Z"></path><path d="M8 12h8M12 8v8"></path></svg>';
-    return `<span class="role-badge ${normalized}" title="${normalized === 'admin' ? 'Administrator' : 'Moderator'}">${icon}<span>${normalized}</span></span>`;
+    const label = window.AeroI18n?.t(`role_${normalized}`) || (normalized === 'admin' ? 'Admin' : 'Moderator');
+    return `<span class="role-badge ${normalized}" title="${escapeHtml(label)}">${icon}<span>${escapeHtml(label)}</span></span>`;
 }
 
 function syncCurrentUserAvatars(user = {}) {
@@ -329,7 +330,7 @@ function renderSearchResults(payload = { users: [], posts: [] }) {
     const query = input.value.trim();
 
     if (users.length === 0 && posts.length === 0) {
-        dropdown.innerHTML = '<div class="search-empty">No results found</div>';
+        dropdown.innerHTML = `<div class="search-empty">${escapeHtml(window.AeroI18n?.translateValue('No results found') || 'No results found')}</div>`;
         shell.classList.remove('is-loading');
         shell.classList.add('is-open');
         return;
@@ -347,7 +348,7 @@ function renderSearchResults(payload = { users: [], posts: [] }) {
                         <span class="user-subline">${highlightMatch(tag, query)}</span>
                     </div>
                 </div>
-                <button type="button" class="user-action-btn" data-action="visit">Visit</button>
+                <button type="button" class="user-action-btn" data-action="visit">${escapeHtml(window.AeroI18n?.t('visit') || 'Visit')}</button>
             </div>
         `;
     }).join('');
@@ -365,20 +366,25 @@ function renderSearchResults(payload = { users: [], posts: [] }) {
         `;
     }).join('');
 
-    const footerText = query ? `Press Enter or Click to see all results for "${escapeHtml(query)}"` : 'Press Enter or Click to see all results';
+    const footerText = query
+        ? escapeHtml(window.AeroI18n?.t('press_enter_search', { query }) || `Press Enter or Click to see all results for "${query}"`)
+        : 'Press Enter or Click to see all results';
+    const usersTitle = window.AeroI18n?.t('search_users_title') || 'Users';
+    const postsTitle = window.AeroI18n?.t('search_posts_title') || 'Posts / Topics';
+    const noPosts = window.AeroI18n?.t('no_posts_found') || 'No posts found';
 
     dropdown.innerHTML = `
         <section class="search-section">
             <div class="search-section-header">
-                <span>Users</span>
+                <span>${escapeHtml(usersTitle)}</span>
             </div>
             <div class="search-result-list">${usersMarkup || '<div class="search-item"><span class="search-query">No users found</span></div>'}</div>
         </section>
         <section class="search-section">
             <div class="search-section-header">
-                <span>Posts / Topics</span>
+                <span>${escapeHtml(postsTitle)}</span>
             </div>
-            <div class="search-result-list">${postsMarkup || '<div class="search-item"><span class="search-query">No posts found</span></div>'}</div>
+            <div class="search-result-list">${postsMarkup || `<div class="search-item"><span class="search-query">${escapeHtml(noPosts)}</span></div>`}</div>
         </section>
         <div class="search-footer"><span>${footerText}</span></div>
     `;
@@ -637,6 +643,13 @@ function closeSearchPanel() {
     searchState.highlightedIndex = -1;
 }
 
+function resetAndCloseSearch() {
+    const input = document.getElementById('global-search');
+    if (input) input.value = '';
+    updateSearchState();
+    closeSearchPanel();
+}
+
 function moveSearchHighlight(direction) {
     const dropdown = document.getElementById('search-dropdown-inner');
     const input = document.getElementById('global-search');
@@ -807,9 +820,14 @@ function setupSearchInteraction() {
 
     document.addEventListener('click', (event) => {
         if (!shell.contains(event.target)) {
-            closeSearchPanel();
+            resetAndCloseSearch();
         }
     });
+
+    window.addEventListener('scroll', resetAndCloseSearch, { passive: true });
+    document.addEventListener('touchmove', (event) => {
+        if (!shell.contains(event.target)) resetAndCloseSearch();
+    }, { passive: true });
 
     document.addEventListener('keydown', (event) => {
         const metaKey = event.metaKey || event.ctrlKey;
@@ -895,12 +913,39 @@ function showNotice(message, type = 'info', options = {}) {
     overlay.noticeTimer = window.setTimeout(() => closeNotice(overlay), 4200);
 }
 
+const PANEL_SELECTORS = ['#notifications-drawer', '#bookmarks-drawer', '#history-drawer'];
+
+function closeAllPanels() {
+    PANEL_SELECTORS.forEach((selector) => {
+        const panel = document.querySelector(selector);
+        panel?.classList.add('hidden');
+        panel?.classList.remove('active');
+    });
+    document.querySelectorAll('#notification-dock-btn, #bookmark-dock-btn, #history-dock-btn').forEach((button) => button.classList.remove('active'));
+}
+
+function openExclusivePanel(targetSelector) {
+    const target = document.querySelector(targetSelector);
+    if (!target) return false;
+    const shouldOpen = target.classList.contains('hidden');
+    closeAllPanels();
+    if (shouldOpen) {
+        target.classList.remove('hidden');
+        target.classList.add('active');
+        const button = document.querySelector({ '#notifications-drawer': '#notification-dock-btn', '#bookmarks-drawer': '#bookmark-dock-btn', '#history-drawer': '#history-dock-btn' }[targetSelector]);
+        button?.classList.add('active');
+    }
+    return shouldOpen;
+}
+
+window.AeroPanelController = { openExclusivePanel, closeAllPanels };
+
 function setBookmarkDrawerVisibility(isOpen) {
     const drawer = document.getElementById('bookmarks-drawer');
     const dockButton = document.getElementById('bookmark-dock-btn');
     if (!drawer || !dockButton) return;
-    drawer.classList.toggle('hidden', !isOpen);
-    dockButton.classList.toggle('active', isOpen);
+    if (isOpen) openExclusivePanel('#bookmarks-drawer');
+    else closeAllPanels();
 }
 
 let notificationItems = [];
@@ -955,8 +1000,8 @@ function setNotificationDrawerVisibility(isOpen) {
     const drawer = document.getElementById('notifications-drawer');
     const button = document.getElementById('notification-dock-btn');
     if (!drawer || !button) return;
-    drawer.classList.toggle('hidden', !isOpen);
-    button.classList.toggle('active', isOpen);
+    if (isOpen) openExclusivePanel('#notifications-drawer');
+    else closeAllPanels();
 }
 
 function renderNotifications() {
@@ -968,8 +1013,10 @@ function renderNotifications() {
         const icon = item.type === 'like' ? '♥' : item.type === 'comment' ? '●' : item.type === 'follow' ? '●' : '↗';
         const avatarUrl = actor.avatar_url ? (actor.avatar_url.startsWith('http') ? actor.avatar_url : `${API_ORIGIN}${actor.avatar_url}`) : '';
         const avatar = avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : escapeHtml((actor.username || 'S').charAt(0).toUpperCase());
-        return `<article class="notification-item" data-post-id="${item.post_id || ''}" tabindex="0"><span class="notification-avatar">${avatar}</span><div class="notification-copy"><strong>@${escapeHtml(actor.username || 'Someone')}</strong><span>${escapeHtml(item.message || `${item.type} your post`)}</span><time>${formatRelativeTime(item.created_at)}</time><p>${escapeHtml(item.post_content || '')}</p></div><span class="notification-type-icon">${icon}</span></article>`;
-    }).join('') : '<div class="bookmarks-empty">No notifications yet.</div>';
+        const fallbackMessage = item.type === 'follow' ? 'followed_you' : item.type === 'like' ? 'liked_your_post' : `${item.type} your post`;
+        const message = item.message || (window.AeroI18n?.t(fallbackMessage) || fallbackMessage);
+        return `<article class="notification-item" data-post-id="${item.post_id || ''}" tabindex="0"><span class="notification-avatar">${avatar}</span><div class="notification-copy"><strong>@${escapeHtml(actor.username || 'Someone')}</strong><span>${escapeHtml(message)}</span><time>${formatRelativeTime(item.created_at)}</time><p>${escapeHtml(item.post_content || '')}</p></div><span class="notification-type-icon">${icon}</span></article>`;
+    }).join('') : `<div class="bookmarks-empty">${window.AeroI18n?.t('no_notifications') || 'No notifications'}</div>`;
     list.querySelectorAll('.notification-item').forEach((item) => item.addEventListener('click', () => {
         const post = document.querySelector(`[data-post-id="${item.dataset.postId}"]`);
         setNotificationDrawerVisibility(false);
@@ -1768,14 +1815,14 @@ async function loadBookmarksDrawer() {
     const list = document.getElementById('bookmarks-list');
     if (!list) return;
 
-    list.innerHTML = '<div class="bookmarks-empty"><div class="bookmarks-empty-icon">★</div><div>Loading bookmarks...</div></div>';
+    list.innerHTML = `<div class="bookmarks-empty"><div class="bookmarks-empty-icon">★</div><div>${window.AeroI18n?.translateValue('Loading...') || 'Loading...'}</div></div>`;
     try {
         const posts = await AeroAPI.getBookmarkedPosts();
         if (!posts || posts.length === 0) {
             list.innerHTML = `
                 <div class="bookmarks-empty">
                     <div class="bookmarks-empty-icon">☆</div>
-                    <div>No bookmarks saved yet.</div>
+                    <div>${window.AeroI18n?.t('no_bookmarks') || 'No bookmarks'}</div>
                 </div>
             `;
             return;
@@ -1814,7 +1861,7 @@ async function loadBookmarksDrawer() {
                             list.innerHTML = `
                                 <div class="bookmarks-empty">
                                     <div class="bookmarks-empty-icon">☆</div>
-                                    <div>No bookmarks saved yet.</div>
+                                    <div>${window.AeroI18n?.t('no_bookmarks') || 'No bookmarks'}</div>
                                 </div>
                             `;
                         }
@@ -2143,8 +2190,8 @@ const AeroAPI = {
             overlay.id = 'report-modal-overlay';
             overlay.className = 'report-modal-overlay';
             overlay.innerHTML = `<div class="report-modal" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
-                <div class="report-modal-header"><h2 id="report-modal-title">Report post</h2><button type="button" class="report-close" aria-label="Close report dialog">&times;</button></div>
-                <form class="report-form"><label for="report-reason">Why are you reporting this?</label><textarea id="report-reason" maxlength="1000" required placeholder="Tell us what is wrong..."></textarea><div class="report-form-actions"><button type="button" class="report-cancel-btn">Cancel</button><button type="submit" class="report-submit-btn">Submit report</button></div></form>
+                <div class="report-modal-header"><h2 id="report-modal-title">${window.AeroI18n?.t('report_post_title') || 'Report post'}</h2><button type="button" class="report-close" aria-label="Close report dialog">&times;</button></div>
+                <form class="report-form"><label for="report-reason">${window.AeroI18n?.t('report_reason_prompt') || 'Tell us what is wrong...'}</label><textarea id="report-reason" maxlength="1000" required placeholder="${window.AeroI18n?.t('report_reason_prompt') || 'Tell us what is wrong...'}"></textarea><div class="report-form-actions"><button type="button" class="report-cancel-btn">Cancel</button><button type="submit" class="report-submit-btn">${window.AeroI18n?.t('submit_report') || 'Submit report'}</button></div></form>
             </div>`;
             document.body.appendChild(overlay);
             const close = () => overlay.classList.remove('is-open');
@@ -2814,12 +2861,12 @@ const AeroAPI = {
             };
 
             const loadComments = async () => {
-                commentsList.innerHTML = '<p class="comments-loading">Loading comments...</p>';
+                commentsList.innerHTML = `<p class="comments-loading">${window.AeroI18n?.t('loading_comments') || 'Loading comments...'}</p>`;
                 try {
                     const comments = await this.getComments(post.id);
                     commentsList.innerHTML = '';
                     if (!comments.length) {
-                        commentsList.innerHTML = '<p class="comments-empty">No comments yet.</p>';
+                        commentsList.innerHTML = `<p class="comments-empty">${window.AeroI18n?.t('no_comments') || 'No comments yet.'}</p>`;
                     } else {
                         comments.forEach(comment => commentsList.appendChild(renderComment(comment)));
                     }

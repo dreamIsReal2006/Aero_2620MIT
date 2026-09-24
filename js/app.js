@@ -25,7 +25,8 @@
         const icon = normalized === 'admin'
             ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Z"></path><path d="m9 12 2 2 4-4"></path></svg>'
             : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Z"></path><path d="M8 12h8M12 8v8"></path></svg>';
-        return `<span class="role-badge ${normalized}">${icon}<span>${normalized}</span></span>`;
+        const label = window.AeroI18n?.t(`role_${normalized}`) || normalized;
+        return `<span class="role-badge ${normalized}">${icon}<span>${label}</span></span>`;
     }
 
     function updateSharedUserState(user) {

@@ -36,6 +36,11 @@
     }
 
     function setDrawerOpen(isOpen) {
+        if (window.AeroPanelController) {
+            if (isOpen) window.AeroPanelController.openExclusivePanel('#history-drawer');
+            else window.AeroPanelController.closeAllPanels();
+            return;
+        }
         document.getElementById('history-drawer')?.classList.toggle('hidden', !isOpen);
         document.getElementById('history-dock-btn')?.classList.toggle('active', isOpen);
     }
@@ -100,7 +105,7 @@
                     <p class="bookmark-item-text">${escapeHtml(post.content || 'Viewed post')}</p>
                 </div>
             </article>
-        `).join('') : `<div class="bookmarks-empty"><div class="bookmarks-empty-icon">${emptyIconSvg}</div><div>No viewed posts yet.</div></div>`;
+        `).join('') : `<div class="bookmarks-empty"><div class="bookmarks-empty-icon">${emptyIconSvg}</div><div>${window.AeroI18n?.t('no_history') || 'No history'}</div></div>`;
 
         list.querySelectorAll('.history-item').forEach((item) => {
             const open = () => openHistoryPost(item.dataset.historyId);
@@ -140,6 +145,17 @@
             localStorage.removeItem(STORAGE_KEY);
             render();
         });
+        document.addEventListener('click', (event) => {
+            if (!event.target.closest('#history-drawer, #history-dock-btn, #bookmarks-drawer, #bookmark-dock-btn, #notifications-drawer, #notification-dock-btn')) {
+                window.AeroPanelController?.closeAllPanels();
+            }
+        });
+        window.addEventListener('scroll', () => window.AeroPanelController?.closeAllPanels(), { passive: true });
+        document.addEventListener('touchmove', (event) => {
+            if (!event.target.closest('.bookmarks-drawer, .notifications-drawer, #notification-dock-btn, #bookmark-dock-btn, #history-dock-btn')) {
+                window.AeroPanelController?.closeAllPanels();
+            }
+        }, { passive: true });
         render();
     }
 

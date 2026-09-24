@@ -4627,6 +4627,55 @@ html.dark-mode .mobile-nav-drawer,
 .mobile-sheet-header button:hover { background: var(--accent-light-fill); color: var(--text-primary); }
 .mobile-nav-drawer button { padding: 12px 14px; border: 0; border-radius: 12px; color: var(--text-primary); background: transparent; cursor: pointer; text-align: left; font: inherit; }
 .mobile-nav-drawer button:hover { background: var(--accent-light-fill); }
+
+/* Keep mobile navigation readable when the glass surface is in dark mode. */
+html.dark-mode .mobile-nav-drawer,
+body.dark-mode .mobile-nav-drawer,
+html[data-theme="dark"] .mobile-nav-drawer,
+html.dark-mode .mobile-drawer,
+body.dark-mode .mobile-drawer,
+html.dark-mode .bottom-sheet,
+body.dark-mode .bottom-sheet,
+html.dark-mode .hamburger-drawer,
+body.dark-mode .hamburger-drawer {
+    background: rgba(18, 18, 20, .95) !important;
+    color: #f3f4f6 !important;
+    border-top-color: rgba(255, 255, 255, .12) !important;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, .42) !important;
+}
+
+html.dark-mode .mobile-nav-drawer button,
+body.dark-mode .mobile-nav-drawer button,
+html[data-theme="dark"] .mobile-nav-drawer button,
+html.dark-mode .mobile-drawer button,
+body.dark-mode .mobile-drawer button,
+html.dark-mode .bottom-sheet button,
+body.dark-mode .bottom-sheet button,
+html.dark-mode .hamburger-drawer button,
+body.dark-mode .hamburger-drawer button {
+    color: #f3f4f6 !important;
+}
+
+html.dark-mode .mobile-nav-drawer button:hover,
+html.dark-mode .mobile-nav-drawer button:active,
+body.dark-mode .mobile-nav-drawer button:hover,
+body.dark-mode .mobile-nav-drawer button:active,
+html[data-theme="dark"] .mobile-nav-drawer button:hover,
+html[data-theme="dark"] .mobile-nav-drawer button:active,
+html.dark-mode .mobile-drawer button:hover,
+html.dark-mode .mobile-drawer button:active,
+html.dark-mode .bottom-sheet button:hover,
+html.dark-mode .bottom-sheet button:active,
+html.dark-mode .hamburger-drawer button:hover,
+html.dark-mode .hamburger-drawer button:active {
+    background: rgba(255, 255, 255, .1) !important;
+}
+
+html.dark-mode .mobile-sheet-handle,
+body.dark-mode .mobile-sheet-handle,
+html[data-theme="dark"] .mobile-sheet-handle {
+    background: rgba(255, 255, 255, .3) !important;
+}
 .mobile-bottom-nav { display: none; }
 .chat-confirm-overlay { position: fixed; inset: 0; z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0, 0, 0, .42); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .2s ease, visibility .2s ease; }
 .chat-confirm-overlay.is-open { opacity: 1; visibility: visible; pointer-events: auto; }

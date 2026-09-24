@@ -4,6 +4,14 @@
     const translations = {
         en: {
             screenTimeWeekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            loading_comments: 'Loading comments...', 'no_comments': 'No comments yet.',
+            no_shorts: 'No Shorts available yet.', 'upload_first_video': '+ Upload First Video', 'upload_video_btn': '+ Video',
+            shared_post_from: 'Shared a post from {user}', 'delete_post': 'Delete Post', 'report_post_title': 'Report post',
+            report_reason_prompt: 'Tell us what is wrong...', 'submit_report': 'Submit report', 'role_admin': 'Admin', 'role_moderator': 'Moderator',
+            search_users_title: 'USERS', 'search_posts_title': 'POSTS / TOPICS', 'no_posts_found': 'No posts found',
+            press_enter_search: 'Press Enter or Click to see all results for "{query}"', 'visit': 'Visit',
+            tab_all: 'All', 'tab_mentions': 'Mentions', 'tab_likes': 'Likes', 'followed_you': 'followed you',
+            liked_your_post: 'liked your post', 'history': 'History', 'nav_history': 'History', 'no_notifications': 'No notifications', 'no_bookmarks': 'No bookmarks', 'no_history': 'No history',
             'author': 'Author', 'author_badge': 'Author',
             'post.bookmark': 'Bookmark Post', 'post.remove_bookmark': 'Remove Bookmark',
             'post.copy_link': 'Copy Link', 'post.not_interested': 'Not Interested',
@@ -12,6 +20,14 @@
         },
         zh: {
             screenTimeWeekdays: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+            loading_comments: '加载评论中...', 'no_comments': '暂无评论',
+            no_shorts: '暂无短视频', 'upload_first_video': '+ 上传第一个视频', 'upload_video_btn': '+ 视频',
+            shared_post_from: '来自 {user} 的分享帖子', 'delete_post': '删除帖子', 'report_post_title': '举报帖子',
+            report_reason_prompt: '请说明举报原因...', 'submit_report': '提交举报', 'role_admin': '管理员', 'role_moderator': '版主',
+            search_users_title: '用户', 'search_posts_title': '帖子 / 话题', 'no_posts_found': '未找到相关帖子',
+            press_enter_search: '按 Enter 或点击查看 "{query}" 的全部结果', 'visit': '访问',
+            tab_all: '全部', 'tab_mentions': '提及', 'tab_likes': '赞', 'followed_you': '关注了你',
+            liked_your_post: '赞了你的帖子', 'history': '历史', 'nav_history': '历史', 'no_notifications': '暂无通知', 'no_bookmarks': '暂无书签', 'no_history': '暂无浏览历史',
             'Settings': '设置', 'Back': '返回', 'Account': '账户', 'Appearance': '外观', 'Languages': '语言',
             'Notifications': '通知', 'Privacy': '隐私', 'Security': '安全', 'Screen Time': '屏幕使用时间',
             'Theme': '主题', 'Light': '浅色', 'Dark': '深色', 'System': '跟随系统', 'App Language': '应用语言',
@@ -69,6 +85,11 @@
     function translateValue(value) {
         const language = getLanguage();
         return translations[language][value] || value;
+    }
+
+    function translate(key, values = {}) {
+        const template = translations[getLanguage()][key] || key;
+        return String(template).replace(/\{(\w+)\}/g, (match, name) => Object.prototype.hasOwnProperty.call(values, name) ? values[name] : match);
     }
 
     function formatChatTimestamp(timestamp) {
@@ -146,7 +167,7 @@
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    window.AeroI18n = { getLanguage, applyLanguage, translateValue, formatChatTimestamp, getScreenTimeWeekdays };
+    window.AeroI18n = { getLanguage, applyLanguage, translateValue, t: translate, formatChatTimestamp, getScreenTimeWeekdays };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup);
     else setup();
 })();
