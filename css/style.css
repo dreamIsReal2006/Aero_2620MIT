@@ -109,6 +109,14 @@ body {
 
 html {
     background: var(--bg-main, #f8fafc);
+    overflow-x: hidden;
+}
+
+html,
+body,
+#main-app {
+    max-width: 100%;
+    overflow-x: hidden;
 }
 
 .gemini-bg-container {
@@ -2462,7 +2470,7 @@ body.dark-mode .action-bar-capsule {
     position: fixed;
     top: 88px;
     right: 24px;
-    z-index: 1200;
+    z-index: 2200;
     width: min(400px, calc(100vw - 32px));
     max-height: calc(100vh - 120px);
     overflow: hidden;
@@ -2478,7 +2486,7 @@ body.dark-mode .action-bar-capsule {
     position: fixed;
     top: 88px;
     right: 24px;
-    z-index: 1200;
+    z-index: 2200;
     width: min(420px, calc(100vw - 32px));
     max-height: calc(100vh - 120px);
     overflow: hidden;
@@ -4675,6 +4683,99 @@ html.dark-mode .mobile-sheet-handle,
 body.dark-mode .mobile-sheet-handle,
 html[data-theme="dark"] .mobile-sheet-handle {
     background: rgba(255, 255, 255, .3) !important;
+}
+
+html.dark-mode .drawer-content,
+body.dark-mode .drawer-content,
+html[data-theme="dark"] .drawer-content,
+html.dark-mode .mobile-drawer,
+body.dark-mode .mobile-drawer,
+html[data-theme="dark"] .mobile-drawer,
+html.dark-mode .bottom-sheet,
+body.dark-mode .bottom-sheet,
+html[data-theme="dark"] .bottom-sheet,
+html.dark-mode .hamburger-drawer,
+body.dark-mode .hamburger-drawer,
+html[data-theme="dark"] .hamburger-drawer {
+    background-color: #121318 !important;
+    color: #f3f4f6 !important;
+    border-top: 1px solid rgba(255, 255, 255, .1) !important;
+}
+
+html.dark-mode .drawer-item,
+body.dark-mode .drawer-item,
+html[data-theme="dark"] .drawer-item {
+    color: #e5e7eb !important;
+}
+
+html.dark-mode .drawer-item:hover,
+html.dark-mode .drawer-item:active,
+body.dark-mode .drawer-item:hover,
+body.dark-mode .drawer-item:active,
+html[data-theme="dark"] .drawer-item:hover,
+html[data-theme="dark"] .drawer-item:active {
+    background-color: rgba(255, 255, 255, .08) !important;
+}
+
+html.dark-mode .drawer-handle,
+body.dark-mode .drawer-handle,
+html[data-theme="dark"] .drawer-handle {
+    background-color: rgba(255, 255, 255, .25) !important;
+}
+
+/* Avoid the bright native scrollbar in dark mode while retaining a narrow thumb. */
+html.dark-mode,
+html[data-theme="dark"],
+body.dark-mode,
+.dark {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, .2) #0f1015;
+}
+
+html.dark-mode::-webkit-scrollbar,
+html[data-theme="dark"]::-webkit-scrollbar,
+body.dark-mode::-webkit-scrollbar,
+.dark::-webkit-scrollbar,
+html.dark-mode *::-webkit-scrollbar,
+html[data-theme="dark"] *::-webkit-scrollbar,
+body.dark-mode *::-webkit-scrollbar,
+.dark *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+html.dark-mode::-webkit-scrollbar-track,
+html[data-theme="dark"]::-webkit-scrollbar-track,
+body.dark-mode::-webkit-scrollbar-track,
+.dark::-webkit-scrollbar-track,
+html.dark-mode *::-webkit-scrollbar-track,
+html[data-theme="dark"] *::-webkit-scrollbar-track,
+body.dark-mode *::-webkit-scrollbar-track,
+.dark *::-webkit-scrollbar-track {
+    background: #0f1015;
+}
+
+html.dark-mode::-webkit-scrollbar-thumb,
+html[data-theme="dark"]::-webkit-scrollbar-thumb,
+body.dark-mode::-webkit-scrollbar-thumb,
+.dark::-webkit-scrollbar-thumb,
+html.dark-mode *::-webkit-scrollbar-thumb,
+html[data-theme="dark"] *::-webkit-scrollbar-thumb,
+body.dark-mode *::-webkit-scrollbar-thumb,
+.dark *::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, .2);
+    border-radius: 3px;
+}
+
+html.dark-mode::-webkit-scrollbar-thumb:hover,
+html[data-theme="dark"]::-webkit-scrollbar-thumb:hover,
+body.dark-mode::-webkit-scrollbar-thumb:hover,
+.dark::-webkit-scrollbar-thumb:hover,
+html.dark-mode *::-webkit-scrollbar-thumb:hover,
+html[data-theme="dark"] *::-webkit-scrollbar-thumb:hover,
+body.dark-mode *::-webkit-scrollbar-thumb:hover,
+.dark *::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, .4);
 }
 .mobile-bottom-nav { display: none; }
 .chat-confirm-overlay { position: fixed; inset: 0; z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0, 0, 0, .42); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .2s ease, visibility .2s ease; }

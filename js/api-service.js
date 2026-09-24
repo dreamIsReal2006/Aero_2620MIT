@@ -3030,8 +3030,10 @@ const AeroAPI = {
         mobileDrawer?.addEventListener('click', (event) => {
             const button = event.target.closest('[data-mobile-nav]');
             if (!button) return;
-            document.getElementById(button.dataset.mobileNav)?.click();
+            event.preventDefault();
+            const target = document.getElementById(button.dataset.mobileNav);
             closeMobileMenu();
+            if (target) window.setTimeout(() => target.click(), 0);
         });
         document.querySelectorAll('[data-mobile-action]').forEach((button) => {
             button.addEventListener('click', () => {
