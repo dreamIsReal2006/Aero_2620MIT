@@ -3018,6 +3018,15 @@ const AeroAPI = {
             mobileMenuButton?.setAttribute('aria-expanded', 'true');
             document.body.style.overflow = 'hidden';
         };
+        const desktopViewport = window.matchMedia('(min-width: 769px)');
+        const resetMobileMenuForDesktop = (event) => {
+            if (event.matches) closeMobileMenu();
+        };
+        desktopViewport.addEventListener?.('change', resetMobileMenuForDesktop);
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 769) closeMobileMenu();
+        }, { passive: true });
+        if (desktopViewport.matches) closeMobileMenu();
         mobileMenuButton?.addEventListener('click', () => {
             if (mobileDrawer?.classList.contains('hidden')) openMobileMenu();
             else closeMobileMenu();
