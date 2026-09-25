@@ -1159,12 +1159,13 @@ async function appendSingleMessageToUI(message, conversation = activeChatUser ||
     if (!box || !contact || box.querySelector(`[data-message-id="${message.id}"]`)) return false;
     const content = escapeHtml(await decryptChatContent(message.content, contact));
     const mediaUrl = message.media_url ? (String(message.media_url).startsWith('http') ? message.media_url : `${API_ORIGIN}${message.media_url}`) : '';
+    const videoType = /\.mov(?:$|\?)/i.test(mediaUrl) ? 'video/quicktime' : 'video/mp4; codecs=hevc, aac';
     const media = mediaUrl && message.type === 'image'
         ? `<img src="${escapeHtml(mediaUrl)}" class="chat-gif-media" alt="Attached image" loading="lazy">`
         : mediaUrl && message.type === 'gif'
             ? `<img src="${escapeHtml(mediaUrl)}" class="chat-gif-media" alt="GIF" loading="lazy">`
         : mediaUrl && message.type === 'video'
-            ? `<video class="chat-inline-video" src="${escapeHtml(mediaUrl)}" controls preload="metadata"></video>`
+            ? `<video class="chat-inline-video" controls preload="metadata"><source src="${escapeHtml(mediaUrl)}" type="${videoType}"></video>`
             : mediaUrl && message.type === 'audio'
                 ? `<audio class="chat-inline-audio" src="${escapeHtml(mediaUrl)}" controls></audio>`
             : '';
@@ -1270,7 +1271,7 @@ async function loadShortVideos() {
         const response = await fetch(`${API_BASE}/videos`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
         const videos = await response.json();
         if (!response.ok) throw new Error(videos.message || 'Unable to load videos');
-        feed.innerHTML = videos.length ? videos.map((video) => `<article class="short-video-card"><video src="${escapeHtml(video.video_url)}" playsinline loop preload="metadata" data-hdr-fallback="${!window.AeroMediaCapabilities?.isHDRSupported()}"></video><div class="short-video-overlay"><button type="button" class="video-action" aria-label="Like video">♥</button><button type="button" class="video-action" aria-label="Comment on video">●</button><button type="button" class="video-action" aria-label="Share video">↗</button></div><div class="short-video-meta"><span class="video-author-avatar">${escapeHtml((video.author?.username || 'U').charAt(0).toUpperCase())}</span><div><strong>@${escapeHtml(video.author?.username || 'User')}</strong><p>${escapeHtml(video.caption || '')}</p><small>♫ ${escapeHtml(video.track_name || 'Original audio')}</small></div><button type="button" class="video-mute-btn" aria-label="Mute video">🔊</button></div></article>`).join('') : '<div class="bookmarks-empty">No short videos yet.</div>';
+        feed.innerHTML = videos.length ? videos.map((video) => { const videoType = /\.mov(?:$|\?)/i.test(video.video_url) ? 'video/quicktime' : 'video/mp4; codecs=hevc, aac'; return `<article class="short-video-card"><video playsinline loop preload="metadata" data-hdr-fallback="${!window.AeroMediaCapabilities?.isHDRSupported()}"><source src="${escapeHtml(video.video_url)}" type="${videoType}"></video><div class="short-video-overlay"><button type="button" class="video-action" aria-label="Like video">♥</button><button type="button" class="video-action" aria-label="Comment on video">●</button><button type="button" class="video-action" aria-label="Share video">↗</button></div><div class="short-video-meta"><span class="video-author-avatar">${escapeHtml((video.author?.username || 'U').charAt(0).toUpperCase())}</span><div><strong>@${escapeHtml(video.author?.username || 'User')}</strong><p>${escapeHtml(video.caption || '')}</p><small>♫ ${escapeHtml(video.track_name || 'Original audio')}</small></div><button type="button" class="video-mute-btn" aria-label="Mute video">🔊</button></div></article>`; }).join('') : '<div class="bookmarks-empty">No short videos yet.</div>';
         feed.querySelectorAll('video').forEach((video) => {
             video.muted = true;
             video.play().catch(() => {});
@@ -2582,7 +2583,6 @@ const AeroAPI = {
                 post.images.slice(0, 3).forEach(mediaUrl => {
                     const isVideo = /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(mediaUrl);
                     const mediaElement = document.createElement(isVideo ? 'video' : 'img');
-                    mediaElement.src = mediaUrl;
                     mediaElement.alt = isVideo ? '' : 'Post media';
                     mediaElement.loading = 'lazy';
                     mediaElement.dataset.hdrFallback = String(!window.AeroMediaCapabilities?.isHDRSupported());
@@ -2590,6 +2590,12 @@ const AeroAPI = {
                         mediaElement.controls = true;
                         mediaElement.preload = 'metadata';
                         mediaElement.playsInline = true;
+                        const source = document.createElement('source');
+                        source.src = mediaUrl;
+                        source.type = /\.mov(?:$|\?)/i.test(mediaUrl) ? 'video/quicktime' : /\.mp4(?:$|\?)/i.test(mediaUrl) ? 'video/mp4; codecs=hevc, aac' : 'video/webm';
+                        mediaElement.appendChild(source);
+                    } else {
+                        mediaElement.src = mediaUrl;
                     }
                     media.appendChild(mediaElement);
                 });
@@ -3356,11 +3362,19 @@ function updateCreatePostState() {
     createPostState.files.forEach((file, index) => {
         const card = document.createElement('div');
         card.className = 'media-preview-item';
-        const objectUrl = file.previewUrl || (file.previewUrl = URL.createObjectURL(file));
-        const isVideo = file.type.startsWith('video/');
-        const media = document.createElement(isVideo ? 'video' : 'img');
-        media.src = objectUrl;
-        media.alt = isVideo ? '' : file.name;
+        const extension = file.name.split('.').pop()?.toLowerCase() || '';
+        const isHeif = ['heic', 'heif'].includes(extension) || ['image/heic', 'image/heif'].includes(file.type);
+        const isVideo = file.type.startsWith('video/') || ['mp4', 'webm', 'mov', 'm4v'].includes(extension);
+        const objectUrl = isHeif ? '' : file.previewUrl || (file.previewUrl = URL.createObjectURL(file));
+        const media = isHeif ? document.createElement('div') : document.createElement(isVideo ? 'video' : 'img');
+        media.className = isHeif ? 'media-heif-placeholder' : '';
+        if (isHeif) {
+            media.textContent = 'HEIF 图片';
+            media.setAttribute('aria-label', 'HEIF 图片');
+        } else {
+            media.src = objectUrl;
+            media.alt = isVideo ? '' : file.name;
+        }
         if (isVideo) {
             media.autoplay = true;
             media.muted = true;
@@ -3377,7 +3391,7 @@ function updateCreatePostState() {
         remove.textContent = '✕';
         remove.setAttribute('aria-label', `Remove ${file.name}`);
         remove.addEventListener('click', () => {
-            URL.revokeObjectURL(objectUrl);
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
             delete file.previewUrl;
             createPostState.files.splice(index, 1);
             updateCreatePostState();

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from flask import jsonify, request
 from werkzeug.utils import secure_filename
 
@@ -47,8 +49,12 @@ def upload_short(current_user):
     if not video_file or not video_file.filename:
         return jsonify({"success": False, "message": "A video file is required"}), 400
     extension = Path(secure_filename(video_file.filename)).suffix.lower()
-    if extension not in {".mp4", ".webm", ".mov", ".m4v"} or not (video_file.mimetype or "").startswith("video/"):
+    mime = (video_file.mimetype or "").lower()
+    allowed_mimes = {"video/mp4", "video/quicktime", "video/webm", "video/x-m4v", "video/hevc"}
+    if extension not in {".mp4", ".webm", ".mov", ".m4v"} or (mime and mime not in allowed_mimes and not mime.startswith("video/")):
         return jsonify({"success": False, "message": "Only MP4, WEBM, MOV, and M4V videos are supported"}), 400
+    if request.content_length and request.content_length > 1024 * 1024 * 1024:
+        return jsonify({"success": False, "message": "Video files must be 1 GB or smaller"}), 413
     try:
         public_url = upload_file_to_supabase(video_file, "shorts")
     except (RuntimeError, ValueError) as error:

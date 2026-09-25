@@ -131,8 +131,9 @@
         const attachmentMarkup = (message) => {
             const url = message.media_url ? (String(message.media_url).startsWith('http') ? message.media_url : `${window.AeroConfig.API_ORIGIN}${message.media_url}`) : '';
             if (!url) return '';
+            const videoType = /\.mov(?:$|\?)/i.test(url) ? 'video/quicktime' : 'video/mp4; codecs=hevc, aac';
             if (message.type === 'image' || message.type === 'gif') return `<button type="button" class="chat-media-preview" data-lightbox-src="${escapeText(url)}"><img src="${escapeText(url)}" alt="Attached image" loading="lazy"></button>`;
-            if (message.type === 'video') return `<video class="chat-inline-video" src="${escapeText(url)}" controls preload="metadata"></video>`;
+            if (message.type === 'video') return `<video class="chat-inline-video" controls preload="metadata"><source src="${escapeText(url)}" type="${videoType}"></video>`;
             if (message.type === 'audio') return `<audio class="chat-inline-audio" src="${escapeText(url)}" controls></audio>`;
             return `<a class="chat-document-card" href="${escapeText(url)}" download><span class="chat-document-ext">${escapeText((message.file_name || 'FILE').split('.').pop().toUpperCase())}</span><span><strong>${escapeText(message.file_name || 'Attached document')}</strong><small>${escapeText(String(message.file_size || 0))} bytes</small></span><span class="chat-document-download">↓</span></a>`;
         };

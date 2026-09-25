@@ -7,7 +7,7 @@ from flask import send_from_directory
 load_dotenv()
 
 app = create_app()
-app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024 * 1024
 BASE_DIR = Path(__file__).resolve().parent
 
 

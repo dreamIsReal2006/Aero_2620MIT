@@ -132,7 +132,7 @@
                 <span class="avatar-edit-badge" aria-hidden="true">&#9998;</span>
                 <span class="sr-only">Choose a profile picture</span>
             </label>
-            <input id="profile-avatar-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
+            <input id="profile-avatar-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif" hidden>
             <label class="onboarding-field">Bio
                 <textarea id="profile-bio" maxlength="150" placeholder="Tell the Aero community a little about you..."></textarea>
                 <span id="profile-bio-count" class="character-count">0 / 150</span>
@@ -369,7 +369,7 @@
             <div id="modal-preview" class="media-preview-grid" aria-live="polite"></div>
             <footer class="create-post-footer">
                 <label class="media-picker-btn" for="modal-post-images"><span aria-hidden="true">⌁</span> Add media</label>
-                <input type="file" id="modal-post-images" accept="image/png,image/jpeg,image/webp,image/avif,image/heic,image/heif,video/mp4,video/webm,video/quicktime,video/x-m4v" multiple hidden>
+                <input type="file" id="modal-post-images" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/quicktime,video/hevc,video/webm,video/x-m4v" multiple hidden>
                 <button type="submit" id="modal-publish-btn" class="btn btn-primary g2-btn" disabled>Post</button>
             </footer>
         </form>
@@ -383,7 +383,7 @@
                 <span class="dropzone-prompt">Drag &amp; drop video here, or Browse</span>
                 <span id="video-file-details" class="dropzone-file-details"></span>
             </div>
-            <input id="short-upload-file" class="visually-hidden-file" type="file" accept="video/mp4,video/webm,video/quicktime,video/x-m4v" required>
+            <input id="short-upload-file" class="visually-hidden-file" type="file" accept="video/mp4,video/quicktime,video/hevc,video/webm,video/x-m4v" required>
             <input id="short-upload-caption" class="video-title-input" type="text" maxlength="2000" placeholder="Video Title" aria-label="Video title">
             <footer class="create-post-footer"><button type="submit" class="btn btn-primary g2-btn">Upload</button></footer>
         </form>
@@ -400,7 +400,7 @@
                 <div class="profile-edit-avatar-controls">
                     <label for="profile-edit-avatar">Avatar letter or image URL</label>
                     <input id="profile-edit-avatar" type="text" maxlength="500" placeholder="K or https://..."><label class="profile-edit-file-label" for="profile-edit-avatar-file">Choose image</label>
-                    <input id="profile-edit-avatar-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+                    <input id="profile-edit-avatar-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif" hidden>
                 </div>
             </div>
             <label class="profile-edit-field">Display Name<input id="profile-edit-display-name" type="text" maxlength="80" required></label>

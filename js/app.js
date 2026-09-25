@@ -445,7 +445,7 @@
                 return;
             }
             if (contentType === 'shorts') {
-                container.innerHTML = `<div class="profile-shorts-grid">${items.map((item) => `<article class="profile-short-card"><video src="${escape(item.video_url)}" muted playsinline preload="metadata"></video><strong>${escape(item.caption || 'Untitled Short')}</strong><small>${Number(item.views_count || 0)} views</small></article>`).join('')}</div>`;
+                container.innerHTML = `<div class="profile-shorts-grid">${items.map((item) => { const videoType = /\.mov(?:$|\?)/i.test(item.video_url) ? 'video/quicktime' : 'video/mp4; codecs=hevc, aac'; return `<article class="profile-short-card"><video muted playsinline preload="metadata"><source src="${escape(item.video_url)}" type="${videoType}"></video><strong>${escape(item.caption || 'Untitled Short')}</strong><small>${Number(item.views_count || 0)} views</small></article>`; }).join('')}</div>`;
                 return;
             }
             container.innerHTML = items.map((item) => {

@@ -39,6 +39,7 @@ ALLOWED_MEDIA_TYPES = {
 
 HDR_IMAGE_EXTENSIONS = {"avif", "heic", "heif"}
 HDR_VIDEO_EXTENSIONS = {"mp4", "webm", "mov", "m4v"}
+VIDEO_UPLOAD_LIMIT = 1024 * 1024 * 1024
 POST_CACHE_TTL_SECONDS = 15
 _post_response_cache = {}
 _post_cache_lock = threading.Lock()
@@ -315,10 +316,20 @@ def get_posts(current_user):
 @token_required
 def upload_media(current_user):
     file = request.files.get("file")
-    extension = Path(secure_filename(file.filename if file else "")).suffix.lower().lstrip(".")
+    extension = Path(secure_filename((file.filename or "") if file else "")).suffix.lower().lstrip(".")
     expected_mime = ALLOWED_MEDIA_TYPES.get(extension)
-    if not file or not file.filename or not expected_mime or not (file.mimetype or "").startswith(expected_mime):
-        return jsonify({"message": "Only JPG, PNG, JPEG, WEBP, MP4, WEBM, or MOV media are supported"}), 400
+    mime = (file.mimetype or "").lower() if file else ""
+    allowed_mimes = {
+        "heic": {"image/heic", "image/heif"}, "heif": {"image/heic", "image/heif"},
+        "mp4": {"video/mp4", "video/hevc"}, "mov": {"video/quicktime", "video/hevc"},
+    }
+    valid_mime = mime in allowed_mimes.get(extension, set()) or (expected_mime and mime.startswith(expected_mime))
+    if not valid_mime and mime in {"", "application/octet-stream"}:
+        valid_mime = bool(expected_mime)
+    if not file or not file.filename or not expected_mime or not valid_mime:
+        return jsonify({"message": "Supported media: JPG, PNG, WEBP, HEIC, HEIF, MP4, WEBM, MOV, or M4V"}), 400
+    if extension in HDR_VIDEO_EXTENSIONS and request.content_length and request.content_length > VIDEO_UPLOAD_LIMIT:
+        return jsonify({"message": "Video files must be 1 GB or smaller"}), 413
     try:
         folder = request.form.get("folder", "posts")
         public_url = upload_file_to_supabase(file, folder)

@@ -27,6 +27,7 @@ def create_app():
     app.config["SESSION_COOKIE_SAMESITE"] = "None"
     app.config["SESSION_COOKIE_SECURE"] = True
     app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024 * 1024
     database_uri = os.environ.get(
         "DATABASE_URL",
         os.environ.get(
