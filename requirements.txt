@@ -12,3 +12,4 @@ a2wsgi>=1.10
 supabase>=2.0
 pillow-heif>=0.18.0
 psycopg[binary]
+sentence-transformers>=2.2.2

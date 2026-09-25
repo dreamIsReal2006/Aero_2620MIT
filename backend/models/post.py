@@ -38,6 +38,7 @@ class Post(db.Model):
 
     parent_id = db.Column(db.Integer, db.ForeignKey("posts.id"), nullable=True, index=True)
     type = db.Column(db.String(12), nullable=False, default="original", index=True)
+    embedding = db.Column(db.Text, nullable=True)
 
     parent = db.relationship(
         "Post",

@@ -1,5 +1,6 @@
 import json
 import datetime as dt
+import logging
 import math
 import base64
 import threading
@@ -7,7 +8,7 @@ import time
 from pathlib import Path
 
 from flask import jsonify, request
-from sqlalchemy import false, func, or_
+from sqlalchemy import false, func, or_, text
 from sqlalchemy.orm import contains_eager, load_only
 from werkzeug.utils import secure_filename
 
@@ -30,6 +31,7 @@ from backend.mentions import add_mention_notifications
 from backend.privacy import visible_author_ids as get_visible_author_ids
 from backend.presence import is_user_online
 from backend.storage import upload_file_to_supabase
+from backend.feed.services import generate_post_embedding, save_post_embedding
 
 ALLOWED_MEDIA_TYPES = {
     "jpg": "image/", "jpeg": "image/", "png": "image/", "webp": "image/", "gif": "image/",
@@ -43,6 +45,29 @@ VIDEO_UPLOAD_LIMIT = 1024 * 1024 * 1024
 POST_CACHE_TTL_SECONDS = 15
 _post_response_cache = {}
 _post_cache_lock = threading.Lock()
+logger = logging.getLogger(__name__)
+
+
+def apply_diversity_filter(posts):
+    selected = []
+    remaining = list(posts)
+    seen_authors = set()
+    while remaining:
+        next_post = next(
+            (post for post in remaining if post.user_id not in seen_authors),
+            remaining[0],
+        )
+        remaining.remove(next_post)
+        selected.append(next_post)
+        seen_authors.add(next_post.user_id)
+    return selected
+
+
+def _for_you_candidate_ids(user_id, limit):
+    return db.session.execute(
+        text("SELECT id FROM get_for_you_feed(:user_id, :limit_num)"),
+        {"user_id": user_id, "limit_num": limit},
+    ).scalars().all()
 
 
 def post_payload(post, current_user_id=None):
@@ -221,6 +246,14 @@ def get_posts(current_user):
         ).all()
     } if current_user else set()
 
+    recommendation_ids = None
+    if current_user and feed_type == "for_you" and author_id is None and not cursor:
+        try:
+            recommendation_ids = _for_you_candidate_ids(current_user.id, limit * 3 + 1)
+        except Exception:
+            db.session.rollback()
+            logger.exception("For You feed function is unavailable; using default feed")
+
     like_counts = db.session.query(
         Like.post_id.label("post_id"),
         func.count(Like.id).label("likes_count"),
@@ -267,6 +300,8 @@ def get_posts(current_user):
         posts_query = posts_query.filter(Post.user_id == author_id)
     elif feed_type == "following":
         posts_query = posts_query.filter(Post.user_id.in_(followed_ids)) if followed_ids else posts_query.filter(false())
+    elif recommendation_ids is not None:
+        posts_query = posts_query.filter(Post.id.in_(recommendation_ids))
 
     rows = posts_query.outerjoin(like_counts, like_counts.c.post_id == Post.id).outerjoin(
         comment_counts, comment_counts.c.post_id == Post.id
@@ -274,9 +309,18 @@ def get_posts(current_user):
         func.coalesce(like_counts.c.likes_count, 0).label("likes_count"),
         func.coalesce(comment_counts.c.comments_count, 0).label("comments_count"),
         func.coalesce(share_counts.c.share_count, 0).label("share_count"),
-    ).order_by(Post.created_at.desc(), Post.id.desc()).limit(limit + 1).all()
+    ).order_by(Post.created_at.desc(), Post.id.desc()).limit(
+        max(limit + 1, limit * 3) if recommendation_ids is not None else limit + 1
+    ).all()
 
-    has_more = len(rows) > limit
+    if recommendation_ids is not None:
+        order = {post_id: index for index, post_id in enumerate(recommendation_ids)}
+        rows.sort(key=lambda row: order.get(row[0].id, len(order)))
+        diverse_posts = apply_diversity_filter([row[0] for row in rows])[:limit]
+        row_by_post_id = {row[0].id: row for row in rows}
+        rows = [row_by_post_id[post.id] for post in diverse_posts]
+
+    has_more = len(rows) > limit if recommendation_ids is None else False
     rows = rows[:limit]
 
     post_ids = [post.id for post, _, _, _ in rows]
@@ -363,6 +407,10 @@ def create_post(current_user):
     )
     db.session.add(post)
     db.session.flush()
+    try:
+        save_post_embedding(post.id, generate_post_embedding(content))
+    except Exception:
+        logger.exception("Unable to generate embedding for post %s", post.id)
     add_mention_notifications(content, current_user, post.id, "post")
     db.session.commit()
     return jsonify(post_payload(post, current_user.id)), 201
