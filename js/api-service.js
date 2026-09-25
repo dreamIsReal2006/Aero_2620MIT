@@ -84,6 +84,69 @@ function escapeHtml(value = '') {
         .replace(/'/g, '&#039;');
 }
 
+function openThreadsMediaViewer(mediaList, startIndex = 0) {
+    const items = Array.isArray(mediaList) ? mediaList.filter(Boolean) : [];
+    if (!items.length) return;
+    document.getElementById('threads-media-modal')?.remove();
+    let currentIndex = Math.min(Math.max(Number(startIndex) || 0, 0), items.length - 1);
+    const modal = document.createElement('div');
+    modal.id = 'threads-media-modal';
+    modal.className = 'threads-media-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Media viewer');
+    modal.innerHTML = '<button type="button" class="threads-media-close" aria-label="Close media viewer">&times;</button><button type="button" class="threads-media-nav threads-media-prev" aria-label="Previous media">&#8592;</button><div class="threads-media-stage"></div><button type="button" class="threads-media-nav threads-media-next" aria-label="Next media">&#8594;</button>';
+    const stage = modal.querySelector('.threads-media-stage');
+    const closeButton = modal.querySelector('.threads-media-close');
+    const previousButton = modal.querySelector('.threads-media-prev');
+    const nextButton = modal.querySelector('.threads-media-next');
+    const close = () => {
+        modal.querySelector('video')?.pause();
+        document.removeEventListener('keydown', onKeyDown);
+        document.body.classList.remove('threads-media-open');
+        modal.remove();
+    };
+    const render = () => {
+        stage.replaceChildren();
+        const url = items[currentIndex];
+        const isVideo = /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(url);
+        const media = document.createElement(isVideo ? 'video' : 'img');
+        media.className = 'threads-media-content';
+        media.alt = isVideo ? '' : 'Post media';
+        media.src = url;
+        if (isVideo) {
+            media.controls = true;
+            media.autoplay = true;
+            media.playsInline = true;
+            media.preload = 'metadata';
+            media.play().catch(() => {});
+        }
+        stage.appendChild(media);
+        previousButton.hidden = items.length < 2;
+        nextButton.hidden = items.length < 2;
+    };
+    const change = (direction) => {
+        currentIndex = (currentIndex + direction + items.length) % items.length;
+        render();
+    };
+    const onKeyDown = (event) => {
+        if (event.key === 'Escape') close();
+        if (event.key === 'ArrowLeft') change(-1);
+        if (event.key === 'ArrowRight') change(1);
+    };
+    closeButton.addEventListener('click', close);
+    previousButton.addEventListener('click', () => change(-1));
+    nextButton.addEventListener('click', () => change(1));
+    modal.addEventListener('click', event => { if (event.target === modal || event.target === stage) close(); });
+    document.addEventListener('keydown', onKeyDown);
+    document.body.appendChild(modal);
+    document.body.classList.add('threads-media-open');
+    render();
+    closeButton.focus();
+}
+
+window.openThreadsMediaViewer = openThreadsMediaViewer;
+
 function highlightMatch(text, query) {
     const rawText = String(text ?? '');
     if (!query.trim()) return escapeHtml(rawText);
@@ -2626,12 +2689,17 @@ const AeroAPI = {
             postEl.append(header, content);
             if (post.images && post.images.length) {
                 const media = document.createElement('div');
-                media.className = 'post-media-grid';
-                post.images.slice(0, 3).forEach(mediaUrl => {
+                const mediaList = post.images.filter(Boolean);
+                media.className = `post-media-container${mediaList.length > 1 ? ' post-media-carousel' : ''}`;
+                mediaList.forEach((mediaUrl, index) => {
                     const isVideo = /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(mediaUrl);
                     const mediaElement = document.createElement(isVideo ? 'video' : 'img');
+                    mediaElement.className = 'post-media-item';
                     mediaElement.alt = isVideo ? '' : 'Post media';
                     mediaElement.loading = 'lazy';
+                    mediaElement.tabIndex = 0;
+                    mediaElement.setAttribute('role', 'button');
+                    mediaElement.setAttribute('aria-label', `Open media ${index + 1} of ${mediaList.length}`);
                     mediaElement.dataset.hdrFallback = String(!window.AeroMediaCapabilities?.isHDRSupported());
                     if (isVideo) {
                         mediaElement.controls = true;
@@ -2644,6 +2712,14 @@ const AeroAPI = {
                     } else {
                         mediaElement.src = mediaUrl;
                     }
+                    const openMedia = () => window.openThreadsMediaViewer(mediaList, index);
+                    mediaElement.addEventListener('click', openMedia);
+                    mediaElement.addEventListener('keydown', event => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            openMedia();
+                        }
+                    });
                     media.appendChild(mediaElement);
                 });
                 postEl.appendChild(media);

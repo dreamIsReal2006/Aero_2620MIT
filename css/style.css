@@ -3690,6 +3690,123 @@ body.dark-mode .comment-composer input::placeholder {
     grid-row: auto;
 }
 
+.post-media-container {
+    position: relative;
+    width: 100%;
+    max-height: 430px;
+    margin-top: 10px;
+    overflow: hidden;
+    border-radius: 12px;
+}
+
+.post-media-item {
+    display: block;
+    width: 100%;
+    max-height: 430px;
+    cursor: pointer;
+    border-radius: 12px;
+    object-fit: cover;
+    transition: opacity 0.2s;
+}
+
+.post-media-item:hover,
+.post-media-item:focus-visible {
+    opacity: 0.95;
+}
+
+.post-media-item:focus-visible {
+    outline: 2px solid var(--accent-primary, #0a84ff);
+    outline-offset: -2px;
+}
+
+.post-media-carousel {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+}
+
+.post-media-carousel .post-media-item {
+    flex: 0 0 85%;
+    scroll-snap-align: start;
+}
+
+body.threads-media-open {
+    overflow: hidden;
+}
+
+.threads-media-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+}
+
+.threads-media-close,
+.threads-media-nav {
+    position: absolute;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.15);
+    cursor: pointer;
+    font-size: 22px;
+}
+
+.threads-media-close:hover,
+.threads-media-nav:hover,
+.threads-media-close:focus-visible,
+.threads-media-nav:focus-visible {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.threads-media-close {
+    top: 20px;
+    left: 20px;
+    font-size: 26px;
+}
+
+.threads-media-nav {
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.threads-media-prev { left: 20px; }
+.threads-media-next { right: 20px; }
+
+.threads-media-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 32px 80px;
+}
+
+.threads-media-content {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+@media (max-width: 640px) {
+    .threads-media-stage { padding: 56px 16px; }
+    .threads-media-prev { left: 12px; }
+    .threads-media-next { right: 12px; }
+}
+
 .delete-modal-content {
     width: min(420px, 100%);
     padding: 30px;
