@@ -324,6 +324,7 @@ def get_posts(current_user):
     ).order_by(Post.created_at.desc(), Post.id.desc()).limit(
         max(limit + 1, limit * 3) if recommendation_ids is not None else limit + 1
     ).all()
+    rows_have_more = len(rows) > limit
 
     if recommendation_ids is not None:
         order = {post_id: index for index, post_id in enumerate(recommendation_ids)}
@@ -332,7 +333,7 @@ def get_posts(current_user):
         row_by_post_id = {row[0].id: row for row in rows}
         rows = [row_by_post_id[post.id] for post in diverse_posts]
 
-    has_more = len(rows) > limit if recommendation_ids is None else False
+    has_more = rows_have_more
     rows = rows[:limit]
 
     post_ids = [post.id for post, _, _, _ in rows]

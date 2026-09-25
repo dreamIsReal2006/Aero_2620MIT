@@ -36,3 +36,6 @@ body:has(.threads-media-modal) { overflow: hidden; }
 .threads-media-stage { position: relative !important; display: flex !important; align-items: center !important; justify-content: center !important; max-width: 90vw !important; max-height: 85vh !important; overflow: hidden !important; border-radius: 16px !important; box-shadow: 0 20px 40px rgba(0, 0, 0, .5) !important; }
 .threads-media-content { display: block; max-width: 90vw !important; max-height: 85vh !important; object-fit: contain !important; border-radius: 12px; }
 @media (max-width: 640px) { .threads-media-stage { padding: 56px 16px; } .threads-media-prev { left: 12px; } .threads-media-next { right: 12px; } }
+.feed-sentinel { display: flex; min-height: 56px; align-items: center; justify-content: center; }
+.loading-spinner { width: 22px; height: 22px; border: 2px solid rgba(10,132,255,.2); border-top-color: var(--aero-accent); border-radius: 50%; animation: feed-spin .7s linear infinite; }
+@keyframes feed-spin { to { transform: rotate(360deg); } }
