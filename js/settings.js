@@ -30,18 +30,29 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function updatePresence() {
-        if (!token()) return;
+        if (document.hidden || !token()) return;
         await fetch(`${API_BASE}/users/me/presence`, {
             method: "POST",
             headers: { "Authorization": `Bearer ${token()}` }
         }).catch(() => {});
     }
 
+    let presenceTimer = 0;
+    const startPresenceTimer = () => {
+        window.clearInterval(presenceTimer);
+        if (document.hidden || !token()) return;
+        presenceTimer = window.setInterval(updatePresence, 60000);
+    };
     updatePresence();
-    window.setInterval(updatePresence, 30000);
+    startPresenceTimer();
     window.addEventListener("focus", updatePresence);
     document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible") updatePresence();
+        if (document.visibilityState === "visible") {
+            updatePresence();
+            startPresenceTimer();
+        } else {
+            window.clearInterval(presenceTimer);
+        }
     });
 
     function applyTheme(theme) {

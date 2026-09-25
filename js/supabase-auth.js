@@ -13,7 +13,10 @@
     };
     const redirectTo = `${window.location.origin}/index.html`;
 
-    window.AeroSupabaseSignOut = () => supabase.auth.signOut();
+    window.AeroSupabaseSignOut = () => {
+        window.AeroStopNotificationRealtime?.();
+        return supabase.auth.signOut();
+    };
 
     async function exchangeSession(session) {
         if (!session?.access_token) return false;

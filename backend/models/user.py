@@ -1,4 +1,5 @@
 from backend import db
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import validates
 # introducing password hashing
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -32,7 +33,7 @@ class User(db.Model):
     bio = db.Column(db.String(150), default="", nullable=False)
     avatar_url = db.Column(db.String(500), default="", nullable=False)
     language_preference = db.Column(db.String(2), default=None, nullable=True)
-    interest_embedding = db.Column(db.Text, nullable=True)
+    interest_embedding = db.Column(Vector(384), nullable=True)
 
     is_private = db.Column(db.Boolean, default=False, nullable=False)
     show_online_status = db.Column(db.Boolean, default=True, nullable=False)

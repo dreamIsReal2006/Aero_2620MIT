@@ -2,6 +2,9 @@ const API_BASE = window.AeroConfig.API_BASE_URL;
 const API_ORIGIN = window.AeroConfig.API_ORIGIN;
 const ADMIN_API_BASE = window.AeroConfig.ADMIN_API_BASE || `${API_ORIGIN}/api/admin`;
 const DEFAULT_ADMIN_STATS = { total_users: 0, total_posts: 0, pending_reports: 0 };
+const NOTIFICATION_POLL_MS = 30000;
+const PRESENCE_POLL_MS = 60000;
+const UNREAD_CHAT_POLL_MS = 30000;
 
 function getAuthToken() {
     const token = localStorage.getItem('aero_token');
@@ -293,7 +296,7 @@ async function refreshCurrentUser() {
 window.refreshCurrentUser = refreshCurrentUser;
 
 async function updatePresence() {
-    if (!localStorage.getItem('aero_token')) return;
+    if (document.hidden || !localStorage.getItem('aero_token')) return;
     await fetch(`${API_BASE}/users/me/presence`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
@@ -305,7 +308,8 @@ function setupPresenceHeartbeat() {
     updatePresence();
     const startPresenceTimer = () => {
         window.clearInterval(presenceTimer);
-        presenceTimer = window.setInterval(updatePresence, 30000);
+        if (document.hidden || !localStorage.getItem('aero_token')) return;
+        presenceTimer = window.setInterval(updatePresence, PRESENCE_POLL_MS);
     };
     startPresenceTimer();
     window.addEventListener('focus', updatePresence);
@@ -953,6 +957,7 @@ let notificationTab = 'all';
 let notificationUnreadCount = null;
 let chatUnreadCount = null;
 const chatMessageSnapshots = new Map();
+let notificationRealtimeChannel = null;
 const notificationSound = new Audio('assets/audio/notification.mp3');
 notificationSound.preload = 'auto';
 let notificationSoundUnlocked = false;
@@ -1046,8 +1051,41 @@ async function loadNotifications(markRead = true) {
     }
 }
 
+function stopNotificationRealtime() {
+    if (!notificationRealtimeChannel) return;
+    const channel = notificationRealtimeChannel;
+    notificationRealtimeChannel = null;
+    window.AeroSupabase?.removeChannel(channel).catch(() => {});
+}
+
+function setupNotificationRealtime() {
+    const client = window.AeroSupabase;
+    const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
+    if (!client || !currentUser.id || !localStorage.getItem('aero_token')) return;
+    stopNotificationRealtime();
+    notificationRealtimeChannel = client
+        .channel(`aero-notifications-${currentUser.id}`)
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${currentUser.id}`
+        }, (payload) => {
+            if (document.hidden || Number(payload.new?.user_id) !== Number(currentUser.id)) return;
+            loadNotifications(false).catch(() => {});
+            playNotificationSound();
+        })
+        .subscribe((status) => {
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.error('[Aero notifications realtime error]', status);
+        });
+}
+
+window.AeroStopNotificationRealtime = stopNotificationRealtime;
+window.addEventListener('pagehide', stopNotificationRealtime);
+
 function setupNotificationDrawer() {
     let notificationTimer = 0;
+    let unreadChatTimer = 0;
     setupNotificationSoundUnlock();
     const button = document.getElementById('notification-dock-btn');
     button?.addEventListener('click', () => {
@@ -1064,17 +1102,24 @@ function setupNotificationDrawer() {
     }));
     if (localStorage.getItem('aero_token')) {
         loadNotifications(false);
+        loadUnreadChatCount().catch(() => {});
+        setupNotificationRealtime();
         const startNotificationTimer = () => {
             window.clearInterval(notificationTimer);
-            notificationTimer = window.setInterval(() => {
-                if (!document.hidden) loadNotifications(false);
-            }, 5000);
+            window.clearInterval(unreadChatTimer);
+            if (document.hidden || !localStorage.getItem('aero_token')) return;
+            notificationTimer = window.setInterval(() => loadNotifications(false), NOTIFICATION_POLL_MS);
+            unreadChatTimer = window.setInterval(() => loadUnreadChatCount().catch(() => {}), UNREAD_CHAT_POLL_MS);
         };
         startNotificationTimer();
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden) window.clearInterval(notificationTimer);
+            if (document.hidden) {
+                window.clearInterval(notificationTimer);
+                window.clearInterval(unreadChatTimer);
+            }
             else {
                 loadNotifications(false);
+                loadUnreadChatCount().catch(() => {});
                 startNotificationTimer();
             }
         });
@@ -3666,6 +3711,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
             window.setFabAuthState?.(false);
+            window.AeroStopNotificationRealtime?.();
             window.AeroSupabaseSignOut?.().catch(() => {});
             ['aero_token', 'token', 'aero_user', 'currentUser'].forEach((key) => localStorage.removeItem(key));
             location.reload();
