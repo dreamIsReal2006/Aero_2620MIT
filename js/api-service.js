@@ -142,7 +142,6 @@ function openThreadsMediaViewer(mediaList, startIndex = 0) {
     document.body.appendChild(modal);
     document.body.classList.add('threads-media-open');
     render();
-    closeButton.focus();
 }
 
 window.openThreadsMediaViewer = openThreadsMediaViewer;
