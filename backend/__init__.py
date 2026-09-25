@@ -161,9 +161,14 @@ def create_app():
         with app.app_context():
             db.session.execute(text("SELECT 1"))
             db.create_all()
-            db.session.execute(text(
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS language_preference VARCHAR(2)"
-            ))
+            try:
+                db.session.execute(text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS language_preference VARCHAR(2)"
+                ))
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.warning(f"Skipping language_preference column check/alter: {e}")
             db.session.execute(text(
                 "UPDATE users SET role = 'admin' "
                 "WHERE is_admin IS TRUE AND role <> 'admin'"
