@@ -162,6 +162,9 @@ def create_app():
             db.session.execute(text("SELECT 1"))
             db.create_all()
             db.session.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS language_preference VARCHAR(2)"
+            ))
+            db.session.execute(text(
                 "UPDATE users SET role = 'admin' "
                 "WHERE is_admin IS TRUE AND role <> 'admin'"
             ))

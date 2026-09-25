@@ -269,6 +269,11 @@ def update_my_profile(current_user):
     email = str(data.get("email", current_user.email)).strip().lower()
     bio = str(data.get("bio", "")).strip()
     avatar_url = data.get("avatar_url")
+    language_preference = data.get("language_preference", current_user.language_preference)
+    if language_preference is not None:
+        language_preference = str(language_preference).strip().lower()
+        if language_preference not in {"en", "zh"}:
+            return jsonify({"message": "Language preference must be en or zh"}), 400
     if len(display_name) > 80:
         return jsonify({"message": "Display name must be 80 characters or fewer"}), 400
     if len(username) < 3 or len(username) > 30 or not re.fullmatch(r"[A-Za-z0-9_ ]+", username):
@@ -291,6 +296,7 @@ def update_my_profile(current_user):
         current_user.display_name = display_name or username
         current_user.email = email
         current_user.bio = bio
+        current_user.language_preference = language_preference
         if avatar_url is not None:
             current_user.avatar_url = str(avatar_url).strip()
         db.session.commit()
@@ -306,6 +312,7 @@ def update_my_profile(current_user):
             "email": current_user.email,
             "bio": current_user.bio,
             "avatar_url": current_user.avatar_url,
+            "language_preference": current_user.language_preference,
             "role": current_user.role if current_user.role in {"admin", "moderator", "user"} else "user",
             "is_admin": current_user.is_admin,
             "is_banned": current_user.is_banned,
@@ -331,6 +338,7 @@ def get_my_profile(current_user):
             "email": current_user.email,
             "bio": current_user.bio or "",
             "avatar_url": current_user.avatar_url or "",
+            "language_preference": current_user.language_preference,
             "role": current_user.role if current_user.role in {"admin", "moderator", "user"} else "user",
             "is_admin": current_user.is_admin,
             "is_banned": current_user.is_banned,

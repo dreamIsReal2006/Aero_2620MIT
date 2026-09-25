@@ -1,5 +1,5 @@
 (() => {
-    const STORAGE_KEY = 'user_preferred_language';
+    const STORAGE_KEY = 'aero_user_lang';
     const originalTitle = document.title;
     const translations = {
         en: {
@@ -76,7 +76,6 @@
         if (preferred) return preferred;
 
         const detected = String(navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en';
-        localStorage.setItem(STORAGE_KEY, detected);
         return detected;
     }
 
@@ -144,9 +143,10 @@
         node.childNodes.forEach(translateNode);
     }
 
-    function applyLanguage(language = getLanguage()) {
-        const normalizedLanguage = normalizeLanguage(language) || (String(navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en');
-        localStorage.setItem(STORAGE_KEY, normalizedLanguage);
+    function applyLanguage(language, options = {}) {
+        const hasExplicitLanguage = language !== undefined;
+        const normalizedLanguage = normalizeLanguage(language) || getLanguage();
+        if (hasExplicitLanguage && options.persist !== false) localStorage.setItem(STORAGE_KEY, normalizedLanguage);
         localStorage.setItem('aero_language', normalizedLanguage);
         document.documentElement.lang = normalizedLanguage === 'zh' ? 'zh-CN' : 'en';
         const translatedTitles = {
@@ -159,17 +159,33 @@
         document.title = normalizedLanguage === 'zh' ? (translatedTitles[originalTitle] || originalTitle) : originalTitle;
         document.body?.childNodes.forEach(translateNode);
         document.querySelectorAll('[data-language-select]').forEach((select) => { select.value = normalizedLanguage; });
-        window.dispatchEvent(new CustomEvent('aero:language-change', { detail: { language: normalizedLanguage } }));
+        window.dispatchEvent(new CustomEvent('aero:language-change', {
+            detail: { language: normalizedLanguage, manual: hasExplicitLanguage }
+        }));
+    }
+
+    function setLanguage(language) {
+        applyLanguage(language);
+    }
+
+    function restoreUserLanguage(user) {
+        const storedLanguage = normalizeLanguage(localStorage.getItem(STORAGE_KEY));
+        const databaseLanguage = normalizeLanguage(user?.language_preference);
+        applyLanguage(storedLanguage || databaseLanguage || getLanguage(), { persist: !storedLanguage && Boolean(databaseLanguage) });
     }
 
     function setup() {
-        applyLanguage();
-        document.querySelectorAll('[data-language-select]').forEach((select) => select.addEventListener('change', (event) => applyLanguage(event.target.value)));
+        applyLanguage(undefined, { persist: false });
+        document.querySelectorAll('[data-language-select]').forEach((select) => select.addEventListener('change', (event) => setLanguage(event.target.value)));
+        window.addEventListener('aero:language-change', (event) => {
+            if (!event.detail?.manual || !localStorage.getItem('aero_token')) return;
+            window.AeroAPI?.updateProfile?.({ language_preference: event.detail.language }).catch((error) => console.error('Language preference sync failed:', error));
+        });
         const observer = new MutationObserver((mutations) => mutations.forEach((mutation) => mutation.addedNodes.forEach(translateNode)));
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    window.AeroI18n = { getLanguage, applyLanguage, translateValue, t: translate, formatChatTimestamp, getScreenTimeWeekdays };
+    window.AeroI18n = { getLanguage, applyLanguage, setLanguage, restoreUserLanguage, translateValue, t: translate, formatChatTimestamp, getScreenTimeWeekdays };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup);
     else setup();
 })();

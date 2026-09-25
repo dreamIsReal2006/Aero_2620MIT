@@ -219,6 +219,7 @@ def verify_otp():
     return jsonify({"token": make_token(user), "user": {
         "id": user.id, "username": user.username, "display_name": user.display_name or user.username, "email": user.email,
         "bio": user.bio or "", "avatar_url": user.avatar_url or "",
+        "language_preference": user.language_preference,
         "role": role,
         "is_moderator": role == "moderator",
         "is_admin": role == "admin", "is_banned": user.is_banned,
@@ -296,6 +297,7 @@ def signin():
     return jsonify({"token": make_token(user), "user": {
         "id": user.id, "username": user.username, "display_name": user.display_name or user.username, "email": user.email,
         "bio": user.bio or "", "avatar_url": user.avatar_url or "",
+        "language_preference": user.language_preference,
         "role": role,
         "is_moderator": role == "moderator",
         "is_admin": role == "admin", "is_banned": user.is_banned,
@@ -343,6 +345,7 @@ def supabase_signin():
     return jsonify({"token": make_token(user), "user": {
         "id": user.id, "username": user.username, "display_name": user.display_name or user.username, "email": user.email,
         "bio": user.bio or "", "avatar_url": user.avatar_url or "", "role": role,
+        "language_preference": user.language_preference,
         "is_moderator": role == "moderator", "is_admin": role == "admin", "is_banned": user.is_banned,
         "is_private": user.is_private, "show_online_status": user.show_online_status,
     }}), 200

@@ -26,6 +26,7 @@
         if (!response.ok) throw new Error(data.message || 'Unable to complete social sign in');
         localStorage.setItem('aero_token', data.token);
         localStorage.setItem('aero_user', JSON.stringify(data.user));
+        window.AeroI18n?.restoreUserLanguage?.(data.user);
         return true;
     }
 

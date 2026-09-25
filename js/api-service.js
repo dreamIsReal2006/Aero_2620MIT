@@ -1935,6 +1935,7 @@ const AeroAPI = {
             if (res.ok) {
                 localStorage.setItem('aero_token', data.token);
                 localStorage.setItem('aero_user', JSON.stringify(data.user));
+                window.AeroI18n?.restoreUserLanguage?.(data.user);
                 window.location.href = 'index.html?tab=for_you';
                 return;
             } else {
@@ -1982,6 +1983,7 @@ const AeroAPI = {
             if (res.ok) {
                 localStorage.setItem('aero_token', data.token);
                 localStorage.setItem('aero_user', JSON.stringify(data.user));
+                window.AeroI18n?.restoreUserLanguage?.(data.user);
                 sessionStorage.setItem('aero_profile_onboarding', '1');
                 window.location.href = 'index.html';
             } else {
@@ -3665,7 +3667,7 @@ document.addEventListener('DOMContentLoaded', () => {
         logoutBtn.addEventListener('click', () => {
             window.setFabAuthState?.(false);
             window.AeroSupabaseSignOut?.().catch(() => {});
-            localStorage.clear();
+            ['aero_token', 'token', 'aero_user', 'currentUser'].forEach((key) => localStorage.removeItem(key));
             location.reload();
         });
     }
