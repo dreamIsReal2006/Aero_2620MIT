@@ -11,3 +11,4 @@ gunicorn>=22.0; platform_system != "Windows"
 a2wsgi>=1.10
 supabase>=2.0
 pillow-heif>=0.18.0
+psycopg[binary]
