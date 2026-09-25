@@ -42,10 +42,18 @@ def _embedding_literal(values):
 def save_post_embedding(post_id, embedding):
     if not embedding:
         return
-    db.session.execute(
-        text("UPDATE posts SET embedding = CAST(:embedding AS vector) WHERE id = :post_id"),
-        {"embedding": _embedding_literal(embedding), "post_id": post_id},
-    )
+    try:
+        db.session.execute(text("SET LOCAL statement_timeout = 5000"))
+        db.session.execute(
+            text("UPDATE posts SET embedding = CAST(:embedding AS vector) WHERE id = :post_id"),
+            {"embedding": _embedding_literal(embedding), "post_id": post_id},
+        )
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Unable to save embedding for post %s", post_id)
+    finally:
+        db.session.remove()
 
 
 def update_interest_embedding(user_id, post_id):

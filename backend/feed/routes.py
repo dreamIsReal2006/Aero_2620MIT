@@ -7,7 +7,7 @@ import threading
 import time
 from pathlib import Path
 
-from flask import jsonify, request
+from flask import current_app, jsonify, request
 from sqlalchemy import false, func, or_, text
 from sqlalchemy.orm import contains_eager, load_only
 from werkzeug.utils import secure_filename
@@ -198,6 +198,18 @@ def _cache_posts(cache_key, posts):
             oldest_key = min(_post_response_cache, key=lambda key: _post_response_cache[key][0])
             _post_response_cache.pop(oldest_key, None)
         _post_response_cache[cache_key] = (time.monotonic() + POST_CACHE_TTL_SECONDS, posts)
+
+
+def async_generate_embedding(app, post_id, content):
+    with app.app_context():
+        try:
+            embedding = generate_post_embedding(content)
+            save_post_embedding(post_id, embedding)
+        except Exception:
+            logger.exception("Unable to generate embedding for post %s", post_id)
+            db.session.rollback()
+        finally:
+            db.session.remove()
 
 
 @feed_bp.get("/search")
@@ -407,12 +419,16 @@ def create_post(current_user):
     )
     db.session.add(post)
     db.session.flush()
-    try:
-        save_post_embedding(post.id, generate_post_embedding(content))
-    except Exception:
-        logger.exception("Unable to generate embedding for post %s", post.id)
     add_mention_notifications(content, current_user, post.id, "post")
     db.session.commit()
+    if content:
+        app = current_app._get_current_object()
+        threading.Thread(
+            target=async_generate_embedding,
+            args=(app, post.id, content),
+            daemon=True,
+            name=f"post-embedding-{post.id}",
+        ).start()
     return jsonify(post_payload(post, current_user.id)), 201
 
 
