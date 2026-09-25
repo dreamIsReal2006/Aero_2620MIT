@@ -3664,6 +3664,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
             window.setFabAuthState?.(false);
+            window.AeroSupabaseSignOut?.().catch(() => {});
             localStorage.clear();
             location.reload();
         });

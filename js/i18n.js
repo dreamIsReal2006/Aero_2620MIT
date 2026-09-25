@@ -16,7 +16,8 @@
             'post.bookmark': 'Bookmark Post', 'post.remove_bookmark': 'Remove Bookmark',
             'post.copy_link': 'Copy Link', 'post.not_interested': 'Not Interested',
             'post.follow': 'Follow', 'post.unfollow': 'Unfollow', 'post.report': 'Report Post',
-            'common.new_post': 'New Post', 'common.new_video': 'Video'
+            'common.new_post': 'New Post', 'common.new_video': 'Video',
+            'auth.or_continue_with': 'Or continue with', 'auth.google': 'Sign in with Google', 'auth.github': 'Sign in with GitHub'
         },
         zh: {
             screenTimeWeekdays: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
@@ -59,7 +60,8 @@
             'post.bookmark': '收藏帖子', 'post.remove_bookmark': '取消收藏',
             'post.copy_link': '复制链接', 'post.not_interested': '不感兴趣',
             'post.follow': '关注', 'post.unfollow': '取消关注', 'post.report': '举报帖子',
-            'common.new_post': '发布新帖', 'common.new_video': '视频'
+            'common.new_post': '发布新帖', 'common.new_video': '视频',
+            'auth.or_continue_with': '或使用以下方式继续', 'auth.google': '使用 Google 登录', 'auth.github': '使用 GitHub 登录'
         }
     };
     const originalText = new WeakMap();
@@ -128,7 +130,7 @@
         if (node.nodeType !== Node.ELEMENT_NODE || ['SCRIPT', 'STYLE'].includes(node.tagName)) return;
         const translationKey = node.getAttribute('data-i18n');
         if (translationKey) {
-            const labelNode = node.querySelector('[data-i18n-text]');
+            const labelNode = node.querySelector('[data-i18n-text]') || (node.querySelector('svg') && node.querySelector('span'));
             if (labelNode) labelNode.textContent = translateValue(translationKey);
             else node.textContent = translateValue(translationKey);
         }

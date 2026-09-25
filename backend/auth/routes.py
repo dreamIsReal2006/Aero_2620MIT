@@ -10,6 +10,7 @@ from urllib import request as urllib_request
 
 import jwt
 from flask import current_app, jsonify, request, session
+from supabase import create_client
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from backend import db
@@ -266,6 +267,8 @@ def reset_password():
             not any(not char.isalnum() for char in new_password)):
         return jsonify({"message": "Password must include uppercase, number, and special character"}), 400
     user = User.query.filter_by(email=email).first()
+    if user and ((user.ban_count or 0) >= 3 or user.is_banned):
+        return jsonify({"message": "This account is suspended"}), 403
     if not user:
         session.pop("password_reset_email", None)
         return jsonify({"message": "Account not found"}), 404
@@ -296,6 +299,51 @@ def signin():
         "role": role,
         "is_moderator": role == "moderator",
         "is_admin": role == "admin", "is_banned": user.is_banned,
+        "is_private": user.is_private, "show_online_status": user.show_online_status,
+    }}), 200
+
+
+@auth_bp.post("/supabase")
+def supabase_signin():
+    access_token = str((request.get_json(silent=True) or {}).get("access_token", "")).strip()
+    if not access_token:
+        return jsonify({"message": "Supabase access token is required"}), 400
+
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
+    if not supabase_url or not supabase_key:
+        return jsonify({"message": "Supabase authentication is not configured"}), 503
+    try:
+        auth_response = create_client(supabase_url, supabase_key).auth.get_user(access_token)
+        supabase_user = getattr(auth_response, "user", None)
+    except Exception:
+        return jsonify({"message": "Supabase session is invalid or expired"}), 401
+    if not supabase_user or not supabase_user.email:
+        return jsonify({"message": "The social account did not provide an email address"}), 400
+
+    metadata = supabase_user.user_metadata or {}
+    email = str(supabase_user.email).strip().lower()
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        raw_name = str(metadata.get("user_name") or metadata.get("preferred_username") or metadata.get("name") or email.split("@", 1)[0])
+        username = re.sub(r"[^A-Za-z0-9_ ]", "", raw_name).strip()[:30] or "Aero User"
+        while User.query.filter_by(username=username).first():
+            suffix = secrets.token_hex(2)
+            username = f"{username[:25].rstrip()}_{suffix}"[:30]
+        user = User(username=username, email=email, active=True, display_name=str(metadata.get("full_name") or metadata.get("name") or username)[:80])
+        user.set_password(secrets.token_urlsafe(32))
+        db.session.add(user)
+    user.active = True
+    avatar_url = metadata.get("avatar_url") or metadata.get("picture")
+    if avatar_url and not user.avatar_url:
+        user.avatar_url = str(avatar_url)[:500]
+    db.session.commit()
+    session["user_id"] = user.id
+    role = effective_user_role(user)
+    return jsonify({"token": make_token(user), "user": {
+        "id": user.id, "username": user.username, "display_name": user.display_name or user.username, "email": user.email,
+        "bio": user.bio or "", "avatar_url": user.avatar_url or "", "role": role,
+        "is_moderator": role == "moderator", "is_admin": role == "admin", "is_banned": user.is_banned,
         "is_private": user.is_private, "show_online_status": user.show_online_status,
     }}), 200
 
