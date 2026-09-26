@@ -3473,6 +3473,131 @@ function exportPostCard(postId, content, username, details = {}) {
 
 
 const createPostState = { files: [] };
+const mentionPickerState = { menu: null, timer: null, requestId: 0, items: [], activeIndex: -1, match: null };
+
+function mentionAtCaret(input) {
+    if (input.selectionStart !== input.selectionEnd) return null;
+    const prefix = input.value.slice(0, input.selectionStart);
+    const match = prefix.match(/(^|[\s([{])@([A-Za-z0-9_]*)$/);
+    if (!match) return null;
+    return { start: input.selectionStart - match[0].length + match[1].length, end: input.selectionStart, query: match[2] };
+}
+
+function positionMentionMenu(input) {
+    const rect = input.getBoundingClientRect();
+    const mirror = document.createElement('div');
+    const style = getComputedStyle(input);
+    ['font', 'padding', 'border', 'boxSizing', 'lineHeight', 'letterSpacing', 'textIndent', 'textTransform'].forEach((key) => { mirror.style[key] = style[key]; });
+    Object.assign(mirror.style, {
+        position: 'fixed', left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`,
+        visibility: 'hidden', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', overflow: 'hidden'
+    });
+    mirror.textContent = input.value.slice(0, input.selectionStart);
+    const marker = document.createElement('span');
+    marker.textContent = '\u200b';
+    mirror.appendChild(marker);
+    document.body.appendChild(mirror);
+    mirror.scrollTop = input.scrollTop;
+    const markerRect = marker.getBoundingClientRect();
+    mirror.remove();
+    const menu = mentionPickerState.menu;
+    if (!menu) return;
+    const top = Math.min(markerRect.bottom + 6, window.innerHeight - 280);
+    menu.style.left = `${Math.max(8, Math.min(markerRect.left, window.innerWidth - 296))}px`;
+    menu.style.top = `${Math.max(8, top)}px`;
+}
+
+function closeMentionMenu() {
+    mentionPickerState.match = null;
+    mentionPickerState.items = [];
+    mentionPickerState.activeIndex = -1;
+    mentionPickerState.menu?.classList.add('hidden');
+}
+
+function selectMention(user) {
+    const input = document.getElementById('modal-post-input');
+    const match = mentionPickerState.match;
+    if (!input || !match || !user?.username) return;
+    const insertion = `@${user.username} `;
+    input.value = `${input.value.slice(0, match.start)}${insertion}${input.value.slice(match.end)}`;
+    const cursor = match.start + insertion.length;
+    input.focus();
+    input.setSelectionRange(cursor, cursor);
+    closeMentionMenu();
+    updateCreatePostState();
+}
+
+function renderMentionMenu(payload, input) {
+    const menu = mentionPickerState.menu;
+    if (!menu) return;
+    const groups = [
+        { label: 'Following', users: payload.friends || [] },
+        { label: 'Other people', users: payload.others || [] }
+    ];
+    mentionPickerState.items = groups.flatMap(group => group.users.map(user => ({ user, isFollowing: group.label === 'Following' })));
+    mentionPickerState.activeIndex = mentionPickerState.items.length ? 0 : -1;
+    menu.replaceChildren();
+    groups.forEach((group) => {
+        if (!group.users.length) return;
+        const header = document.createElement('div');
+        header.className = 'mention-section-header';
+        header.textContent = group.label;
+        menu.appendChild(header);
+        group.users.forEach((user) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'mention-user-item';
+            button.dataset.mentionIndex = String(mentionPickerState.items.findIndex(item => item.user.id === user.id));
+            button.innerHTML = `${user.avatar_url ? `<img src="${escapeHtml(user.avatar_url)}" alt="">` : '<span class="mention-avatar-fallback" aria-hidden="true"></span>'}<span class="mention-user-copy"><strong>@${escapeHtml(user.username)}</strong><small>${escapeHtml(user.display_name || user.username)}</small></span>${group.label === 'Following' ? '<span class="mention-following-badge">Following</span>' : ''}`;
+            button.addEventListener('mousedown', event => event.preventDefault());
+            button.addEventListener('click', () => selectMention(user));
+            menu.appendChild(button);
+        });
+    });
+    menu.classList.toggle('hidden', !mentionPickerState.items.length);
+    if (mentionPickerState.items.length) positionMentionMenu(input);
+}
+
+function updateMentionPicker(input) {
+    const match = mentionAtCaret(input);
+    if (!match) {
+        closeMentionMenu();
+        return;
+    }
+    mentionPickerState.match = match;
+    window.clearTimeout(mentionPickerState.timer);
+    const requestId = ++mentionPickerState.requestId;
+    mentionPickerState.timer = window.setTimeout(async () => {
+        try {
+            const response = await fetch(`${API_BASE}/users/search-mention?q=${encodeURIComponent(match.query)}`, { headers: authHeaders({ Accept: 'application/json' }) });
+            if (!response.ok || requestId !== mentionPickerState.requestId) return;
+            renderMentionMenu(await response.json(), input);
+        } catch (error) {
+            if (requestId === mentionPickerState.requestId) closeMentionMenu();
+        }
+    }, 100);
+}
+
+function onMentionKeydown(event) {
+    const menu = mentionPickerState.menu;
+    if (!menu || menu.classList.contains('hidden')) return;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const direction = event.key === 'ArrowDown' ? 1 : -1;
+        mentionPickerState.activeIndex = (mentionPickerState.activeIndex + direction + mentionPickerState.items.length) % mentionPickerState.items.length;
+        menu.querySelectorAll('.mention-user-item').forEach((item, index) => {
+            const selected = Number(item.dataset.mentionIndex) === mentionPickerState.activeIndex;
+            item.classList.toggle('is-active', selected);
+            item.setAttribute('aria-selected', String(selected));
+        });
+        menu.querySelector('.mention-user-item.is-active')?.scrollIntoView({ block: 'nearest' });
+    } else if (event.key === 'Enter' && mentionPickerState.activeIndex >= 0) {
+        event.preventDefault();
+        selectMention(mentionPickerState.items[mentionPickerState.activeIndex].user);
+    } else if (event.key === 'Escape') {
+        closeMentionMenu();
+    }
+}
 
 function updateCreatePostState() {
     const preview = document.getElementById('modal-preview');
@@ -3559,6 +3684,12 @@ function setupCreatePostExperience() {
     const modal = document.getElementById('create-post-modal');
     const fileInput = document.getElementById('modal-post-images');
     const input = document.getElementById('modal-post-input');
+    if (!mentionPickerState.menu) {
+        mentionPickerState.menu = document.createElement('div');
+        mentionPickerState.menu.className = 'mention-dropdown-menu hidden';
+        mentionPickerState.menu.setAttribute('role', 'listbox');
+        document.body.appendChild(mentionPickerState.menu);
+    }
     document.getElementById('compose-trigger')?.addEventListener('click', openCreatePostModal);
     document.getElementById('compose-trigger')?.addEventListener('keydown', event => {
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openCreatePostModal(); }
@@ -3573,10 +3704,15 @@ function setupCreatePostExperience() {
         updateCreatePostState();
     });
     input?.addEventListener('input', updateCreatePostState);
+    input?.addEventListener('input', () => updateMentionPicker(input));
+    input?.addEventListener('click', () => updateMentionPicker(input));
+    input?.addEventListener('keyup', event => { if (!['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) updateMentionPicker(input); });
+    input?.addEventListener('keydown', onMentionKeydown);
     document.getElementById('create-post-form')?.addEventListener('submit', event => { event.preventDefault(); publishCreatePost(); });
     document.addEventListener('keydown', event => {
-        if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) modal.classList.add('hidden');
+        if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) { modal.classList.add('hidden'); closeMentionMenu(); }
     });
+    document.addEventListener('click', event => { if (!event.target.closest('.mention-dropdown-menu') && event.target !== input) closeMentionMenu(); });
 }
 
 function setupPostScrollBehavior() {

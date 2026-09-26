@@ -65,6 +65,51 @@ def update_presence(current_user):
     return jsonify({"online": True}), 200
 
 
+@social_bp.get("/users/search-mention")
+@token_required
+def search_mention_users(current_user):
+    query = str(request.args.get("q", "")).strip()[:50]
+    following_ids = db.session.query(Follow.following_id).filter_by(
+        follower_id=current_user.id,
+        status="approved",
+    )
+    friends_query = User.query.filter(
+        User.id.in_(following_ids),
+        User.id != current_user.id,
+        User.active.is_(True),
+        User.is_banned.is_(False),
+    )
+    if query:
+        pattern = f"%{query}%"
+        friends = friends_query.filter(
+            User.username.ilike(pattern) | User.display_name.ilike(pattern)
+        ).order_by(func.lower(User.username)).limit(5).all()
+        others = User.query.filter(
+            ~User.id.in_(following_ids),
+            User.id != current_user.id,
+            User.active.is_(True),
+            User.is_banned.is_(False),
+            User.is_private.is_(False),
+            User.username.ilike(pattern) | User.display_name.ilike(pattern),
+        ).order_by(func.lower(User.username)).limit(5).all()
+    else:
+        friends = friends_query.order_by(func.lower(User.username)).limit(10).all()
+        others = []
+
+    def serialize(user):
+        return {
+            "id": user.id,
+            "username": user.username,
+            "display_name": user.display_name or user.username,
+            "avatar_url": user.avatar_url or "",
+        }
+
+    return jsonify({
+        "friends": [serialize(user) for user in friends],
+        "others": [serialize(user) for user in others],
+    }), 200
+
+
 @social_bp.post("/social/follow/<int:user_id>")
 @social_bp.post("/users/<int:user_id>/follow")
 @token_required

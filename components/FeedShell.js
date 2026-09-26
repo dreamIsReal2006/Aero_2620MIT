@@ -12,6 +12,148 @@ import { getValidUrl } from '../lib/apiUrl';
 
 const apiHeaders = () => ({ Accept: 'application/json', Authorization: `Bearer ${localStorage.getItem('aero_token') || ''}` });
 
+function installMentionPicker(textarea) {
+  const menu = document.createElement('div');
+  menu.className = 'mention-dropdown-menu hidden';
+  menu.setAttribute('role', 'listbox');
+  document.body.appendChild(menu);
+  let match = null;
+  let items = [];
+  let activeIndex = -1;
+  let timer;
+  let requestId = 0;
+
+  const hide = () => { match = null; items = []; activeIndex = -1; menu.classList.add('hidden'); };
+  const position = () => {
+    if (!match || menu.classList.contains('hidden')) return;
+    const rect = textarea.getBoundingClientRect();
+    const style = getComputedStyle(textarea);
+    const mirror = document.createElement('div');
+    ['font', 'padding', 'border', 'boxSizing', 'lineHeight', 'letterSpacing', 'textIndent', 'textTransform'].forEach((key) => { mirror.style[key] = style[key]; });
+    Object.assign(mirror.style, { position: 'fixed', left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, visibility: 'hidden', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', overflow: 'hidden' });
+    mirror.textContent = textarea.value.slice(0, textarea.selectionStart);
+    const marker = document.createElement('span');
+    marker.textContent = '\u200b';
+    mirror.appendChild(marker);
+    document.body.appendChild(mirror);
+    mirror.scrollTop = textarea.scrollTop;
+    const caret = marker.getBoundingClientRect();
+    mirror.remove();
+    menu.style.left = `${Math.max(8, Math.min(caret.left, window.innerWidth - 296))}px`;
+    menu.style.top = `${Math.max(8, Math.min(caret.bottom + 6, window.innerHeight - 280))}px`;
+  };
+  const choose = (user) => {
+    if (!match || !user?.username) return;
+    const selectedMatch = match;
+    const insertion = `@${user.username} `;
+    const value = `${textarea.value.slice(0, selectedMatch.start)}${insertion}${textarea.value.slice(selectedMatch.end)}`;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(textarea, value);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    const cursor = selectedMatch.start + insertion.length;
+    hide();
+    requestAnimationFrame(() => { textarea.focus(); textarea.setSelectionRange(cursor, cursor); });
+  };
+  const render = (payload) => {
+    const groups = [{ label: 'Following', users: payload.friends || [] }, { label: 'Other people', users: payload.others || [] }];
+    items = groups.flatMap((group) => group.users.map((user) => ({ user, group: group.label })));
+    activeIndex = items.length ? 0 : -1;
+    menu.replaceChildren();
+    groups.forEach((group) => {
+      if (!group.users.length) return;
+      const header = document.createElement('div');
+      header.className = 'mention-section-header';
+      header.textContent = group.label;
+      menu.appendChild(header);
+      group.users.forEach((user) => {
+        const index = items.findIndex((item) => item.user.id === user.id);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `mention-user-item${index === activeIndex ? ' is-active' : ''}`;
+        button.dataset.mentionIndex = String(index);
+        button.setAttribute('role', 'option');
+        button.setAttribute('aria-selected', String(index === activeIndex));
+        const avatar = document.createElement(user.avatar_url ? 'img' : 'span');
+        avatar.className = user.avatar_url ? '' : 'mention-avatar-fallback';
+        if (user.avatar_url) { avatar.src = user.avatar_url; avatar.alt = ''; }
+        const details = document.createElement('span');
+        details.className = 'mention-user-copy';
+        const username = document.createElement('strong');
+        username.textContent = `@${user.username}`;
+        const displayName = document.createElement('small');
+        displayName.textContent = user.display_name || user.username;
+        details.append(username, displayName);
+        button.append(avatar, details);
+        if (group.label === 'Following') {
+          const badge = document.createElement('span');
+          badge.className = 'mention-following-badge';
+          badge.textContent = 'Following';
+          button.appendChild(badge);
+        }
+        button.addEventListener('mousedown', (event) => event.preventDefault());
+        button.addEventListener('click', () => choose(user));
+        menu.appendChild(button);
+      });
+    });
+    menu.classList.toggle('hidden', !items.length);
+    position();
+  };
+  const update = () => {
+    const prefix = textarea.value.slice(0, textarea.selectionStart);
+    const found = prefix.match(/(^|[\s([{])@([A-Za-z0-9_]*)$/);
+    if (!found || textarea.selectionStart !== textarea.selectionEnd) { hide(); return; }
+    match = { start: textarea.selectionStart - found[0].length + found[1].length, end: textarea.selectionStart, query: found[2] };
+    window.clearTimeout(timer);
+    const currentRequest = ++requestId;
+    timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`${getValidUrl('users/search-mention')}?q=${encodeURIComponent(match.query)}`, { headers: apiHeaders() });
+        if (response.ok && currentRequest === requestId) render(await response.json());
+      } catch { if (currentRequest === requestId) hide(); }
+    }, 100);
+  };
+  const onKeydown = (event) => {
+    if (menu.classList.contains('hidden')) return;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (!items.length) return;
+      event.preventDefault();
+      activeIndex = (activeIndex + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+      menu.querySelectorAll('.mention-user-item').forEach((button) => {
+        const selected = Number(button.dataset.mentionIndex) === activeIndex;
+        button.classList.toggle('is-active', selected);
+        button.setAttribute('aria-selected', String(selected));
+      });
+      menu.querySelector('.mention-user-item.is-active')?.scrollIntoView({ block: 'nearest' });
+    } else if (event.key === 'Enter' && activeIndex >= 0) {
+      event.preventDefault();
+      choose(items[activeIndex].user);
+    } else if (event.key === 'Escape') hide();
+  };
+  const onDocumentClick = (event) => { if (!menu.contains(event.target) && event.target !== textarea) hide(); };
+  const onWindowChange = () => position();
+  textarea.addEventListener('input', update);
+  textarea.addEventListener('click', update);
+  textarea.addEventListener('keyup', update);
+  textarea.addEventListener('keydown', onKeydown);
+  textarea.addEventListener('scroll', onWindowChange);
+  document.addEventListener('click', onDocumentClick);
+  window.addEventListener('resize', onWindowChange);
+  window.addEventListener('scroll', onWindowChange, true);
+  return () => {
+    requestId += 1;
+    window.clearTimeout(timer);
+    textarea.removeEventListener('input', update);
+    textarea.removeEventListener('click', update);
+    textarea.removeEventListener('keyup', update);
+    textarea.removeEventListener('keydown', onKeydown);
+    textarea.removeEventListener('scroll', onWindowChange);
+    document.removeEventListener('click', onDocumentClick);
+    window.removeEventListener('resize', onWindowChange);
+    window.removeEventListener('scroll', onWindowChange, true);
+    menu.remove();
+  };
+}
+
 export default function FeedShell() {
   const [user, setUser] = useState(null); const [active, setActive] = useState('Home'); const [tab, setTab] = useState('for_you'); const [posts, setPosts] = useState([]); const [currentCursor, setCurrentCursor] = useState(null); const [isLoadingMore, setIsLoadingMore] = useState(false); const [hasMore, setHasMore] = useState(true); const [query, setQuery] = useState(''); const [search, setSearch] = useState({ users: [], posts: [] }); const [composerOpen, setComposerOpen] = useState(false); const [draft, setDraft] = useState('');
   const feedSentinelRef = useRef(null);
@@ -40,6 +182,11 @@ export default function FeedShell() {
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [currentCursor, hasMore, isLoadingMore, tab, user]);
+  useEffect(() => {
+    if (!composerOpen) return undefined;
+    const textarea = Array.from(document.querySelectorAll('.aero-pop textarea')).at(-1);
+    return textarea ? installMentionPicker(textarea) : undefined;
+  }, [composerOpen]);
   if (!user) return <AuthPanel onAuthenticated={setUser} />;
   const logout = () => { localStorage.removeItem('aero_token'); localStorage.removeItem('aero_user'); setUser(null); };
   const publish = async (event) => { event.preventDefault(); if (!draft.trim()) return; const response = await fetch(getValidUrl('posts'), { method: 'POST', headers: { ...apiHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ content: draft.trim(), images: [] }) }); if (response.ok) { setDraft(''); setComposerOpen(false); const created = await response.json(); setPosts((current) => [created.post || created, ...current]); } };

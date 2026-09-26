@@ -28,6 +28,7 @@ from backend.models import (
     UserInteraction,
 )
 from backend.mentions import add_mention_notifications
+from backend.email_service import send_mention_email
 from backend.privacy import visible_author_ids as get_visible_author_ids
 from backend.presence import is_user_online
 from backend.storage import upload_file_to_supabase
@@ -420,8 +421,16 @@ def create_post(current_user):
     )
     db.session.add(post)
     db.session.flush()
-    add_mention_notifications(content, current_user, post.id, "post")
+    mentioned_users = add_mention_notifications(content, current_user, post.id, "post")
     db.session.commit()
+    for mentioned_user in mentioned_users:
+        if mentioned_user.email:
+            threading.Thread(
+                target=send_mention_email,
+                args=(mentioned_user.email, current_user.display_name or current_user.username, post.id, content),
+                daemon=True,
+                name=f"post-mention-email-{post.id}-{mentioned_user.id}",
+            ).start()
     if content:
         app = current_app._get_current_object()
         threading.Thread(
