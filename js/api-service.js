@@ -160,8 +160,13 @@ function safeRegex(value) {
 
 function renderMentionText(value) {
     const escaped = escapeHtml(value ?? '');
-    return escaped.replace(/(^|[^A-Za-z0-9_])@([A-Za-z0-9_.-]{1,50})|(^|[\s([{])#([\p{L}\p{N}_][\p{L}\p{N}_.-]{0,99})/gu,
-        (match, mentionPrefix, username, hashtagPrefix, hashtag) => {
+    return escaped.replace(/(^|[^A-Za-z0-9_])@([A-Za-z0-9_.-]{1,50})|(^|[\s([{])#([\p{L}\p{N}_][\p{L}\p{N}_.-]{0,99})|📍\s*(-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?|[^,\n]+(?:,\s*[^,\n]+)?)/gu,
+        (match, mentionPrefix, username, hashtagPrefix, hashtag, locationText) => {
+            if (locationText !== undefined) {
+                const location = locationText.trim();
+                const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+                return `<a href="${escapeHtml(mapsUrl)}" target="_blank" rel="noopener noreferrer" class="post-location-link" onclick="event.stopPropagation()">📍 ${escapeHtml(location)}</a>`;
+            }
             if (username) {
                 const profilePath = `/profile/${encodeURIComponent(username)}`;
                 return `${mentionPrefix}<a href="${escapeHtml(profilePath)}" class="mention-link mention-tag" data-username="${escapeHtml(username)}" data-mention-username="${escapeHtml(username)}">@${escapeHtml(username)}</a>`;
@@ -3804,9 +3809,12 @@ function closeThreadsCompose(saveDraft = true) {
     document.getElementById('threads-compose-editor')?.classList.remove('hidden');
     document.getElementById('threads-modal-title').textContent = 'New Post';
     document.getElementById('threads-more-menu')?.classList.add('hidden');
+    document.getElementById('threads-topic-menu')?.classList.add('hidden');
     document.getElementById('threads-options-menu')?.classList.add('hidden');
     document.getElementById('threads-schedule-field')?.classList.add('hidden');
     document.getElementById('threads-gif-picker')?.classList.add('hidden');
+    document.getElementById('threads-emoji-picker')?.classList.add('hidden');
+    closeThreadsPanels();
     threadsPostState.splice(0, threadsPostState.length, { content: '', files: [], gif: '' });
     threadsActivePostIndex = 0;
     const root = document.querySelector('#threads-compose-editor .threads-post-item[data-index="0"]');
@@ -3820,6 +3828,16 @@ function closeThreadsCompose(saveDraft = true) {
     const submitButton = document.getElementById('threads-submit-btn');
     if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Post'; }
     document.getElementById('threads-compose-error')?.classList.add('hidden');
+}
+
+function closeThreadsPanels(exceptId = '') {
+    ['threads-more-menu', 'threads-topic-menu', 'threads-emoji-picker', 'threads-options-menu', 'threads-schedule-field', 'threads-gif-picker'].forEach((id) => {
+        if (id !== exceptId) document.getElementById(id)?.classList.add('hidden');
+    });
+    if (exceptId !== 'threads-more-menu') document.getElementById('threads-more-btn')?.setAttribute('aria-expanded', 'false');
+    if (exceptId !== 'threads-topic-menu') document.getElementById('threads-topic-select')?.setAttribute('aria-expanded', 'false');
+    if (exceptId !== 'threads-options-menu') document.getElementById('threads-options-btn')?.setAttribute('aria-expanded', 'false');
+    if (exceptId !== 'threads-emoji-picker') document.querySelector('#threads-compose-overlay [data-threads-action="emoji"]')?.setAttribute('aria-expanded', 'false');
 }
 
 function renderThreadChildren() {
@@ -3976,6 +3994,7 @@ function setupCreatePostExperience() {
         if (event.key === 'Escape' && !overlay.classList.contains('hidden')) closeThreadsCompose(true);
     });
     document.getElementById('threads-add-chain-btn')?.addEventListener('click', () => {
+        closeThreadsPanels();
         updateThreadsComposerState();
         if (threadsPostState.length >= 10) return;
         threadsPostState.push({ content: '', files: [], gif: '' });
@@ -4007,11 +4026,12 @@ function setupCreatePostExperience() {
             return;
         }
         const action = event.target.closest('[data-threads-action]')?.dataset.threadsAction;
-        if (action === 'media') document.getElementById('threads-media-input')?.click();
+        if (action === 'media') { closeThreadsPanels(); document.getElementById('threads-media-input')?.click(); }
         if (action === 'emoji') {
             const picker = document.getElementById('threads-emoji-picker');
             const button = overlay.querySelector('[data-threads-action="emoji"]');
             const opening = picker.classList.contains('hidden');
+            closeThreadsPanels(opening ? 'threads-emoji-picker' : '');
             picker.classList.toggle('hidden', !opening);
             button.setAttribute('aria-expanded', String(opening));
         }
@@ -4027,19 +4047,24 @@ function setupCreatePostExperience() {
                 textarea.setSelectionRange(start + insertion.length, start + insertion.length);
                 updateThreadsComposerState();
             }
-            document.getElementById('threads-emoji-picker').classList.add('hidden');
-            overlay.querySelector('[data-threads-action="emoji"]').setAttribute('aria-expanded', 'false');
+            closeThreadsPanels();
         }
         if (action === 'poll' || action === 'quote') {
+            closeThreadsPanels();
             const textarea = overlay.querySelector(`.threads-post-item[data-index="${threadsActivePostIndex}"] .threads-textarea`);
             if (textarea) { textarea.value += action === 'poll' ? `${textarea.value ? '\n' : ''}Poll: ` : '“”'; updateThreadsComposerState(); textarea.focus(); }
         }
-        if (action === 'location' && navigator.geolocation) navigator.geolocation.getCurrentPosition(({ coords }) => {
-            const textarea = overlay.querySelector(`.threads-post-item[data-index="${threadsActivePostIndex}"] .threads-textarea`);
-            if (textarea) { textarea.value += ` ${coords.latitude.toFixed(3)}, ${coords.longitude.toFixed(3)}`; updateThreadsComposerState(); }
-        });
+        if (action === 'location') {
+            closeThreadsPanels();
+            if (navigator.geolocation) navigator.geolocation.getCurrentPosition(({ coords }) => {
+                const textarea = overlay.querySelector(`.threads-post-item[data-index="${threadsActivePostIndex}"] .threads-textarea`);
+                if (textarea) { textarea.value += ` 📍${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`; updateThreadsComposerState(); }
+            });
+        }
         if (action === 'gif') {
             const picker = document.getElementById('threads-gif-picker');
+            const opening = picker.classList.contains('hidden');
+            closeThreadsPanels(opening ? 'threads-gif-picker' : '');
             picker.replaceChildren(...trendingGifs.map((gif) => {
                 const button = document.createElement('button');
                 button.type = 'button';
@@ -4048,31 +4073,52 @@ function setupCreatePostExperience() {
                 button.addEventListener('click', () => {
                     threadsPostState[threadsActivePostIndex].gif = gif.url;
                     renderThreadMediaList(threadsActivePostIndex);
-                    picker.classList.add('hidden');
+                    closeThreadsPanels();
                     updateThreadsComposerState();
                 });
                 return button;
             }));
-            picker.classList.toggle('hidden');
+            picker.classList.toggle('hidden', !opening);
         }
         if (action === 'suggest-tag') {
+            closeThreadsPanels();
             const textarea = overlay.querySelector('.threads-textarea');
             if (textarea) { textarea.value += `${textarea.value ? ' ' : ''}#Aero`; updateThreadsComposerState(); }
-            document.getElementById('threads-more-menu').classList.add('hidden');
         }
         if (action === 'schedule') {
-            document.getElementById('threads-schedule-field').classList.toggle('hidden');
-            document.getElementById('threads-more-menu').classList.add('hidden');
+            const field = document.getElementById('threads-schedule-field');
+            const opening = field.classList.contains('hidden');
+            closeThreadsPanels(opening ? 'threads-schedule-field' : '');
+            field.classList.toggle('hidden', !opening);
         }
-        if (event.target.closest('#threads-more-btn')) document.getElementById('threads-more-menu').classList.toggle('hidden');
-        if (event.target.closest('#threads-topic-select')) document.getElementById('threads-topic-menu').classList.toggle('hidden');
+        if (event.target.closest('#threads-more-btn')) {
+            const panel = document.getElementById('threads-more-menu');
+            const opening = panel.classList.contains('hidden');
+            closeThreadsPanels(opening ? 'threads-more-menu' : '');
+            panel.classList.toggle('hidden', !opening);
+            event.target.closest('#threads-more-btn').setAttribute('aria-expanded', String(opening));
+        }
+        if (event.target.closest('#threads-topic-select')) {
+            const panel = document.getElementById('threads-topic-menu');
+            const opening = panel.classList.contains('hidden');
+            closeThreadsPanels(opening ? 'threads-topic-menu' : '');
+            panel.classList.toggle('hidden', !opening);
+            event.target.closest('#threads-topic-select').setAttribute('aria-expanded', String(opening));
+        }
         const topic = event.target.closest('[data-topic]');
         if (topic) {
             document.querySelector('.selected-topic').textContent = topic.textContent;
-            document.getElementById('threads-topic-menu').classList.add('hidden');
+            closeThreadsPanels();
         }
-        if (event.target.closest('#threads-options-btn')) document.getElementById('threads-options-menu').classList.toggle('hidden');
+        if (event.target.closest('#threads-options-btn')) {
+            const panel = document.getElementById('threads-options-menu');
+            const opening = panel.classList.contains('hidden');
+            closeThreadsPanels(opening ? 'threads-options-menu' : '');
+            panel.classList.toggle('hidden', !opening);
+            event.target.closest('#threads-options-btn').setAttribute('aria-expanded', String(opening));
+        }
         if (event.target.closest('#threads-drafts-btn')) {
+            closeThreadsPanels();
             const editor = document.getElementById('threads-compose-editor');
             const draftsView = document.getElementById('threads-drafts-view');
             const opening = draftsView.classList.contains('hidden');
@@ -4082,12 +4128,7 @@ function setupCreatePostExperience() {
             document.getElementById('threads-modal-title').textContent = opening ? 'Drafts' : 'New Post';
         }
         if (event.target.closest('#threads-submit-btn')) publishThreadsPosts();
-        if (!event.target.closest('.threads-menu-anchor, .threads-inline-options, [data-threads-action="gif"]')) {
-            document.getElementById('threads-more-menu').classList.add('hidden');
-            document.getElementById('threads-topic-menu').classList.add('hidden');
-            document.getElementById('threads-emoji-picker').classList.add('hidden');
-            overlay.querySelector('[data-threads-action="emoji"]').setAttribute('aria-expanded', 'false');
-        }
+        if (!event.target.closest('.threads-menu-anchor, .threads-inline-options, #threads-options-btn, [data-threads-action="gif"]')) closeThreadsPanels();
     });
 }
 

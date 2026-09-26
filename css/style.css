@@ -6382,6 +6382,45 @@ body.threads-compose-open { overflow: hidden; }
 [data-theme="dark"] .threads-custom-select,
 [data-theme="dark"] .threads-footer-action { color: #d1d5db !important; }
 [data-theme="dark"] .threads-primary-btn { background: #f3f4f6 !important; color: #121212 !important; }
+[data-theme="dark"] .threads-dropdown-menu,
+[data-theme="dark"] .reply-settings-panel,
+[data-theme="dark"] .threads-emoji-picker,
+[data-theme="dark"] .threads-more-menu {
+    background-color: #1e1e1e !important;
+    color: #f3f4f6 !important;
+    border: 1px solid #333 !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .5) !important;
+}
+[data-theme="dark"] .threads-dropdown-menu button,
+[data-theme="dark"] .threads-dropdown-menu label,
+[data-theme="dark"] .threads-options-menu strong,
+[data-theme="dark"] .threads-options-menu label { color: #f3f4f6 !important; }
+[data-theme="dark"] .threads-dropdown-menu button:hover,
+[data-theme="dark"] .threads-dropdown-menu button:focus-visible { background-color: #2a2a2a !important; color: #fff !important; }
+[data-theme="dark"] .threads-text-btn,
+[data-theme="dark"] #threads-add-chain-btn { background-color: transparent !important; color: #a3a3a3 !important; }
+[data-theme="dark"] #threads-add-chain-btn:hover,
+[data-theme="dark"] #threads-add-chain-btn:active { background-color: #2a2a2a !important; color: #fff !important; }
+[data-theme="dark"] .threads-toggle-row input:checked + .threads-switch { background: #f3f4f6; }
+[data-theme="dark"] .threads-toggle-row input:checked + .threads-switch::after { background: #121212; }
+[data-theme="dark"] .threads-option-trigger,
+[data-theme="dark"] .threads-inline-options,
+[data-theme="dark"] .threads-inline-options select { border-color: #333 !important; background-color: #1e1e1e !important; color: #f3f4f6 !important; }
+[data-theme="dark"] .threads-draft-item { border-color: #333; background-color: #1e1e1e; color: #f3f4f6; }
+.post-location-link { color: var(--accent-primary, #0a84ff); font-weight: 600; text-decoration: none; }
+.post-location-link:hover { text-decoration: underline; }
+@keyframes springPopIn {
+    0% { opacity: 0; transform: scale(.88) translateY(10px); }
+    70% { transform: scale(1.02) translateY(-2px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.threads-dropdown-menu,
+.reply-settings-panel,
+.threads-emoji-picker,
+.threads-post-item,
+.threads-post-row,
+.threads-drafts-view:not(.hidden),
+#threads-add-chain-btn { animation: springPopIn .22s cubic-bezier(.175, .885, .32, 1.275) forwards; }
 [data-theme="dark"] .mobile-nav-drawer,
 [data-theme="dark"] .mobile-drawer,
 [data-theme="dark"] .hamburger-menu-content,

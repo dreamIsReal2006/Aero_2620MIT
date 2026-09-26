@@ -195,6 +195,35 @@ body:has(.threads-media-modal) { overflow: hidden; }
 :root[data-theme="dark"] .threads-footer-menu-button,
 :root[data-theme="dark"] .threads-add-post-button { color: #d1d5db; }
 :root[data-theme="dark"] .threads-publish-button { background: #f3f4f6; color: #121212; }
+:root[data-theme="dark"] .threads-dropdown-menu,
+:root[data-theme="dark"] .reply-settings-panel,
+:root[data-theme="dark"] .threads-emoji-picker,
+:root[data-theme="dark"] .threads-more-menu {
+	border: 1px solid #333;
+	background-color: #1e1e1e;
+	color: #f3f4f6;
+	box-shadow: 0 16px 40px rgba(0,0,0,.5);
+}
+:root[data-theme="dark"] .threads-dropdown-menu button,
+:root[data-theme="dark"] .threads-dropdown-menu label,
+:root[data-theme="dark"] .threads-options-menu strong,
+:root[data-theme="dark"] .threads-options-menu label { color: #f3f4f6; }
+:root[data-theme="dark"] .threads-dropdown-menu button:hover,
+:root[data-theme="dark"] .threads-dropdown-menu button:focus-visible { background-color: #2a2a2a; color: #fff; }
+:root[data-theme="dark"] .threads-text-button,
+:root[data-theme="dark"] #threads-add-chain-btn,
+:root[data-theme="dark"] .threads-add-post-button { background-color: transparent; color: #a3a3a3; }
+:root[data-theme="dark"] #threads-add-chain-btn:hover,
+:root[data-theme="dark"] #threads-add-chain-btn:active,
+:root[data-theme="dark"] .threads-add-post-button:hover,
+:root[data-theme="dark"] .threads-add-post-button:active { background-color: #2a2a2a; color: #fff; }
+:root[data-theme="dark"] .threads-option-trigger,
+:root[data-theme="dark"] .threads-schedule-menu input { border-color: #333; background-color: #1e1e1e; color: #f3f4f6; }
+:root[data-theme="dark"] .threads-draft-item { border-color: #333; background-color: #1e1e1e; color: #f3f4f6; }
+.post-location-link { color: var(--aero-accent); font-weight: 600; text-decoration: none; }
+.post-location-link:hover { text-decoration: underline; }
+@keyframes springPopIn { 0% { opacity: 0; transform: scale(.88) translateY(10px); } 70% { transform: scale(1.02) translateY(-2px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+.threads-dropdown-menu, .reply-settings-panel, .threads-emoji-picker, .threads-post-item, .threads-post-row, .threads-drafts-view:not(.hidden), .threads-add-post-button { animation: springPopIn .22s cubic-bezier(.175,.885,.32,1.275) forwards; }
 .post-video-placeholder { display: grid; min-height: 190px; aspect-ratio: 16 / 9; place-content: center; justify-items: center; gap: 8px; padding: 16px; border: 0; border-radius: 12px; background: #17191d; color: #fff; cursor: pointer; }
 .post-video-placeholder:hover { background: #22252b; }
 .post-video-placeholder-icon { display: grid; width: 48px; height: 48px; place-items: center; border: 1px solid rgba(255,255,255,.45); border-radius: 50%; background: rgba(0,0,0,.35); }

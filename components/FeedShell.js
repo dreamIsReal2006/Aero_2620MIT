@@ -272,7 +272,8 @@ export default function FeedShell() {
   const [threadPosts, setThreadPosts] = useState([{ id: 1, content: '', files: [] }]);
   const [composerView, setComposerView] = useState('compose');
   const [savedDrafts, setSavedDrafts] = useState([]);
-  const [composerMenu, setComposerMenu] = useState('');
+  const [activePanel, setActivePanel] = useState('none');
+  const [activeSubpanel, setActiveSubpanel] = useState('none');
   const [replyPermission, setReplyPermission] = useState('everyone');
   const [reviewReplies, setReviewReplies] = useState(false);
   const [shareTo, setShareTo] = useState('none');
@@ -328,14 +329,16 @@ export default function FeedShell() {
     return textarea ? installMentionPicker(textarea) : undefined;
   }, [composerOpen]);
   useEffect(() => {
-    if (!composerMenu || composerMenu.endsWith('-closing')) return undefined;
+    if (activePanel === 'none' || activePanel.endsWith('-closing')) return undefined;
     const handleClickOutside = (event) => {
       if (event.target.closest('.threads-dropdown-menu, .threads-dropdown-trigger, .threads-compose-toolbar')) return;
-      setComposerMenu((current) => current ? `${current}-closing` : current);
+      setActivePanel((current) => current !== 'none' ? `${current}-closing` : current);
+      setActiveSubpanel('none');
     };
     const handleKeyDown = (event) => {
       if (event.key !== 'Escape') return;
-      setComposerMenu((current) => current ? `${current}-closing` : current);
+      setActivePanel((current) => current !== 'none' ? `${current}-closing` : current);
+      setActiveSubpanel('none');
     };
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
@@ -343,12 +346,12 @@ export default function FeedShell() {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [composerMenu]);
+  }, [activePanel]);
   useEffect(() => {
-    if (!composerMenu.endsWith('-closing')) return undefined;
-    const closeTimer = window.setTimeout(() => setComposerMenu(''), 160);
+    if (!activePanel.endsWith('-closing')) return undefined;
+    const closeTimer = window.setTimeout(() => setActivePanel('none'), 160);
     return () => window.clearTimeout(closeTimer);
-  }, [composerMenu]);
+  }, [activePanel]);
   if (!user) return <AuthPanel onAuthenticated={setUser} />;
   const logout = () => { localStorage.removeItem('aero_token'); localStorage.removeItem('aero_user'); setUser(null); };
   const handlePostAction = async (action, post, liked) => {
@@ -372,7 +375,8 @@ export default function FeedShell() {
     const end = textarea.selectionEnd;
     const insertion = `${emoji} `;
     updateThreadPost(index, { content: `${post.content.slice(0, start)}${insertion}${post.content.slice(end)}` });
-    setComposerMenu('');
+    setActivePanel('none');
+    setActiveSubpanel('none');
     window.requestAnimationFrame(() => {
       textarea.focus();
       textarea.setSelectionRange(start + insertion.length, start + insertion.length);
@@ -380,12 +384,17 @@ export default function FeedShell() {
   };
   const addThreadPost = () => {
     if (threadPosts.length >= 10) return;
+    setActivePanel('none');
+    setActiveSubpanel('none');
     setThreadPosts((current) => [...current, { id: Date.now(), content: '', files: [] }]);
   };
-  const isComposerMenuOpen = (menu) => composerMenu === menu || composerMenu === `${menu}-closing`;
-  const toggleComposerMenu = (menu) => {
-    setComposerMenu((current) => current === menu ? `${menu}-closing` : menu);
+  const isPanelOpen = (panel) => activePanel === panel || activePanel === `${panel}-closing`;
+  const isSubpanelOpen = (panel) => activeSubpanel === panel;
+  const togglePanel = (panel) => {
+    setActiveSubpanel('none');
+    setActivePanel((current) => current === panel ? `${panel}-closing` : panel);
   };
+  const toggleSubpanel = (panel) => setActiveSubpanel((current) => current === panel ? 'none' : panel);
   const persistDrafts = (nextDrafts) => {
     setSavedDrafts(nextDrafts);
     localStorage.setItem('aero_post_drafts', JSON.stringify(nextDrafts));
@@ -396,7 +405,8 @@ export default function FeedShell() {
     }
     setComposerOpen(false);
     setComposerView('compose');
-    setComposerMenu('');
+    setActivePanel('none');
+    setActiveSubpanel('none');
   };
   const loadDraft = (saved) => {
     setThreadPosts(saved.posts.map((post, index) => ({ id: Date.now() + index, content: post.content || '', files: [] })));
@@ -491,14 +501,14 @@ export default function FeedShell() {
             <button type="button" className="threads-text-button" onClick={() => closeComposer(true)}>{t('cancel')}</button>
             <h2 id="threads-compose-title">{composerView === 'drafts' ? t('drafts') : t('new_thread')}</h2>
             <div className="threads-header-actions">
-              <button type="button" className="threads-icon-button" aria-label={t('drafts')} title={t('drafts')} onClick={() => { setComposerView(composerView === 'drafts' ? 'compose' : 'drafts'); setComposerMenu(''); }}><Icon name="draft" className="threads-header-icon" /></button>
+              <button type="button" className="threads-icon-button" aria-label={t('drafts')} title={t('drafts')} onClick={() => { setComposerView(composerView === 'drafts' ? 'compose' : 'drafts'); setActivePanel(composerView === 'drafts' ? 'none' : 'drafts'); setActiveSubpanel('none'); }}><Icon name="draft" className="threads-header-icon" /></button>
               <div className="threads-menu-anchor">
-                <button type="button" className="threads-icon-button threads-more-button threads-dropdown-trigger" aria-label={t('more_options')} title={t('more_options')} onClick={() => toggleComposerMenu('more')}><Icon name="more" className="threads-header-icon" /></button>
-                {isComposerMenuOpen('more') && <div className={`threads-dropdown-menu threads-more-menu${composerMenu.endsWith('-closing') ? ' is-closing' : ''}`}>
-                  <button type="button" onClick={() => { appendToPost(0, `${threadPosts[0].content.trim() ? ' ' : ''}#Aero`); setComposerMenu(''); }}>{t('recommended_tags')}</button>
-                  <button type="button" onClick={() => setComposerMenu('schedule')}>{t('select_publish_time')}</button>
+                <button type="button" className="threads-icon-button threads-more-button threads-dropdown-trigger" aria-label={t('more_options')} title={t('more_options')} onClick={() => togglePanel('more_menu')}><Icon name="more" className="threads-header-icon" /></button>
+                {isPanelOpen('more_menu') && <div className={`threads-dropdown-menu threads-more-menu${activePanel.endsWith('-closing') ? ' is-closing' : ''}`}>
+                  <button type="button" onClick={() => { appendToPost(0, `${threadPosts[0].content.trim() ? ' ' : ''}#Aero`); setActivePanel('none'); }}>{t('recommended_tags')}</button>
+                  <button type="button" onClick={() => setActivePanel('schedule')}>{t('select_publish_time')}</button>
                 </div>}
-                {isComposerMenuOpen('schedule') && <div className={`threads-dropdown-menu threads-schedule-menu${composerMenu.endsWith('-closing') ? ' is-closing' : ''}`}><label htmlFor="threads-schedule">{t('select_publish_time')}</label><input id="threads-schedule" type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} /><button type="button" onClick={() => setComposerMenu('')}>{t('complete')}</button></div>}
+                {isPanelOpen('schedule') && <div className={`threads-dropdown-menu threads-schedule-menu${activePanel.endsWith('-closing') ? ' is-closing' : ''}`}><label htmlFor="threads-schedule">{t('select_publish_time')}</label><input id="threads-schedule" type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} /><button type="button" onClick={() => setActivePanel('none')}>{t('complete')}</button></div>}
               </div>
             </div>
           </header>
@@ -511,9 +521,9 @@ export default function FeedShell() {
                 <strong>{user.username || user.display_name || 'User'}</strong>
                 <span className="threads-chevron">›</span>
                 <div className="threads-menu-anchor threads-topic-anchor">
-                  <button type="button" className="threads-dropdown-trigger threads-topic-trigger" aria-label={t('choose_topic')} aria-expanded={isComposerMenuOpen('topic')} onClick={() => toggleComposerMenu('topic')}>{t(topicLabel)}<Icon name="chevron" className="threads-chevron-icon" /></button>
-                  {isComposerMenuOpen('topic') && <div className={`threads-dropdown-menu threads-topic-menu${composerMenu.endsWith('-closing') ? ' is-closing' : ''}`} role="listbox" aria-label={t('choose_topic')}>
-                    {topicOptions.map(([value, label]) => <button type="button" role="option" aria-selected={topic === value} key={value} onClick={() => { setTopic(value); setComposerMenu(''); }}>{t(label)}{topic === value && <Icon name="check" className="threads-option-check" />}</button>)}
+                  <button type="button" className="threads-dropdown-trigger threads-topic-trigger" aria-label={t('choose_topic')} aria-expanded={isPanelOpen('topic')} onClick={() => togglePanel('topic')}>{t(topicLabel)}<Icon name="chevron" className="threads-chevron-icon" /></button>
+                  {isPanelOpen('topic') && <div className={`threads-dropdown-menu threads-topic-menu${activePanel.endsWith('-closing') ? ' is-closing' : ''}`} role="listbox" aria-label={t('choose_topic')}>
+                    {topicOptions.map(([value, label]) => <button type="button" role="option" aria-selected={topic === value} key={value} onClick={() => { setTopic(value); setActivePanel('none'); }}>{t(label)}{topic === value && <Icon name="check" className="threads-option-check" />}</button>)}
                   </div>}
                 </div>
                 {threadPosts.length > 1 && <span className="threads-chain-count">1/{threadPosts.length}</span>}
@@ -533,38 +543,38 @@ export default function FeedShell() {
               </div>
               {selectedGif && <div className="threads-gif-preview"><img src={selectedGif} alt={t('selected_gif')} /><button type="button" aria-label={t('remove_gif')} onClick={() => setSelectedGif('')}>×</button></div>}
               <div className="threads-compose-toolbar" aria-label={t('post_attachments')}>
-                <button type="button" title={t('image_or_video')} aria-label={t('image_or_video')} onClick={() => uploadInputRef.current?.click()}><Icon name="image" /></button>
-                <button type="button" className="threads-gif-trigger threads-dropdown-trigger" title={t('gif_animation')} aria-label={t('gif_animation')} aria-expanded={isComposerMenuOpen('gif')} onClick={() => toggleComposerMenu('gif')}><Icon name="gif" /></button>
+                <button type="button" title={t('image_or_video')} aria-label={t('image_or_video')} onClick={() => { setActivePanel('none'); setActiveSubpanel('none'); uploadInputRef.current?.click(); }}><Icon name="image" /></button>
+                <button type="button" className="threads-gif-trigger threads-dropdown-trigger" title={t('gif_animation')} aria-label={t('gif_animation')} aria-expanded={isPanelOpen('gif')} onClick={() => togglePanel('gif')}><Icon name="gif" /></button>
                 <div className="threads-menu-anchor threads-emoji-anchor">
-                  <button type="button" className="threads-dropdown-trigger" title={t('emoji')} aria-label={t('emoji')} aria-expanded={isComposerMenuOpen('emoji')} onClick={() => toggleComposerMenu('emoji')}><Icon name="smile" /></button>
-                  {isComposerMenuOpen('emoji') && <div className={`threads-emoji-picker threads-dropdown-menu${composerMenu.endsWith('-closing') ? ' is-closing' : ''}`} role="group" aria-label={t('emoji')}>
+                  <button type="button" className="threads-dropdown-trigger" title={t('emoji')} aria-label={t('emoji')} aria-expanded={isPanelOpen('emoji')} onClick={() => togglePanel('emoji')}><Icon name="smile" /></button>
+                  {isPanelOpen('emoji') && <div className={`threads-emoji-picker threads-dropdown-menu${activePanel.endsWith('-closing') ? ' is-closing' : ''}`} role="group" aria-label={t('emoji')}>
                     {['😄', '😂', '❤️', '🔥', '👍', '🎉', '✨', '👀'].map((emoji) => <button type="button" key={emoji} aria-label={emoji} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}
                   </div>}
                 </div>
                 <button type="button" title={t('voice_input')} aria-label={t('voice_input')} onClick={() => setComposerError(t('unsupported_voice'))}><Icon name="mic" /></button>
-                <button type="button" title={t('poll')} aria-label={t('poll')} onClick={() => appendToPost(0, `${threadPosts[0].content.trim() ? '\n' : ''}${t('poll')}: `)}><Icon name="poll" /></button>
-                <button type="button" title={t('quote')} aria-label={t('quote')} onClick={() => appendToPost(0, '“”')}><Icon name="quote" /></button>
-                <button type="button" title={t('location')} aria-label={t('location')} onClick={() => { if (!navigator.geolocation) setComposerError(t('device_location')); else navigator.geolocation.getCurrentPosition(({ coords }) => appendToPost(0, ` ${coords.latitude.toFixed(3)}, ${coords.longitude.toFixed(3)}`), () => setComposerError(t('location_failed'))); }}><Icon name="pin" /></button>
+                <button type="button" title={t('poll')} aria-label={t('poll')} onClick={() => { setActivePanel('none'); setActiveSubpanel('none'); appendToPost(0, `${threadPosts[0].content.trim() ? '\n' : ''}${t('poll')}: `); }}><Icon name="poll" /></button>
+                <button type="button" title={t('quote')} aria-label={t('quote')} onClick={() => { setActivePanel('none'); setActiveSubpanel('none'); appendToPost(0, '“”'); }}><Icon name="quote" /></button>
+                <button type="button" title={t('location')} aria-label={t('location')} onClick={() => { setActivePanel('none'); setActiveSubpanel('none'); if (!navigator.geolocation) setComposerError(t('device_location')); else navigator.geolocation.getCurrentPosition(({ coords }) => appendToPost(0, ` 📍${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`), () => setComposerError(t('location_failed'))); }}><Icon name="pin" /></button>
                 <button type="button" title={t('audio')} aria-label={t('audio')} onClick={() => setComposerError(t('unsupported_audio'))}><Icon name="audio" /></button>
                 <input ref={uploadInputRef} type="file" accept="image/*,video/*" multiple hidden onChange={(event) => { const files = [...threadPosts[0].files, ...Array.from(event.target.files || [])].slice(0, 10); updateThreadPost(0, { files }); event.target.value = ''; }} />
               </div>
-              {isComposerMenuOpen('gif') && <div className={`threads-gif-picker threads-dropdown-menu${composerMenu.endsWith('-closing') ? ' is-closing' : ''}`}>{['https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif', 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif', 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif'].map((url) => <button type="button" key={url} onClick={() => { setSelectedGif(url); setComposerMenu(''); }}><img src={url} alt={t('select_gif')} /></button>)}</div>}
+              {isPanelOpen('gif') && <div className={`threads-gif-picker threads-dropdown-menu${activePanel.endsWith('-closing') ? ' is-closing' : ''}`}>{['https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif', 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif', 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif'].map((url) => <button type="button" key={url} onClick={() => { setSelectedGif(url); setActivePanel('none'); }}><img src={url} alt={t('select_gif')} /></button>)}</div>}
               {composerError && <p className="threads-compose-error" role="status">{composerError}</p>}
             </div>
             <footer className="threads-compose-footer">
               <div className="threads-compose-footer-left">
                 <div className="threads-menu-anchor">
-                  <button type="button" className="threads-footer-menu-button threads-dropdown-trigger" aria-expanded={isComposerMenuOpen('options')} onClick={() => toggleComposerMenu('options')}><Icon name="options" />{t('post_options')}</button>
-                  {isComposerMenuOpen('options') && <div className={`threads-dropdown-menu threads-options-menu${composerMenu.endsWith('-closing') ? ' is-closing' : ''}`}>
-                    <div className="threads-option-group"><strong>{t('who_can_reply')}</strong><button type="button" className="threads-option-trigger threads-dropdown-trigger" aria-expanded={isComposerMenuOpen('reply')} onClick={() => toggleComposerMenu('reply')}>{t(replyLabel)}<Icon name="chevron" className="threads-chevron-icon" /></button>
-                      {isComposerMenuOpen('reply') && <div className={`threads-dropdown-menu threads-reply-menu${composerMenu.endsWith('-closing') ? ' is-closing' : ''}`} role="listbox" aria-label={t('who_can_reply')}>
-                        {replyOptions.map(([value, label]) => <button type="button" role="option" aria-selected={replyPermission === value} key={value} onClick={() => { setReplyPermission(value); setComposerMenu('options'); }}>{t(label)}{replyPermission === value && <Icon name="check" className="threads-option-check" />}</button>)}
+                  <button type="button" className="threads-footer-menu-button threads-dropdown-trigger" aria-expanded={isPanelOpen('reply_settings')} onClick={() => togglePanel('reply_settings')}><Icon name="options" />{t('post_options')}</button>
+                  {isPanelOpen('reply_settings') && <div className={`threads-dropdown-menu threads-options-menu reply-settings-panel${activePanel.endsWith('-closing') ? ' is-closing' : ''}`}>
+                    <div className="threads-option-group"><strong>{t('who_can_reply')}</strong><button type="button" className="threads-option-trigger threads-dropdown-trigger" aria-expanded={isSubpanelOpen('reply')} onClick={() => toggleSubpanel('reply')}>{t(replyLabel)}<Icon name="chevron" className="threads-chevron-icon" /></button>
+                      {isSubpanelOpen('reply') && <div className="threads-dropdown-menu threads-reply-menu" role="listbox" aria-label={t('who_can_reply')}>
+                        {replyOptions.map(([value, label]) => <button type="button" role="option" aria-selected={replyPermission === value} key={value} onClick={() => { setReplyPermission(value); setActiveSubpanel('none'); }}>{t(label)}{replyPermission === value && <Icon name="check" className="threads-option-check" />}</button>)}
                       </div>}
                     </div>
                     <label className="threads-toggle-row">{t('review_replies')}<input type="checkbox" checked={reviewReplies} onChange={(event) => setReviewReplies(event.target.checked)} /><span className="threads-toggle" /></label>
-                    <div className="threads-option-group"><strong>{t('share_to')}</strong><button type="button" className="threads-option-trigger threads-dropdown-trigger" aria-expanded={isComposerMenuOpen('share')} onClick={() => toggleComposerMenu('share')}>{t(shareTo === 'none' ? 'dont_share' : shareTo)}<Icon name="chevron" className="threads-chevron-icon" /></button>
-                      {isComposerMenuOpen('share') && <div className={`threads-dropdown-menu threads-share-menu${composerMenu.endsWith('-closing') ? ' is-closing' : ''}`} role="listbox" aria-label={t('share_to')}>
-                        {[['none', 'dont_share'], ['facebook', 'facebook'], ['instagram', 'instagram']].map(([value, label]) => <button type="button" role="option" aria-selected={shareTo === value} key={value} onClick={() => { setShareTo(value); setComposerMenu('options'); }}>{t(label)}{shareTo === value && <Icon name="check" className="threads-option-check" />}</button>)}
+                    <div className="threads-option-group"><strong>{t('share_to')}</strong><button type="button" className="threads-option-trigger threads-dropdown-trigger" aria-expanded={isSubpanelOpen('share')} onClick={() => toggleSubpanel('share')}>{t(shareTo === 'none' ? 'dont_share' : shareTo)}<Icon name="chevron" className="threads-chevron-icon" /></button>
+                      {isSubpanelOpen('share') && <div className="threads-dropdown-menu threads-share-menu" role="listbox" aria-label={t('share_to')}>
+                        {[['none', 'dont_share'], ['facebook', 'facebook'], ['instagram', 'instagram']].map(([value, label]) => <button type="button" role="option" aria-selected={shareTo === value} key={value} onClick={() => { setShareTo(value); setActiveSubpanel('none'); }}>{t(label)}{shareTo === value && <Icon name="check" className="threads-option-check" />}</button>)}
                       </div>}
                     </div>
                   </div>}

@@ -4,18 +4,21 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Avatar, Glass, Icon } from './ui';
 
-const inlineTagPattern = /(^|[^A-Za-z0-9_])@([A-Za-z0-9_.-]{1,50})|(^|[\s([{])#([\p{L}\p{N}_][\p{L}\p{N}_.-]{0,99})/gu;
+const inlineTagPattern = /(^|[^A-Za-z0-9_])@([A-Za-z0-9_.-]{1,50})|(^|[\s([{])#([\p{L}\p{N}_][\p{L}\p{N}_.-]{0,99})|📍\s*(-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?|[^,\n]+(?:,\s*[^,\n]+)?)/gu;
 
 function renderTaggedContent(content) {
   const text = String(content || '');
   const parts = [];
   let cursor = 0;
   for (const match of text.matchAll(inlineTagPattern)) {
-    const [whole, mentionPrefix, username, hashtagPrefix, hashtag] = match;
+    const [whole, mentionPrefix, username, hashtagPrefix, hashtag, locationText] = match;
     const prefix = mentionPrefix ?? hashtagPrefix ?? '';
     const linkStart = match.index + prefix.length;
     if (linkStart > cursor) parts.push(text.slice(cursor, linkStart));
-    if (username) {
+    if (locationText !== undefined) {
+      const location = locationText.trim();
+      parts.push(<a key={`location-${match.index}`} href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`} target="_blank" rel="noopener noreferrer" className="post-location-link" onClick={(event) => event.stopPropagation()}>📍 {location}</a>);
+    } else if (username) {
       parts.push(<a key={`mention-${match.index}`} href={`/profile/${encodeURIComponent(username)}`} className="mention-link" data-username={username} onClick={(event) => event.stopPropagation()}>@{username}</a>);
     } else {
       parts.push(<a key={`hashtag-${match.index}`} href={`/hashtag/${encodeURIComponent(hashtag)}`} className="hashtag-link" onClick={(event) => event.stopPropagation()}>#{hashtag}</a>);

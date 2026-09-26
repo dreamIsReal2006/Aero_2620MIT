@@ -29,10 +29,16 @@ export function Icon({ name, className = 'h-5 w-5' }) {
 }
 
 export function Avatar({ user = {}, className = 'h-10 w-10' }) {
-  const avatar = user.avatar_url || user.avatar || '';
-  const url = avatar && !String(avatar).startsWith('letter:') ? (String(avatar).startsWith('http') ? avatar : `${process.env.NEXT_PUBLIC_API_ORIGIN || ''}${avatar}`) : '';
-  const letter = avatar.startsWith('letter:') ? avatar.slice(7, 8).toUpperCase() : (user.display_name || user.username || 'U').slice(0, 1).toUpperCase();
-  return <span className={`inline-grid shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#0A84FF] to-[#39c6ff] font-bold text-white ${className}`}>{url ? <img src={url} alt="" className="h-full w-full object-cover" /> : letter}</span>;
+  const avatar = String(user.avatar_url || user.avatar || '');
+  const letter = (avatar.startsWith('letter:') ? avatar.slice(7, 8) : String(user.username || user.display_name || 'U').slice(0, 1)).toUpperCase() || 'U';
+  const identity = String(user.username || user.display_name || letter).toLowerCase();
+  const colors = ['#0A84FF', '#16A085', '#D35400', '#C0392B', '#7D3C98', '#2874A6'];
+  let hash = 0;
+  for (const character of identity) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="${colors[hash % colors.length]}"/><text x="50" y="52" dominant-baseline="central" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="48" font-weight="700">${letter}</text></svg>`;
+  const fallbackUrl = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  const url = avatar && !avatar.startsWith('letter:') ? (avatar.startsWith('http') || avatar.startsWith('data:') ? avatar : `${process.env.NEXT_PUBLIC_API_ORIGIN || ''}${avatar}`) : fallbackUrl;
+  return <span className={`inline-grid shrink-0 place-items-center overflow-hidden rounded-full bg-[#0A84FF] font-bold text-white ${className}`}><img src={url} data-avatar-fallback={fallbackUrl} onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = fallbackUrl; }} alt="" className="h-full w-full object-cover" /></span>;
 }
 
 export function Glass({ children, className = '' }) { return <div className={`border border-white/60 bg-white/65 shadow-glass backdrop-blur-2xl ${className}`}>{children}</div>; }

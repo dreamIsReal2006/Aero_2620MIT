@@ -15,8 +15,15 @@
 
     function profileAvatarValue(user = {}) {
         const value = String(user.avatar_url || '');
-        if (value.startsWith('letter:')) return { letter: value.slice(7, 8).toUpperCase() || 'U' };
-        return { url: value ? (value.startsWith('http') ? value : `${window.AeroConfig.API_ORIGIN}${value}`) : '', letter: String(user.display_name || user.username || 'U').charAt(0).toUpperCase() };
+        const letter = (value.startsWith('letter:') ? value.slice(7, 8) : String(user.username || user.display_name || 'U').slice(0, 1)).toUpperCase() || 'U';
+        const identity = String(user.username || user.display_name || letter).toLowerCase();
+        const colors = ['#0A84FF', '#16A085', '#D35400', '#C0392B', '#7D3C98', '#2874A6'];
+        let hash = 0;
+        for (const character of identity) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="${colors[hash % colors.length]}"/><text x="50" y="52" dominant-baseline="central" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="48" font-weight="700">${letter}</text></svg>`;
+        const fallbackUrl = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+        if (!value || value.startsWith('letter:')) return { url: fallbackUrl, fallbackUrl, letter };
+        return { url: value.startsWith('http') ? value : `${window.AeroConfig.API_ORIGIN}${value}`, fallbackUrl, letter };
     }
 
     function profileRoleBadge(role) {
@@ -353,7 +360,7 @@
                         </div>
                     </div>
                     <div class="profile-avatar-wrap ${user.is_online ? 'is-online' : ''}">
-                        ${avatar ? `<img class="profile-avatar" src="${avatar}" alt="${(user.username || 'User').replace(/"/g, '&quot;')}" />` : `<span class="profile-avatar profile-avatar-empty">${avatarValue.letter || initials}</span>`}
+                        <img class="profile-avatar" src="${avatar || avatarValue.fallbackUrl}" data-avatar-fallback="${avatarValue.fallbackUrl}" alt="${(user.username || 'User').replace(/"/g, '&quot;')}" onerror="this.onerror=null;this.src=this.dataset.avatarFallback" />
                     </div>
                 </div>
             `;
@@ -404,12 +411,12 @@
                 <article class="post-card glass-card liquid-glass liquid-glass-interactive pop-in g2-card">
                     <div class="post-header">
                         <div class="post-author-identity">
-                            <span class="post-avatar ${user.is_online ? 'is-online' : ''}"><img src="${avatar}" alt="@${(user.username || 'User').replace(/"/g, '&quot;')}" /></span>
+                            <span class="post-avatar ${user.is_online ? 'is-online' : ''}"><img src="${avatar || avatarValue.fallbackUrl}" data-avatar-fallback="${avatarValue.fallbackUrl}" alt="@${(user.username || 'User').replace(/"/g, '&quot;')}" onerror="this.onerror=null;this.src=this.dataset.avatarFallback" /></span>
                             <span class="post-author">@${user.username || 'user'}${profileRoleBadge(user.role)}</span>
                             <time class="post-relative-time">${window.AeroFormatRelativeTime?.(post.created_at) || new Date(post.created_at || Date.now()).toLocaleDateString()}</time>
                         </div>
                     </div>
-                    <div class="post-content">${(post.content || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]))}</div>
+                    <div class="post-content">${window.AeroMentionText?.(post.content || '') || (post.content || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]))}</div>
                 </article>
             `).join('') : '<div class="post-card glass-card text-center"><p>No posts yet.</p></div>';
             bindProfileTabs(profileUserId, user, avatar);
@@ -451,7 +458,9 @@
             container.innerHTML = items.map((item) => {
                 const content = contentType === 'replies' ? item.content : item.content;
                 const summary = contentType === 'replies' ? `<small class="profile-content-context">On @${escape(item.post?.username)}: ${escape(item.post?.content)}</small>` : '';
-                return `<article class="post-card glass-card liquid-glass liquid-glass-interactive pop-in g2-card"><div class="post-header"><div class="post-author-identity"><span class="post-avatar ${user.is_online ? 'is-online' : ''}"><img src="${escape(avatar)}" alt="@${escape(user.username)}"></span><span class="post-author">@${escape(user.username)}${profileRoleBadge(user.role)}</span><time class="post-relative-time">${window.AeroFormatRelativeTime?.(item.created_at) || new Date(item.created_at || Date.now()).toLocaleDateString()}</time></div></div><div class="post-content">${escape(content)}</div>${summary}</article>`;
+                const renderedContent = window.AeroMentionText?.(content) || escape(content);
+                const fallbackUrl = profileAvatarValue(user).fallbackUrl;
+                return `<article class="post-card glass-card liquid-glass liquid-glass-interactive pop-in g2-card"><div class="post-header"><div class="post-author-identity"><span class="post-avatar ${user.is_online ? 'is-online' : ''}"><img src="${escape(avatar || fallbackUrl)}" data-avatar-fallback="${fallbackUrl}" alt="@${escape(user.username)}" onerror="this.onerror=null;this.src=this.dataset.avatarFallback"></span><span class="post-author">@${escape(user.username)}${profileRoleBadge(user.role)}</span><time class="post-relative-time">${window.AeroFormatRelativeTime?.(item.created_at) || new Date(item.created_at || Date.now()).toLocaleDateString()}</time></div></div><div class="post-content">${renderedContent}</div>${summary}</article>`;
             }).join('');
         } catch (error) {
             container.innerHTML = `<div class="post-card glass-card text-center"><p>${error.message}</p></div>`;
