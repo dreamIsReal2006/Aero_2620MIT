@@ -3544,7 +3544,8 @@ function exportPostCard(postId, content, username, details = {}) {
 
 
 
-const createPostState = { files: [] };
+const threadsPostState = [{ content: '', files: [], gif: '' }];
+let threadsActivePostIndex = 0;
 const mentionPickerState = { menu: null, timer: null, requestId: 0, items: [], activeIndex: -1, match: null };
 
 function mentionAtCaret(input) {
@@ -3611,7 +3612,7 @@ function showMentionMenuMessage(message, input) {
 }
 
 function selectMention(item) {
-    const input = document.getElementById('modal-post-input');
+    const input = document.querySelector('#threads-compose-editor .threads-textarea');
     const match = mentionPickerState.match;
     if (!input || !match || !item) return;
     const insertion = match.kind === 'mention' ? `@${item.user.username} ` : `#${item.tag} `;
@@ -3620,7 +3621,7 @@ function selectMention(item) {
     input.focus();
     input.setSelectionRange(cursor, cursor);
     closeMentionMenu();
-    updateCreatePostState();
+    updateThreadsComposerState();
 }
 
 function renderMentionMenu(payload, input, currentMatch) {
@@ -3745,115 +3746,329 @@ function onMentionKeydown(event) {
     }
 }
 
-function updateCreatePostState() {
-    const preview = document.getElementById('modal-preview');
-    const button = document.getElementById('modal-publish-btn');
-    const input = document.getElementById('modal-post-input');
-    if (!preview || !button) return;
-    preview.replaceChildren();
-    preview.classList.toggle('has-media', createPostState.files.length > 0);
-    createPostState.files.forEach((file, index) => {
-        const card = document.createElement('div');
-        card.className = 'media-preview-item';
-        const extension = file.name.split('.').pop()?.toLowerCase() || '';
-        const isHeif = ['heic', 'heif'].includes(extension) || ['image/heic', 'image/heif'].includes(file.type);
-        const isVideo = file.type.startsWith('video/') || ['mp4', 'webm', 'mov', 'm4v'].includes(extension);
-        const objectUrl = isHeif ? '' : file.previewUrl || (file.previewUrl = URL.createObjectURL(file));
-        const media = isHeif ? document.createElement('div') : document.createElement(isVideo ? 'video' : 'img');
-        media.className = isHeif ? 'media-heif-placeholder' : '';
-        if (isHeif) {
-            media.textContent = 'HEIF 图片';
-            media.setAttribute('aria-label', 'HEIF 图片');
-        } else {
-            media.src = objectUrl;
-            media.alt = isVideo ? '' : file.name;
-        }
-        if (isVideo) {
-            media.autoplay = true;
-            media.muted = true;
-            media.loop = true;
-            media.playsInline = true;
-            const overlay = document.createElement('span');
-            overlay.className = 'media-preview-video-icon';
-            overlay.textContent = '▶';
-            card.appendChild(overlay);
-        }
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'media-remove-btn';
-        remove.textContent = '✕';
-        remove.setAttribute('aria-label', `Remove ${file.name}`);
-        remove.addEventListener('click', () => {
-            if (objectUrl) URL.revokeObjectURL(objectUrl);
-            delete file.previewUrl;
-            createPostState.files.splice(index, 1);
-            updateCreatePostState();
-        });
-        card.append(media, remove);
-        preview.appendChild(card);
+function updateThreadsComposerState() {
+    const editor = document.getElementById('threads-compose-editor');
+    const submitButton = document.getElementById('threads-submit-btn');
+    if (!editor || !submitButton) return;
+    const textareas = Array.from(editor.querySelectorAll('.threads-textarea'));
+    textareas.forEach((textarea, index) => {
+        if (threadsPostState[index]) threadsPostState[index].content = textarea.value;
     });
-    button.disabled = !input?.value.trim() && createPostState.files.length === 0;
+    submitButton.disabled = !threadsPostState.some((post) => post.content.trim() || post.files.length || post.gif);
 }
 
-function openCreatePostModal(event) {
+function updateThreadsUser() {
+    const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
+    const username = user.display_name || user.username || 'User';
+    const avatarUrl = window.getUserAvatarUrl?.(user) || user.avatar_url || '';
+    document.querySelectorAll('#threads-compose-overlay .current-user-name').forEach((node) => { node.textContent = username; });
+    document.querySelectorAll('#threads-compose-overlay .current-user-avatar').forEach((avatar) => {
+        if (avatarUrl) {
+            avatar.src = avatarUrl;
+            avatar.classList.remove('is-empty');
+        } else {
+            avatar.removeAttribute('src');
+            avatar.classList.add('is-empty');
+            avatar.dataset.initial = username.charAt(0).toUpperCase();
+        }
+    });
+}
+
+function openThreadsCompose(event) {
     event?.preventDefault();
     event?.stopPropagation();
-    window.dispatchEvent(new CustomEvent('aero:compose-request'));
+    if (window.requireAuth && !window.requireAuth(null, 'Please sign in before creating a post.')) return;
+    const overlay = document.getElementById('threads-compose-overlay');
+    if (!overlay) return;
+    updateThreadsUser();
+    overlay.classList.remove('hidden');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('threads-compose-open');
+    window.setTimeout(() => overlay.querySelector('.threads-textarea')?.focus(), 0);
 }
 
-async function publishCreatePost() {
-    const input = document.getElementById('modal-post-input');
-    const button = document.getElementById('modal-publish-btn');
-    const content = input?.value.trim() || '';
-    if (!content && !createPostState.files.length) return;
+function closeThreadsCompose(saveDraft = true) {
+    const overlay = document.getElementById('threads-compose-overlay');
+    if (!overlay) return;
+    updateThreadsComposerState();
+    if (saveDraft && threadsPostState.some((post) => post.content.trim() || post.files.length || post.gif)) {
+        let drafts = [];
+        try { drafts = JSON.parse(localStorage.getItem('aero_post_drafts') || '[]'); } catch {}
+        drafts.unshift({ id: Date.now(), content: threadsPostState.map((post) => post.content).join('\n---\n'), updatedAt: new Date().toISOString() });
+        localStorage.setItem('aero_post_drafts', JSON.stringify(drafts.slice(0, 30)));
+    }
+    overlay.classList.add('hidden');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('threads-compose-open');
+    document.getElementById('threads-drafts-view')?.classList.add('hidden');
+    document.getElementById('threads-compose-editor')?.classList.remove('hidden');
+    document.getElementById('threads-modal-title').textContent = 'New Thread';
+    document.getElementById('threads-more-menu')?.classList.add('hidden');
+    document.getElementById('threads-options-menu')?.classList.add('hidden');
+    document.getElementById('threads-schedule-field')?.classList.add('hidden');
+    document.getElementById('threads-gif-picker')?.classList.add('hidden');
+    threadsPostState.splice(0, threadsPostState.length, { content: '', files: [], gif: '' });
+    threadsActivePostIndex = 0;
+    const root = document.querySelector('#threads-compose-editor .threads-post-item[data-index="0"]');
+    if (root) {
+        const textarea = root.querySelector('.threads-textarea');
+        if (textarea) textarea.value = '';
+        root.querySelector('.threads-media-list')?.replaceChildren();
+        root.querySelector('.threads-thread-line')?.classList.add('hidden');
+    }
+    document.querySelectorAll('#threads-compose-editor .threads-post-item:not([data-index="0"])').forEach((item) => item.remove());
+    const submitButton = document.getElementById('threads-submit-btn');
+    if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Post'; }
+    document.getElementById('threads-compose-error')?.classList.add('hidden');
+}
+
+function renderThreadChildren() {
+    const editor = document.getElementById('threads-compose-editor');
+    const root = editor?.querySelector('.threads-post-item[data-index="0"]');
+    if (!editor || !root) return;
+    root.querySelector('.threads-thread-line')?.classList.toggle('hidden', threadsPostState.length < 2);
+    editor.querySelectorAll('.threads-post-item:not([data-index="0"])').forEach((item) => item.remove());
+    const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
+    const username = user.display_name || user.username || 'User';
+    const avatarUrl = window.getUserAvatarUrl?.(user) || user.avatar_url || '';
+    for (let index = 1; index < threadsPostState.length; index += 1) {
+        const item = document.createElement('div');
+        item.className = 'threads-post-item threads-child-post';
+        item.dataset.index = String(index);
+        item.innerHTML = `<div class="threads-post-rail"><img class="threads-avatar ${avatarUrl ? '' : 'is-empty'}" alt=""><span class="threads-thread-line"></span></div><div class="threads-post-content"><div class="threads-reply-byline"><span class="threads-username"></span><span class="threads-post-counter"></span><button type="button" class="threads-remove-child" data-remove-thread="${index}" aria-label="Remove thread post">×</button></div><textarea class="threads-textarea" placeholder="Continue this thread..." rows="3" maxlength="5000" aria-label="Thread post ${index + 1}"></textarea><div class="threads-media-list"></div></div>`;
+        const avatar = item.querySelector('.threads-avatar');
+        if (avatarUrl) avatar.src = avatarUrl;
+        else avatar.dataset.initial = username.charAt(0).toUpperCase();
+        item.querySelector('.threads-username').textContent = username;
+        item.querySelector('.threads-post-counter').textContent = `${index + 1}/${threadsPostState.length}`;
+        item.querySelector('.threads-textarea').value = threadsPostState[index].content;
+        editor.appendChild(item);
+    }
+    editor.querySelectorAll('.threads-post-item').forEach((item, index) => {
+        item.querySelector('.threads-thread-line')?.classList.toggle('hidden', index >= threadsPostState.length - 1);
+        const counter = item.querySelector('.threads-post-counter');
+        if (counter) counter.textContent = `${index + 1}/${threadsPostState.length}`;
+    });
+}
+
+function renderThreadMediaList(index) {
+    const item = document.querySelector(`#threads-compose-editor .threads-post-item[data-index="${index}"]`);
+    const list = item?.querySelector('.threads-media-list');
+    if (!list) return;
+    list.replaceChildren();
+    const media = [...threadsPostState[index].files, ...(threadsPostState[index].gif ? [{ name: 'GIF', isGif: true }] : [])];
+    media.forEach((file, fileIndex) => {
+        const chip = document.createElement('span');
+        chip.className = 'threads-media-chip';
+        chip.append(document.createTextNode(file.name));
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.textContent = '×';
+        remove.setAttribute('aria-label', `Remove ${file.name}`);
+        remove.addEventListener('click', () => {
+            if (file.isGif) threadsPostState[index].gif = '';
+            else threadsPostState[index].files.splice(fileIndex, 1);
+            renderThreadMediaList(index);
+            updateThreadsComposerState();
+        });
+        chip.appendChild(remove);
+        list.appendChild(chip);
+    });
+}
+
+function renderThreadsDrafts() {
+    const view = document.getElementById('threads-drafts-view');
+    if (!view) return;
+    let drafts = [];
+    try { drafts = JSON.parse(localStorage.getItem('aero_post_drafts') || '[]'); } catch {}
+    view.replaceChildren();
+    if (!drafts.length) {
+        const empty = document.createElement('p');
+        empty.className = 'threads-drafts-empty';
+        empty.textContent = 'No drafts yet';
+        view.appendChild(empty);
+    } else drafts.forEach((draft, index) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'threads-draft-item';
+        button.textContent = draft.content || `Draft ${index + 1}`;
+        button.addEventListener('click', () => {
+            const content = String(draft.content || '').split('\n---\n');
+            threadsPostState.splice(0, threadsPostState.length, ...content.map((text) => ({ content: text, files: [], gif: '' })));
+            document.querySelector('#threads-compose-editor .threads-textarea').value = content[0] || '';
+            renderThreadChildren();
+            view.classList.add('hidden');
+            document.getElementById('threads-compose-editor').classList.remove('hidden');
+            document.getElementById('threads-modal-title').textContent = 'New Thread';
+            updateThreadsComposerState();
+        });
+        view.appendChild(button);
+    });
+}
+
+async function publishThreadsPosts() {
+    updateThreadsComposerState();
+    const entries = threadsPostState.filter((post) => post.content.trim() || post.files.length || post.gif);
+    if (!entries.length) return;
+    const button = document.getElementById('threads-submit-btn');
+    const error = document.getElementById('threads-compose-error');
     button.disabled = true;
+    error.classList.add('hidden');
     try {
-        const mediaUrls = await Promise.all(createPostState.files.map(file => AeroAPI.uploadMedia(file)));
-        await AeroAPI.createPost(content, mediaUrls);
-        createPostState.files = [];
-        input.value = '';
-        updateCreatePostState();
-        document.getElementById('create-post-modal').classList.add('hidden');
+        const posts = await Promise.all(entries.map(async (post) => ({
+            content: post.content.trim(),
+            images: [...await Promise.all(post.files.map((file) => AeroAPI.uploadMedia(file))), ...(post.gif ? [post.gif] : [])],
+        })));
+        const response = await fetch(`${API_BASE}/posts/chain`, {
+            method: 'POST',
+            headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                posts,
+                reply_permission: document.getElementById('threads-reply-permission').value,
+                review_replies: document.getElementById('threads-review-replies').checked,
+                share_to: document.getElementById('threads-share-to').value,
+                scheduled_at: document.getElementById('threads-scheduled-at').value || null,
+                topic: document.querySelector('.selected-topic')?.textContent || '',
+            }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.message || 'Unable to publish thread');
+        closeThreadsCompose(false);
         await AeroAPI.renderFeed();
-    } catch (error) {
-        showNotice(error.message, 'error');
-        updateCreatePostState();
+    } catch (publishError) {
+        error.textContent = publishError.message || 'Unable to publish thread';
+        error.classList.remove('hidden');
+    } finally {
+        button.disabled = false;
     }
 }
 
+function openCreatePostModal(event) {
+    openThreadsCompose(event);
+}
+
 function setupCreatePostExperience() {
-    const modal = document.getElementById('create-post-modal');
-    const fileInput = document.getElementById('modal-post-images');
-    const input = document.getElementById('modal-post-input');
+    const overlay = document.getElementById('threads-compose-overlay');
+    if (!overlay) return;
     if (!mentionPickerState.menu) {
         mentionPickerState.menu = document.createElement('div');
         mentionPickerState.menu.className = 'mention-dropdown-menu hidden';
         mentionPickerState.menu.setAttribute('role', 'listbox');
         document.body.appendChild(mentionPickerState.menu);
     }
-    document.getElementById('compose-trigger')?.addEventListener('click', openCreatePostModal);
-    document.getElementById('compose-trigger')?.addEventListener('keydown', event => {
+    const input = overlay.querySelector('.threads-textarea');
+    if (input) {
+        input.addEventListener('input', updateThreadsComposerState);
+        input.addEventListener('input', () => updateMentionPicker(input));
+        input.addEventListener('click', () => updateMentionPicker(input));
+        input.addEventListener('keyup', (event) => { if (!['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) updateMentionPicker(input); });
+        input.addEventListener('keydown', onMentionKeydown);
+    }
+    document.querySelectorAll('#global-fab-btn, #compose-trigger, .compose-trigger-media, [data-mobile-action="compose"], .btn-new-post, #new-post-btn, .share-box-input, [data-action="create-post"]').forEach((button) => {
+        button.addEventListener('click', openCreatePostModal);
+    });
+    document.getElementById('compose-trigger')?.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') openCreatePostModal(event);
     });
-    document.getElementById('compose-trigger-media')?.addEventListener('click', openCreatePostModal);
-    document.getElementById('global-fab-btn')?.addEventListener('click', openCreatePostModal);
-    document.getElementById('close-create-post')?.addEventListener('click', () => modal?.classList.add('hidden'));
-    modal?.addEventListener('click', event => { if (event.target === modal) modal.classList.add('hidden'); });
-    fileInput?.addEventListener('change', () => {
-        createPostState.files = [...createPostState.files, ...Array.from(fileInput.files || [])].slice(0, 10);
-        fileInput.value = '';
-        updateCreatePostState();
+    document.getElementById('threads-cancel-btn')?.addEventListener('click', () => closeThreadsCompose(true));
+    overlay.addEventListener('mousedown', (event) => { if (event.target === overlay) closeThreadsCompose(true); });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !overlay.classList.contains('hidden')) closeThreadsCompose(true);
     });
-    input?.addEventListener('input', updateCreatePostState);
-    input?.addEventListener('input', () => updateMentionPicker(input));
-    input?.addEventListener('click', () => updateMentionPicker(input));
-    input?.addEventListener('keyup', event => { if (!['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) updateMentionPicker(input); });
-    input?.addEventListener('keydown', onMentionKeydown);
-    document.getElementById('create-post-form')?.addEventListener('submit', event => { event.preventDefault(); publishCreatePost(); });
-    document.addEventListener('keydown', event => {
-        if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) { modal.classList.add('hidden'); closeMentionMenu(); }
+    document.getElementById('threads-add-chain-btn')?.addEventListener('click', () => {
+        updateThreadsComposerState();
+        if (threadsPostState.length >= 10) return;
+        threadsPostState.push({ content: '', files: [], gif: '' });
+        renderThreadChildren();
+        overlay.querySelector('.threads-post-item:last-child .threads-textarea')?.focus();
+        updateThreadsComposerState();
     });
-    document.addEventListener('click', event => { if (!event.target.closest('.mention-dropdown-menu') && event.target !== input) closeMentionMenu(); });
+    document.getElementById('threads-media-input')?.addEventListener('change', (event) => {
+        const files = Array.from(event.target.files || []);
+        threadsPostState[threadsActivePostIndex].files.push(...files);
+        event.target.value = '';
+        renderThreadMediaList(threadsActivePostIndex);
+        updateThreadsComposerState();
+    });
+    overlay.addEventListener('focusin', (event) => {
+        const item = event.target.closest('.threads-post-item');
+        if (item) threadsActivePostIndex = Number(item.dataset.index) || 0;
+    });
+    overlay.addEventListener('input', (event) => {
+        if (event.target.matches('.threads-textarea')) updateThreadsComposerState();
+    });
+    overlay.addEventListener('click', (event) => {
+        const removeIndex = event.target.closest('[data-remove-thread]')?.dataset.removeThread;
+        if (removeIndex !== undefined) {
+            updateThreadsComposerState();
+            threadsPostState.splice(Number(removeIndex), 1);
+            renderThreadChildren();
+            updateThreadsComposerState();
+            return;
+        }
+        const action = event.target.closest('[data-threads-action]')?.dataset.threadsAction;
+        if (action === 'media') document.getElementById('threads-media-input')?.click();
+        if (action === 'emoji') {
+            const textarea = overlay.querySelector(`.threads-post-item[data-index="${threadsActivePostIndex}"] .threads-textarea`);
+            if (textarea) { textarea.value += ' 😊'; updateThreadsComposerState(); textarea.focus(); }
+        }
+        if (action === 'poll' || action === 'quote') {
+            const textarea = overlay.querySelector(`.threads-post-item[data-index="${threadsActivePostIndex}"] .threads-textarea`);
+            if (textarea) { textarea.value += action === 'poll' ? `${textarea.value ? '\n' : ''}Poll: ` : '“”'; updateThreadsComposerState(); textarea.focus(); }
+        }
+        if (action === 'location' && navigator.geolocation) navigator.geolocation.getCurrentPosition(({ coords }) => {
+            const textarea = overlay.querySelector(`.threads-post-item[data-index="${threadsActivePostIndex}"] .threads-textarea`);
+            if (textarea) { textarea.value += ` ${coords.latitude.toFixed(3)}, ${coords.longitude.toFixed(3)}`; updateThreadsComposerState(); }
+        });
+        if (action === 'gif') {
+            const picker = document.getElementById('threads-gif-picker');
+            picker.replaceChildren(...trendingGifs.map((gif) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'threads-gif-choice';
+                button.innerHTML = `<img src="${escapeHtml(gif.url)}" alt="${escapeHtml(gif.name)}">`;
+                button.addEventListener('click', () => {
+                    threadsPostState[threadsActivePostIndex].gif = gif.url;
+                    renderThreadMediaList(threadsActivePostIndex);
+                    picker.classList.add('hidden');
+                    updateThreadsComposerState();
+                });
+                return button;
+            }));
+            picker.classList.toggle('hidden');
+        }
+        if (action === 'suggest-tag') {
+            const textarea = overlay.querySelector('.threads-textarea');
+            if (textarea) { textarea.value += `${textarea.value ? ' ' : ''}#Aero`; updateThreadsComposerState(); }
+            document.getElementById('threads-more-menu').classList.add('hidden');
+        }
+        if (action === 'schedule') {
+            document.getElementById('threads-schedule-field').classList.toggle('hidden');
+            document.getElementById('threads-more-menu').classList.add('hidden');
+        }
+        if (event.target.closest('#threads-more-btn')) document.getElementById('threads-more-menu').classList.toggle('hidden');
+        if (event.target.closest('#threads-topic-select')) document.getElementById('threads-topic-menu').classList.toggle('hidden');
+        const topic = event.target.closest('[data-topic]');
+        if (topic) {
+            document.querySelector('.selected-topic').textContent = topic.textContent;
+            document.getElementById('threads-topic-menu').classList.add('hidden');
+        }
+        if (event.target.closest('#threads-options-btn')) document.getElementById('threads-options-menu').classList.toggle('hidden');
+        if (event.target.closest('#threads-drafts-btn')) {
+            const editor = document.getElementById('threads-compose-editor');
+            const draftsView = document.getElementById('threads-drafts-view');
+            const opening = draftsView.classList.contains('hidden');
+            if (opening) renderThreadsDrafts();
+            draftsView.classList.toggle('hidden', !opening);
+            editor.classList.toggle('hidden', opening);
+            document.getElementById('threads-modal-title').textContent = opening ? 'Drafts' : 'New Thread';
+        }
+        if (event.target.closest('#threads-submit-btn')) publishThreadsPosts();
+        if (!event.target.closest('.threads-menu-anchor, .threads-inline-options, [data-threads-action="gif"]')) {
+            document.getElementById('threads-more-menu').classList.add('hidden');
+            document.getElementById('threads-topic-menu').classList.add('hidden');
+        }
+    });
 }
 
 function setupPostScrollBehavior() {

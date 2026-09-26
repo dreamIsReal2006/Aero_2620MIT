@@ -367,6 +367,62 @@
     </nav>
 
     <button type="button" id="global-fab-btn" class="fab-new-post" aria-label="Create a new post"><span class="fab-plus">+</span><span class="fab-label">New Post</span></button>
+    <div id="threads-compose-overlay" class="threads-compose-overlay hidden" role="presentation" aria-hidden="true">
+        <section class="threads-compose-modal" role="dialog" aria-modal="true" aria-labelledby="threads-modal-title">
+            <header class="threads-modal-header">
+                <button id="threads-cancel-btn" type="button" class="threads-text-btn">Cancel</button>
+                <h2 id="threads-modal-title" class="threads-modal-title">New Thread</h2>
+                <div class="threads-header-actions">
+                    <button id="threads-drafts-btn" type="button" class="threads-icon-btn" title="Drafts" aria-label="Drafts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13h8M8 17h8"></path></svg></button>
+                    <div class="threads-menu-anchor"><button id="threads-more-btn" type="button" class="threads-icon-btn" title="More options" aria-label="More options"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg></button>
+                        <div id="threads-more-menu" class="threads-dropdown-menu hidden"><button type="button" data-threads-action="suggest-tag">Add suggested tag</button><button type="button" data-threads-action="schedule">Schedule post...</button></div>
+                    </div>
+                </div>
+            </header>
+            <div class="threads-modal-body">
+                <div id="threads-compose-editor">
+                    <div class="threads-post-item" data-index="0">
+                        <div class="threads-post-rail"><img class="threads-avatar current-user-avatar" src="" alt=""><span class="threads-thread-line hidden"></span></div>
+                        <div class="threads-post-content">
+                            <div class="threads-author-line">
+                                <div class="threads-author-info">
+                                    <span class="threads-username current-user-name">User</span>
+                                    <span class="threads-chevron" aria-hidden="true">›</span>
+                                    <div class="threads-menu-anchor"><button type="button" class="threads-custom-select" id="threads-topic-select" aria-expanded="false"><span class="selected-topic">Your profile</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                                        <div id="threads-topic-menu" class="threads-dropdown-menu hidden"><button type="button" data-topic="profile">Your profile</button><button type="button" data-topic="technology">Technology</button><button type="button" data-topic="design">Design</button><button type="button" data-topic="community">Community</button></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <textarea class="threads-textarea" placeholder="What's new?" rows="3" maxlength="5000" aria-label="Post text"></textarea>
+                            <div class="threads-toolbar" aria-label="Post tools">
+                                <button type="button" class="tb-btn" data-threads-action="media" title="Add media" aria-label="Add media"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></button>
+                                <button type="button" class="tb-btn threads-gif-trigger" data-threads-action="gif" title="GIF" aria-label="GIF"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M8 9H6v6h2v-2H7m4-4v6m3-6v6m0-6h2a2 2 0 0 1 0 4h-2"></path></svg></button>
+                                <button type="button" class="tb-btn" data-threads-action="emoji" title="Emoji" aria-label="Emoji"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><path d="M9 9h.01M15 9h.01"></path></svg></button>
+                                <button type="button" class="tb-btn" data-threads-action="poll" title="Poll" aria-label="Poll"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V5m0 15h17"></path><path d="M8 16v-3m5 3V8m5 8V5"></path></svg></button>
+                                <button type="button" class="tb-btn" data-threads-action="quote" title="Quote" aria-label="Quote"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-6a5 5 0 0 0-5-5m15 5h-5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-6a5 5 0 0 0-5-5"></path></svg></button>
+                                <button type="button" class="tb-btn" data-threads-action="location" title="Location" aria-label="Location"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg></button>
+                                <input id="threads-media-input" type="file" accept="image/*,video/*" multiple hidden>
+                            </div>
+                            <div class="threads-media-list"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="threads-gif-picker" class="threads-gif-picker hidden" aria-label="Choose GIF"></div>
+                <div id="threads-options-menu" class="threads-inline-options hidden">
+                    <label>Who can reply<select id="threads-reply-permission"><option value="everyone">Anyone</option><option value="followers">Your followers</option><option value="following">Profiles you follow</option><option value="mentioned">Profiles you mention</option></select></label>
+                    <label class="threads-review-row">Review and approve replies<input id="threads-review-replies" type="checkbox"><span class="threads-switch"></span></label>
+                    <label>Also share to<select id="threads-share-to"><option value="none">Don't share</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select></label>
+                </div>
+                <div id="threads-drafts-view" class="threads-drafts-view hidden"></div>
+                <label id="threads-schedule-field" class="threads-schedule-field hidden">Schedule post<input id="threads-scheduled-at" type="datetime-local"></label>
+                <p id="threads-compose-error" class="threads-compose-error hidden" role="alert"></p>
+            </div>
+            <footer class="threads-modal-footer">
+                <div class="threads-footer-left"><button id="threads-options-btn" type="button" class="threads-footer-action">Reply settings</button><button id="threads-add-chain-btn" type="button" class="threads-footer-action">+ Add to thread</button></div>
+                <button id="threads-submit-btn" type="button" class="threads-primary-btn">Post</button>
+            </footer>
+        </section>
+    </div>
     <div id="chat-lightbox" class="chat-lightbox hidden" role="dialog" aria-modal="true"><button type="button" id="chat-lightbox-close" aria-label="Close media preview">&times;</button><img id="chat-lightbox-image" alt=""></div>
 
     <div id="short-upload-modal" class="create-post-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="short-upload-title">
