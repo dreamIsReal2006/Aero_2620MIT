@@ -3795,8 +3795,10 @@ function updateCreatePostState() {
     button.disabled = !input?.value.trim() && createPostState.files.length === 0;
 }
 
-function openCreatePostModal() {
-    window.location.assign('/?compose=1');
+function openCreatePostModal(event) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    window.dispatchEvent(new CustomEvent('aero:compose-request'));
 }
 
 async function publishCreatePost() {
@@ -3831,9 +3833,9 @@ function setupCreatePostExperience() {
     }
     document.getElementById('compose-trigger')?.addEventListener('click', openCreatePostModal);
     document.getElementById('compose-trigger')?.addEventListener('keydown', event => {
-        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openCreatePostModal(); }
+        if (event.key === 'Enter' || event.key === ' ') openCreatePostModal(event);
     });
-    document.getElementById('compose-trigger-media')?.addEventListener('click', event => { event.stopPropagation(); openCreatePostModal(); });
+    document.getElementById('compose-trigger-media')?.addEventListener('click', openCreatePostModal);
     document.getElementById('global-fab-btn')?.addEventListener('click', openCreatePostModal);
     document.getElementById('close-create-post')?.addEventListener('click', () => modal?.classList.add('hidden'));
     modal?.addEventListener('click', event => { if (event.target === modal) modal.classList.add('hidden'); });

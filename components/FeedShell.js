@@ -292,9 +292,9 @@ export default function FeedShell() {
     return () => window.removeEventListener('aero:language-change', syncLanguage);
   }, []);
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('compose') !== '1') return;
-    setComposerOpen(true);
-    window.history.replaceState(null, '', window.location.pathname);
+    const openComposer = () => setComposerOpen(true);
+    window.addEventListener('aero:compose-request', openComposer);
+    return () => window.removeEventListener('aero:compose-request', openComposer);
   }, []);
   useEffect(() => { try { setSavedDrafts(JSON.parse(localStorage.getItem('aero_post_drafts') || '[]')); } catch { setSavedDrafts([]); } }, []);
   useEffect(() => {
