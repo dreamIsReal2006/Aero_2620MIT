@@ -291,6 +291,11 @@ export default function FeedShell() {
     window.addEventListener('aero:language-change', syncLanguage);
     return () => window.removeEventListener('aero:language-change', syncLanguage);
   }, []);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('compose') !== '1') return;
+    setComposerOpen(true);
+    window.history.replaceState(null, '', window.location.pathname);
+  }, []);
   useEffect(() => { try { setSavedDrafts(JSON.parse(localStorage.getItem('aero_post_drafts') || '[]')); } catch { setSavedDrafts([]); } }, []);
   useEffect(() => {
     if (!user) return undefined;
@@ -440,7 +445,7 @@ export default function FeedShell() {
     ['everyone', 'reply_anyone'], ['followers', 'reply_followers'], ['following', 'reply_following'], ['mentioned', 'reply_mentioned'],
   ];
   const replyLabel = replyOptions.find(([value]) => value === replyPermission)?.[1] || 'reply_anyone';
-  const navigate = (label) => { if (label === 'Post') setComposerOpen(true); else if (label === 'Profile') setActive('Profile'); else if (label === 'Home') setActive('Home'); else setActive(label); };
+  const navigate = (label) => { if (label === 'Post') { setComposerOpen(true); return; } if (label === 'Profile') setActive('Profile'); else if (label === 'Home') setActive('Home'); else setActive(label); };
   return (
     <>
       <div className="aero-bg" aria-hidden="true"><span className="aero-glow aero-glow-one" /><span className="aero-glow aero-glow-two" /><span className="aero-glow aero-glow-three" /></div>
@@ -463,6 +468,7 @@ export default function FeedShell() {
           </> : <Glass className="rounded-[20px] p-8"><h1 className="mb-2 text-2xl font-bold">{active}</h1><p className="text-[#65676b]">This view keeps the original Aero navigation ready for its API-backed module.</p></Glass>}
         </main>
       </div>
+      <button type="button" className="threads-compose-fab" aria-label={t('new_thread')} title={t('new_thread')} onClick={() => setComposerOpen(true)}><Icon name="plus" /><span>{t('new_thread')}</span></button>
       {composerOpen && <div className="threads-compose-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeComposer(true); }}>
         <section className="threads-compose-modal" role="dialog" aria-modal="true" aria-labelledby="threads-compose-title">
           <header className="threads-compose-header">

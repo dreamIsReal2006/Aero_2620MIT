@@ -3796,14 +3796,7 @@ function updateCreatePostState() {
 }
 
 function openCreatePostModal() {
-    if (!requireAuth(null, 'Please sign in before creating a post.')) return;
-    const modal = document.getElementById('create-post-modal');
-    if (!modal) return;
-    const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
-    document.getElementById('create-post-username').textContent = user.username || 'User';
-    syncCurrentUserAvatars(user);
-    modal.classList.remove('hidden');
-    document.getElementById('modal-post-input')?.focus();
+    window.location.assign('/?compose=1');
 }
 
 async function publishCreatePost() {

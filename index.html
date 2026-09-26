@@ -369,22 +369,6 @@
     <button type="button" id="global-fab-btn" class="fab-new-post" aria-label="Create a new post"><span class="fab-plus">+</span><span class="fab-label">New Post</span></button>
     <div id="chat-lightbox" class="chat-lightbox hidden" role="dialog" aria-modal="true"><button type="button" id="chat-lightbox-close" aria-label="Close media preview">&times;</button><img id="chat-lightbox-image" alt=""></div>
 
-    <div id="create-post-modal" class="create-post-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="create-post-title">
-        <form id="create-post-form" class="create-post-modal glass-card liquid-glass">
-            <header class="create-post-header">
-                <div class="create-post-user"><span id="modal-user-avatar" class="user-avatar">U</span><div><h2 id="create-post-title">Create post</h2><span id="create-post-username">User</span></div></div>
-                <button type="button" id="close-create-post" class="modal-close-btn" aria-label="Close create post">&times;</button>
-            </header>
-            <textarea id="modal-post-input" class="create-post-textarea" maxlength="5000" placeholder="Share what's on your mind..."></textarea>
-            <div id="modal-preview" class="media-preview-grid" aria-live="polite"></div>
-            <footer class="create-post-footer">
-                <label class="media-picker-btn" for="modal-post-images"><span aria-hidden="true">⌁</span> Add media</label>
-                <input type="file" id="modal-post-images" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/quicktime,video/hevc,video/webm,video/x-m4v" multiple hidden>
-                <button type="submit" id="modal-publish-btn" class="btn btn-primary g2-btn" disabled>Post</button>
-            </footer>
-        </form>
-    </div>
-
     <div id="short-upload-modal" class="create-post-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="short-upload-title">
         <form id="short-upload-form" class="create-post-modal glass-card aero-glass-panel liquid-glass">
             <header class="create-post-header"><h2 id="short-upload-title">Upload Video</h2><button type="button" id="close-short-upload" class="modal-close-btn" aria-label="Close upload">&times;</button></header>

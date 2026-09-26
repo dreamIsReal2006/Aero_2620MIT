@@ -54,6 +54,9 @@ body:has(.threads-media-modal) { overflow: hidden; }
 @keyframes feed-spin { to { transform: rotate(360deg); } }
 
 .threads-compose-overlay { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.threads-compose-fab { position: fixed; right: 28px; bottom: 28px; z-index: 60; display: inline-flex; min-height: 48px; align-items: center; justify-content: center; gap: 8px; padding: 0 18px; border: 0; border-radius: 999px; background: #0a84ff; color: #fff; box-shadow: 0 8px 24px rgba(10,132,255,.24); cursor: pointer; font-size: 14px; font-weight: 650; transition: transform .18s ease, box-shadow .18s ease; }
+.threads-compose-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(10,132,255,.3); }
+.threads-compose-fab svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2; }
 .threads-compose-modal { position: relative; display: flex; width: min(620px, 100%); max-height: min(760px, calc(100dvh - 40px)); flex-direction: column; overflow: visible; border-radius: 22px; corner-shape: squircle; background: #fff; color: #101010; box-shadow: 0 16px 40px rgba(0,0,0,.12); animation: aero-pop .2s ease-out both; }
 .threads-compose-header { position: relative; display: grid; min-height: 58px; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 18px; border-bottom: 1px solid #f0f0f0; }
 .threads-compose-header h2 { margin: 0; font-size: 16px; font-weight: 700; }
@@ -146,6 +149,7 @@ body:has(.threads-media-modal) { overflow: hidden; }
 .threads-draft-item > span { overflow: hidden; color: #222; text-overflow: ellipsis; white-space: nowrap; }
 .threads-draft-item time { flex: 0 0 auto; color: #888; font-size: 12px; }
 @media (max-width: 600px) {
+	.threads-compose-fab { right: 16px; bottom: calc(78px + env(safe-area-inset-bottom)); }
 	.threads-compose-overlay { align-items: flex-end; padding: 0; }
 	.threads-compose-modal { width: 100%; max-height: 92dvh; border-radius: 18px 18px 0 0; }
 	.threads-compose-body { padding: 16px 16px 8px; }
