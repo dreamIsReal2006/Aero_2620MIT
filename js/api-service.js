@@ -1318,13 +1318,13 @@ async function appendSingleMessageToUI(message, conversation = activeChatUser ||
     if (!box || !contact || box.querySelector(`[data-message-id="${message.id}"]`)) return false;
     const content = escapeHtml(await decryptChatContent(message.content, contact));
     const mediaUrl = message.media_url ? (String(message.media_url).startsWith('http') ? message.media_url : `${API_ORIGIN}${message.media_url}`) : '';
-    const videoType = /\.mov(?:$|\?)/i.test(mediaUrl) ? 'video/quicktime' : 'video/mp4; codecs=hevc, aac';
+    const videoType = /\.mov(?:$|\?)/i.test(mediaUrl) ? 'video/quicktime' : /\.webm(?:$|\?)/i.test(mediaUrl) ? 'video/webm' : /\.m4v(?:$|\?)/i.test(mediaUrl) ? 'video/x-m4v' : 'video/mp4';
     const media = mediaUrl && message.type === 'image'
         ? `<img src="${escapeHtml(mediaUrl)}" class="chat-gif-media" alt="Attached image" loading="lazy">`
         : mediaUrl && message.type === 'gif'
             ? `<img src="${escapeHtml(mediaUrl)}" class="chat-gif-media" alt="GIF" loading="lazy">`
         : mediaUrl && message.type === 'video'
-            ? `<video class="chat-inline-video" controls preload="metadata"><source src="${escapeHtml(mediaUrl)}" type="${videoType}"></video>`
+            ? `<video class="chat-inline-video" controls preload="metadata" playsinline crossorigin="anonymous"><source src="${escapeHtml(mediaUrl)}" type="${videoType}"></video>`
             : mediaUrl && message.type === 'audio'
                 ? `<audio class="chat-inline-audio" src="${escapeHtml(mediaUrl)}" controls></audio>`
             : '';
@@ -1430,7 +1430,7 @@ async function loadShortVideos() {
         const response = await fetch(`${API_BASE}/videos`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
         const videos = await response.json();
         if (!response.ok) throw new Error(videos.message || 'Unable to load videos');
-        feed.innerHTML = videos.length ? videos.map((video) => { const videoType = /\.mov(?:$|\?)/i.test(video.video_url) ? 'video/quicktime' : 'video/mp4; codecs=hevc, aac'; return `<article class="short-video-card"><video playsinline loop preload="metadata" data-hdr-fallback="${!window.AeroMediaCapabilities?.isHDRSupported()}"><source src="${escapeHtml(video.video_url)}" type="${videoType}"></video><div class="short-video-overlay"><button type="button" class="video-action" aria-label="Like video">♥</button><button type="button" class="video-action" aria-label="Comment on video">●</button><button type="button" class="video-action" aria-label="Share video">↗</button></div><div class="short-video-meta"><span class="video-author-avatar">${escapeHtml((video.author?.username || 'U').charAt(0).toUpperCase())}</span><div><strong>@${escapeHtml(video.author?.username || 'User')}</strong><p>${escapeHtml(video.caption || '')}</p><small>♫ ${escapeHtml(video.track_name || 'Original audio')}</small></div><button type="button" class="video-mute-btn" aria-label="Mute video">🔊</button></div></article>`; }).join('') : '<div class="bookmarks-empty">No short videos yet.</div>';
+        feed.innerHTML = videos.length ? videos.map((video) => { const videoType = /\.mov(?:$|\?)/i.test(video.video_url) ? 'video/quicktime' : /\.webm(?:$|\?)/i.test(video.video_url) ? 'video/webm' : /\.m4v(?:$|\?)/i.test(video.video_url) ? 'video/x-m4v' : 'video/mp4'; return `<article class="short-video-card"><video playsinline loop preload="metadata" data-hdr-fallback="${!window.AeroMediaCapabilities?.isHDRSupported()}"><source src="${escapeHtml(video.video_url)}" type="${videoType}"></video><div class="short-video-overlay"><button type="button" class="video-action" aria-label="Like video">♥</button><button type="button" class="video-action" aria-label="Comment on video">●</button><button type="button" class="video-action" aria-label="Share video">↗</button></div><div class="short-video-meta"><span class="video-author-avatar">${escapeHtml((video.author?.username || 'U').charAt(0).toUpperCase())}</span><div><strong>@${escapeHtml(video.author?.username || 'User')}</strong><p>${escapeHtml(video.caption || '')}</p><small>♫ ${escapeHtml(video.track_name || 'Original audio')}</small></div><button type="button" class="video-mute-btn" aria-label="Mute video">🔊</button></div></article>`; }).join('') : '<div class="bookmarks-empty">No short videos yet.</div>';
         feed.querySelectorAll('video').forEach((video) => {
             video.muted = true;
             video.play().catch(() => {});
@@ -1656,7 +1656,7 @@ async function renderChatMessages(messages, contact) {
         const url = message.media_url ? (String(message.media_url).startsWith('http') ? message.media_url : `${API_ORIGIN}${message.media_url}`) : '';
         if (!url) return '';
         if (message.type === 'image' || message.type === 'gif') return `<button type="button" class="chat-media-preview" data-lightbox-src="${escapeHtml(url)}"><img src="${escapeHtml(url)}" alt="Attached image" loading="lazy"></button>`;
-        if (message.type === 'video') return `<video class="chat-inline-video" src="${escapeHtml(url)}" controls preload="metadata"></video>`;
+        if (message.type === 'video') return `<video class="chat-inline-video" src="${escapeHtml(url)}" controls preload="metadata" playsinline crossorigin="anonymous"></video>`;
         if (message.type === 'audio') return `<audio class="chat-inline-audio" src="${escapeHtml(url)}" controls></audio>`;
         return `<a class="chat-document-card" href="${escapeHtml(url)}" download><span class="chat-document-ext">${escapeHtml((message.file_name || 'FILE').split('.').pop().slice(0, 5).toUpperCase())}</span><span><strong>${escapeHtml(message.file_name || 'Attached document')}</strong><small>${formatBytes(message.file_size)}</small></span><span class="chat-document-download" aria-hidden="true">↓</span></a>`;
     };
@@ -2778,19 +2778,21 @@ const AeroAPI = {
                         mediaElement.playsInline = true;
                         const source = document.createElement('source');
                         source.src = mediaUrl;
-                        source.type = /\.mov(?:$|\?)/i.test(mediaUrl) ? 'video/quicktime' : /\.mp4(?:$|\?)/i.test(mediaUrl) ? 'video/mp4; codecs=hevc, aac' : 'video/webm';
+                        source.type = /\.mov(?:$|\?)/i.test(mediaUrl) ? 'video/quicktime' : /\.webm(?:$|\?)/i.test(mediaUrl) ? 'video/webm' : /\.m4v(?:$|\?)/i.test(mediaUrl) ? 'video/x-m4v' : 'video/mp4';
                         mediaElement.appendChild(source);
                     } else {
                         mediaElement.src = mediaUrl;
                     }
                     const openMedia = () => window.openThreadsMediaViewer(mediaList, index);
-                    mediaElement.addEventListener('click', openMedia);
-                    mediaElement.addEventListener('keydown', event => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            openMedia();
-                        }
-                    });
+                    if (!isVideo) {
+                        mediaElement.addEventListener('click', openMedia);
+                        mediaElement.addEventListener('keydown', event => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                openMedia();
+                            }
+                        });
+                    }
                     media.appendChild(mediaElement);
                 });
                 postEl.appendChild(media);
@@ -3802,7 +3804,7 @@ function closeThreadsCompose(saveDraft = true) {
     document.body.classList.remove('threads-compose-open');
     document.getElementById('threads-drafts-view')?.classList.add('hidden');
     document.getElementById('threads-compose-editor')?.classList.remove('hidden');
-    document.getElementById('threads-modal-title').textContent = 'New Thread';
+    document.getElementById('threads-modal-title').textContent = 'New Post';
     document.getElementById('threads-more-menu')?.classList.add('hidden');
     document.getElementById('threads-options-menu')?.classList.add('hidden');
     document.getElementById('threads-schedule-field')?.classList.add('hidden');
@@ -3899,7 +3901,7 @@ function renderThreadsDrafts() {
             renderThreadChildren();
             view.classList.add('hidden');
             document.getElementById('threads-compose-editor').classList.remove('hidden');
-            document.getElementById('threads-modal-title').textContent = 'New Thread';
+            document.getElementById('threads-modal-title').textContent = 'New Post';
             updateThreadsComposerState();
         });
         view.appendChild(button);
@@ -4009,8 +4011,26 @@ function setupCreatePostExperience() {
         const action = event.target.closest('[data-threads-action]')?.dataset.threadsAction;
         if (action === 'media') document.getElementById('threads-media-input')?.click();
         if (action === 'emoji') {
+            const picker = document.getElementById('threads-emoji-picker');
+            const button = overlay.querySelector('[data-threads-action="emoji"]');
+            const opening = picker.classList.contains('hidden');
+            picker.classList.toggle('hidden', !opening);
+            button.setAttribute('aria-expanded', String(opening));
+        }
+        const selectedEmoji = event.target.closest('[data-emoji]')?.dataset.emoji;
+        if (selectedEmoji) {
             const textarea = overlay.querySelector(`.threads-post-item[data-index="${threadsActivePostIndex}"] .threads-textarea`);
-            if (textarea) { textarea.value += ' 😊'; updateThreadsComposerState(); textarea.focus(); }
+            if (textarea) {
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const insertion = `${selectedEmoji} `;
+                textarea.value = `${textarea.value.slice(0, start)}${insertion}${textarea.value.slice(end)}`;
+                textarea.focus();
+                textarea.setSelectionRange(start + insertion.length, start + insertion.length);
+                updateThreadsComposerState();
+            }
+            document.getElementById('threads-emoji-picker').classList.add('hidden');
+            overlay.querySelector('[data-threads-action="emoji"]').setAttribute('aria-expanded', 'false');
         }
         if (action === 'poll' || action === 'quote') {
             const textarea = overlay.querySelector(`.threads-post-item[data-index="${threadsActivePostIndex}"] .threads-textarea`);
@@ -4061,12 +4081,14 @@ function setupCreatePostExperience() {
             if (opening) renderThreadsDrafts();
             draftsView.classList.toggle('hidden', !opening);
             editor.classList.toggle('hidden', opening);
-            document.getElementById('threads-modal-title').textContent = opening ? 'Drafts' : 'New Thread';
+            document.getElementById('threads-modal-title').textContent = opening ? 'Drafts' : 'New Post';
         }
         if (event.target.closest('#threads-submit-btn')) publishThreadsPosts();
         if (!event.target.closest('.threads-menu-anchor, .threads-inline-options, [data-threads-action="gif"]')) {
             document.getElementById('threads-more-menu').classList.add('hidden');
             document.getElementById('threads-topic-menu').classList.add('hidden');
+            document.getElementById('threads-emoji-picker').classList.add('hidden');
+            overlay.querySelector('[data-threads-action="emoji"]').setAttribute('aria-expanded', 'false');
         }
     });
 }

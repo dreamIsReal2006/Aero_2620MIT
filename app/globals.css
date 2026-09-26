@@ -57,7 +57,9 @@ body:has(.threads-media-modal) { overflow: hidden; }
 .threads-compose-fab { position: fixed; right: 28px; bottom: 28px; z-index: 60; display: inline-flex; min-height: 48px; align-items: center; justify-content: center; gap: 8px; padding: 0 18px; border: 0; border-radius: 999px; background: #0a84ff; color: #fff; box-shadow: 0 8px 24px rgba(10,132,255,.24); cursor: pointer; font-size: 14px; font-weight: 650; transition: transform .18s ease, box-shadow .18s ease; }
 .threads-compose-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(10,132,255,.3); }
 .threads-compose-fab svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2; }
-.threads-compose-modal { position: relative; display: flex; width: min(620px, 100%); max-height: min(760px, calc(100dvh - 40px)); flex-direction: column; overflow: visible; border-radius: 22px; corner-shape: squircle; background: #fff; color: #101010; box-shadow: 0 16px 40px rgba(0,0,0,.12); animation: aero-pop .2s ease-out both; }
+.threads-compose-modal { position: relative; display: flex; width: min(620px, 100%); max-height: min(90vh, 760px, calc(100dvh - 40px)); flex-direction: column; overflow: visible; border-radius: 22px; corner-shape: squircle; background: #fff; color: #101010; box-shadow: 0 16px 40px rgba(0,0,0,.12); animation: threadsModalIn .22s cubic-bezier(.16,1,.3,1) forwards; }
+@keyframes threadsModalIn { from { opacity: 0; transform: scale(.95) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes threadsDropdownIn { from { opacity: 0; transform: scale(.9) translateY(-8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 .threads-compose-header { position: relative; display: grid; min-height: 58px; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 18px; border-bottom: 1px solid #f0f0f0; }
 .threads-compose-header h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .threads-text-button, .threads-icon-button { border: 0; background: transparent; color: #111; cursor: pointer; }
@@ -116,7 +118,7 @@ body:has(.threads-media-modal) { overflow: hidden; }
 .threads-publish-button { min-width: 76px; min-height: 36px; padding: 7px 16px; border: 0; border-radius: 999px; background: #101010; color: #fff; cursor: pointer; font-size: 14px; font-weight: 650; }
 .threads-publish-button:disabled { cursor: not-allowed; opacity: .35; }
 .threads-menu-anchor { position: relative; }
-.threads-dropdown-menu { position: absolute; z-index: 10; min-width: 230px; padding: 8px; border: 1px solid #ededed; border-radius: 16px; corner-shape: squircle; background: #fff; box-shadow: 0 12px 32px rgba(0,0,0,.15); transform-origin: top left; animation: menuScaleIn .18s cubic-bezier(.16,1,.3,1) forwards; }
+.threads-dropdown-menu { position: absolute; z-index: 10; min-width: 230px; padding: 8px; border: 1px solid #ededed; border-radius: 16px; corner-shape: squircle; background: #fff; box-shadow: 0 12px 32px rgba(0,0,0,.15); transform-origin: top left; animation: threadsDropdownIn .18s cubic-bezier(.16,1,.3,1) forwards; }
 .threads-dropdown-menu.is-closing { animation: menuScaleOut .16s ease-in forwards; pointer-events: none; }
 @keyframes menuScaleIn { from { opacity: 0; transform: scale(.92) translateY(-6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 @keyframes menuScaleOut { from { opacity: 1; transform: scale(1) translateY(0); } to { opacity: 0; transform: scale(.96) translateY(-3px); } }
@@ -142,16 +144,25 @@ body:has(.threads-media-modal) { overflow: hidden; }
 .threads-toggle-row input:checked + .threads-toggle { background: #111; }
 .threads-toggle-row input:checked + .threads-toggle::after { transform: translateX(16px); }
 .threads-drafts-view { display: flex; min-height: 300px; flex: 1; flex-direction: column; overflow-y: auto; padding: 14px 20px; }
+.threads-drafts-view:not(.hidden) { animation: threadsDropdownIn .18s cubic-bezier(.16,1,.3,1) forwards; }
 .threads-drafts-empty { display: grid; flex: 1; align-content: center; justify-items: center; gap: 10px; color: #777; }
 .threads-drafts-empty > span { display: grid; width: 54px; height: 54px; place-items: center; border-radius: 50%; background: #f5f5f5; }
 .threads-drafts-empty strong { color: #333; font-size: 14px; font-weight: 600; }
 .threads-draft-item { display: flex; min-height: 58px; align-items: center; justify-content: space-between; gap: 16px; border: 0; border-bottom: 1px solid #eee; background: #fff; text-align: left; cursor: pointer; }
 .threads-draft-item > span { overflow: hidden; color: #222; text-overflow: ellipsis; white-space: nowrap; }
 .threads-draft-item time { flex: 0 0 auto; color: #888; font-size: 12px; }
+.threads-compose-header { flex-shrink: 0; }
+.threads-compose-body { flex: 1; }
+.threads-compose-footer { flex-shrink: 0; }
+.threads-compose-form { min-height: 0; }
+.threads-emoji-anchor { position: relative; }
+.threads-emoji-picker { position: absolute; z-index: 20; bottom: calc(100% + 8px); left: 0; display: grid; width: 208px; grid-template-columns: repeat(4, 1fr); gap: 3px; padding: 7px; border: 1px solid #ededed; border-radius: 14px; background: #fff; box-shadow: 0 12px 32px rgba(0,0,0,.15); animation: threadsDropdownIn .18s cubic-bezier(.16,1,.3,1) forwards; }
+.threads-emoji-picker button { display: grid; width: 42px; height: 42px; place-items: center; border: 0; border-radius: 9px; background: transparent; cursor: pointer; font-size: 22px; }
+.threads-emoji-picker button:hover, .threads-emoji-picker button:focus-visible { background: #f4f4f4; }
 @media (max-width: 600px) {
 	.threads-compose-fab { right: 16px; bottom: calc(78px + env(safe-area-inset-bottom)); }
 	.threads-compose-overlay { align-items: flex-end; padding: 0; }
-	.threads-compose-modal { width: 100%; max-height: 92dvh; border-radius: 18px 18px 0 0; }
+	.threads-compose-modal { width: 100%; max-height: min(90vh, 90dvh); border-radius: 18px 18px 0 0; }
 	.threads-compose-body { padding: 16px 16px 8px; }
 	.threads-compose-footer { align-items: flex-end; padding: 10px 12px max(10px, env(safe-area-inset-bottom)); }
 	.threads-compose-footer-left { gap: 2px; }

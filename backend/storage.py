@@ -1,3 +1,4 @@
+import mimetypes
 import os
 import uuid
 from io import BytesIO
@@ -50,6 +51,15 @@ def upload_file_to_supabase(file_obj, folder="uploads"):
         raise ValueError("Uploaded file is empty")
 
     client = create_client(supabase_url, supabase_key)
-    options = {"content-type": getattr(upload_obj, "mimetype", None) or "application/octet-stream"}
+    video_content_types = {
+        ".mp4": "video/mp4",
+        ".webm": "video/webm",
+        ".mov": "video/quicktime",
+        ".m4v": "video/x-m4v",
+    }
+    content_type = video_content_types.get(extension) or getattr(upload_obj, "mimetype", None)
+    if not content_type or content_type == "application/octet-stream":
+        content_type = mimetypes.guess_type(getattr(upload_obj, "filename", None) or filename)[0] or "application/octet-stream"
+    options = {"content-type": content_type}
     client.storage.from_(SUPABASE_BUCKET).upload(storage_path, content, options)
     return client.storage.from_(SUPABASE_BUCKET).get_public_url(storage_path)

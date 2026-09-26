@@ -14,7 +14,7 @@ const apiHeaders = () => ({ Accept: 'application/json', Authorization: `Bearer $
 
 const composerTranslations = {
   en: {
-    cancel: 'Cancel', new_thread: 'New Thread', post: 'Post', reply_anyone: 'Anyone can reply', add_to_thread: 'Add to thread',
+    cancel: 'Cancel', new_thread: 'New Post', post: 'Post', reply_anyone: 'Anyone can reply', add_to_thread: 'Add to thread',
     drafts: 'Drafts', more_options: 'More options', topic_profile: 'Your profile', topic_technology: 'Technology', topic_design: 'Design', topic_community: 'Community',
     write_something: 'Write something...', remove_thread: 'Remove thread post', attachment: 'Attachment', remove_attachment: 'Remove attachment',
     image_or_video: 'Image or video', gif_animation: 'GIF', emoji: 'Emoji', voice_input: 'Voice input', poll: 'Poll', quote: 'Quote', location: 'Location', audio: 'Audio',
@@ -282,6 +282,7 @@ export default function FeedShell() {
   const [composerError, setComposerError] = useState('');
   const [language, setLanguage] = useState('en');
   const uploadInputRef = useRef(null);
+  const activeComposerTextareaRef = useRef(null);
   const feedSentinelRef = useRef(null);
   const t = (key) => (typeof window !== 'undefined' && window.AeroI18n?.t(key)) || composerTranslations[language][key] || key;
   useEffect(() => { try { const saved = JSON.parse(localStorage.getItem('aero_user') || 'null'); if (localStorage.getItem('aero_token') && saved) setUser(saved); } catch {} }, []);
@@ -362,6 +363,21 @@ export default function FeedShell() {
   };
   const updateThreadPost = (index, changes) => setThreadPosts((current) => current.map((post, postIndex) => postIndex === index ? { ...post, ...changes } : post));
   const appendToPost = (index, text) => updateThreadPost(index, { content: `${threadPosts[index].content}${text}` });
+  const insertEmoji = (emoji) => {
+    const textarea = activeComposerTextareaRef.current;
+    const index = Number(textarea?.dataset.threadIndex || 0);
+    const post = threadPosts[index];
+    if (!textarea || !post) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const insertion = `${emoji} `;
+    updateThreadPost(index, { content: `${post.content.slice(0, start)}${insertion}${post.content.slice(end)}` });
+    setComposerMenu('');
+    window.requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + insertion.length, start + insertion.length);
+    });
+  };
   const addThreadPost = () => {
     if (threadPosts.length >= 10) return;
     setThreadPosts((current) => [...current, { id: Date.now(), content: '', files: [] }]);
@@ -510,7 +526,7 @@ export default function FeedShell() {
                   </div>
                   <div className="threads-post-content">
                     {index > 0 && <div className="threads-post-byline"><strong>{user.username || user.display_name || 'User'}</strong><span>{index + 1}/{threadPosts.length}</span><button type="button" className="threads-remove-post" aria-label={t('remove_thread')} onClick={() => setThreadPosts((current) => current.filter((_, itemIndex) => itemIndex !== index))}>×</button></div>}
-                    <textarea autoFocus={index === 0} value={post.content} maxLength={5000} placeholder={t('write_something')} aria-label={`${t('add_to_thread')} ${index + 1}`} onChange={(event) => updateThreadPost(index, { content: event.target.value })} />
+                    <textarea autoFocus={index === 0} data-thread-index={index} value={post.content} maxLength={5000} placeholder={t('write_something')} aria-label={`${t('add_to_thread')} ${index + 1}`} onFocus={(event) => { activeComposerTextareaRef.current = event.currentTarget; }} onSelect={(event) => { activeComposerTextareaRef.current = event.currentTarget; }} onChange={(event) => updateThreadPost(index, { content: event.target.value })} />
                     {post.files.length > 0 && <div className="threads-upload-list">{post.files.map((file, fileIndex) => <span key={`${file.name}-${fileIndex}`}>{file.name}<button type="button" aria-label={t('remove_attachment')} onClick={() => updateThreadPost(index, { files: post.files.filter((_, itemIndex) => itemIndex !== fileIndex) })}>×</button></span>)}</div>}
                   </div>
                 </div>)}
@@ -519,7 +535,12 @@ export default function FeedShell() {
               <div className="threads-compose-toolbar" aria-label={t('post_attachments')}>
                 <button type="button" title={t('image_or_video')} aria-label={t('image_or_video')} onClick={() => uploadInputRef.current?.click()}><Icon name="image" /></button>
                 <button type="button" className="threads-gif-trigger threads-dropdown-trigger" title={t('gif_animation')} aria-label={t('gif_animation')} aria-expanded={isComposerMenuOpen('gif')} onClick={() => toggleComposerMenu('gif')}><Icon name="gif" /></button>
-                <button type="button" title={t('emoji')} aria-label={t('emoji')} onClick={() => appendToPost(0, ' 😊')}><Icon name="smile" /></button>
+                <div className="threads-menu-anchor threads-emoji-anchor">
+                  <button type="button" className="threads-dropdown-trigger" title={t('emoji')} aria-label={t('emoji')} aria-expanded={isComposerMenuOpen('emoji')} onClick={() => toggleComposerMenu('emoji')}><Icon name="smile" /></button>
+                  {isComposerMenuOpen('emoji') && <div className={`threads-emoji-picker threads-dropdown-menu${composerMenu.endsWith('-closing') ? ' is-closing' : ''}`} role="group" aria-label={t('emoji')}>
+                    {['😄', '😂', '❤️', '🔥', '👍', '🎉', '✨', '👀'].map((emoji) => <button type="button" key={emoji} aria-label={emoji} onClick={() => insertEmoji(emoji)}>{emoji}</button>)}
+                  </div>}
+                </div>
                 <button type="button" title={t('voice_input')} aria-label={t('voice_input')} onClick={() => setComposerError(t('unsupported_voice'))}><Icon name="mic" /></button>
                 <button type="button" title={t('poll')} aria-label={t('poll')} onClick={() => appendToPost(0, `${threadPosts[0].content.trim() ? '\n' : ''}${t('poll')}: `)}><Icon name="poll" /></button>
                 <button type="button" title={t('quote')} aria-label={t('quote')} onClick={() => appendToPost(0, '“”')}><Icon name="quote" /></button>

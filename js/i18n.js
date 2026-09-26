@@ -4,7 +4,7 @@
     const translations = {
         en: {
             screenTimeWeekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-            cancel: 'Cancel', new_thread: 'New Thread', post: 'Post', reply_anyone: 'Anyone can reply', add_to_thread: 'Add to thread',
+            cancel: 'Cancel', new_thread: 'New Post', post: 'Post', reply_anyone: 'Anyone can reply', add_to_thread: 'Add to thread',
             drafts: 'Drafts', more_options: 'More options', topic_profile: 'Your profile', topic_technology: 'Technology', topic_design: 'Design', topic_community: 'Community',
             write_something: 'Write something...', remove_thread: 'Remove thread post', remove_attachment: 'Remove attachment', image_or_video: 'Image or video', gif_animation: 'GIF', emoji: 'Emoji', voice_input: 'Voice input', poll: 'Poll', quote: 'Quote', location: 'Location', audio: 'Audio',
             post_options: 'Post options', who_can_reply: 'Who can reply and quote', reply_followers: 'Your followers', reply_following: 'Profiles you follow', reply_mentioned: 'Profiles you mention', review_replies: 'Review and approve replies', share_to: 'Also share to...', dont_share: 'Don’t share',
