@@ -9,6 +9,7 @@ from pathlib import Path
 
 from flask import current_app, jsonify, request
 from sqlalchemy import false, func, or_, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import contains_eager, load_only
 from werkzeug.utils import secure_filename
 
@@ -244,17 +245,22 @@ def search(current_user):
 @optional_token
 def search_hashtags(current_user):
     query = str(request.args.get("q", "")).strip().lstrip("#")[:100]
-    visible_ids = visible_posts_query(current_user).with_entities(Post.id).subquery()
-    counts = db.session.query(
-        Hashtag.tag.label("tag"),
-        func.count(PostHashtag.post_id).label("post_count"),
-    ).join(PostHashtag, PostHashtag.hashtag_id == Hashtag.id).filter(
-        PostHashtag.post_id.in_(visible_ids)
-    ).group_by(Hashtag.id, Hashtag.tag)
-    if query:
-        counts = counts.filter(Hashtag.tag.ilike(f"%{query}%"))
-    results = counts.order_by(func.count(PostHashtag.post_id).desc(), func.lower(Hashtag.tag)).limit(5).all()
-    return jsonify({"hashtags": [{"tag": tag, "post_count": count} for tag, count in results]}), 200
+    try:
+        visible_ids = visible_posts_query(current_user).with_entities(Post.id).subquery()
+        counts = db.session.query(
+            Hashtag.tag.label("tag"),
+            func.count(PostHashtag.post_id).label("post_count"),
+        ).join(PostHashtag, PostHashtag.hashtag_id == Hashtag.id).filter(
+            PostHashtag.post_id.in_(visible_ids)
+        ).group_by(Hashtag.id, Hashtag.tag)
+        if query:
+            counts = counts.filter(Hashtag.tag.ilike(f"%{query}%"))
+        results = counts.order_by(func.count(PostHashtag.post_id).desc(), func.lower(Hashtag.tag)).limit(5).all()
+        return jsonify({"hashtags": [{"tag": tag, "post_count": count} for tag, count in results]}), 200
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Unable to search hashtags")
+        return jsonify({"hashtags": []}), 200
 
 
 @feed_bp.get("/hashtags/<string:tag>/posts")
@@ -460,7 +466,11 @@ def create_post(current_user):
     )
     db.session.add(post)
     db.session.flush()
-    index_post_hashtags(post.id, content)
+    try:
+        with db.session.begin_nested():
+            index_post_hashtags(post.id, content)
+    except SQLAlchemyError:
+        logger.exception("Unable to index hashtags for post %s", post.id)
     mentioned_users = add_mention_notifications(content, current_user, post.id, "post")
     db.session.commit()
     for mentioned_user in mentioned_users:
@@ -480,6 +490,76 @@ def create_post(current_user):
             name=f"post-embedding-{post.id}",
         ).start()
     return jsonify(post_payload(post, current_user.id)), 201
+
+
+@feed_bp.post("/posts/chain")
+@token_required
+def create_post_chain(current_user):
+    data = request.get_json(silent=True) or {}
+    entries = data.get("posts")
+    if not isinstance(entries, list) or not 1 <= len(entries) <= 10:
+        return jsonify({"message": "A thread must contain between 1 and 10 posts"}), 400
+
+    normalized = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            return jsonify({"message": "Invalid post in thread"}), 400
+        content = str(entry.get("content", "")).strip()
+        images = entry.get("images", [])
+        if (not content and not images) or len(content) > 5000 or not isinstance(images, list) or len(images) > 10:
+            return jsonify({"message": "Invalid post content or number of media files"}), 400
+        normalized.append((content, images))
+
+    created_posts = []
+    mention_notifications = []
+    try:
+        parent_id = None
+        for content, images in normalized:
+            post = Post(
+                content=content,
+                images_json=json.dumps(images),
+                user_id=current_user.id,
+                parent_id=parent_id,
+                type="original",
+            )
+            db.session.add(post)
+            db.session.flush()
+            parent_id = post.id
+            created_posts.append(post)
+            try:
+                with db.session.begin_nested():
+                    index_post_hashtags(post.id, content)
+            except SQLAlchemyError:
+                logger.exception("Unable to index hashtags for post %s", post.id)
+            mention_notifications.extend(
+                (post, content, mentioned_user)
+                for mentioned_user in add_mention_notifications(content, current_user, post.id, "post")
+            )
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.exception("Unable to create post chain for user %s", current_user.id)
+        return jsonify({"message": "Unable to publish thread"}), 500
+
+    app = current_app._get_current_object()
+    for post, content, mentioned_user in mention_notifications:
+        if mentioned_user.email:
+            threading.Thread(
+                target=send_mention_email,
+                args=(mentioned_user.email, current_user.display_name or current_user.username, post.id, content),
+                daemon=True,
+                name=f"post-mention-email-{post.id}-{mentioned_user.id}",
+            ).start()
+    for post, content in zip(created_posts, (content for content, _ in normalized)):
+        if content:
+            threading.Thread(
+                target=async_generate_embedding,
+                args=(app, post.id, content),
+                daemon=True,
+                name=f"post-embedding-{post.id}",
+            ).start()
+
+    return jsonify({"posts": [post_payload(post, current_user.id) for post in created_posts]}), 201
 
 
 @feed_bp.delete("/posts/<post_id>")

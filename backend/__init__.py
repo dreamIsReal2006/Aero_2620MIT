@@ -5,7 +5,7 @@ from pathlib import Path
 from flask import Flask, g, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 
 logger = logging.getLogger(__name__)
@@ -135,6 +135,15 @@ def create_app():
         PostHashtag,
         UserHashtagInterest,
     )
+
+    hashtag_tables = [
+        db.metadata.tables[name]
+        for name in ("hashtags", "post_hashtags", "user_hashtag_interests")
+    ]
+    with app.app_context():
+        existing_tables = set(inspect(db.engine).get_table_names())
+        if not {table.name for table in hashtag_tables}.issubset(existing_tables):
+            db.metadata.create_all(bind=db.engine, tables=hashtag_tables)
 
     from backend.auth import auth_bp
     from backend.auth import routes

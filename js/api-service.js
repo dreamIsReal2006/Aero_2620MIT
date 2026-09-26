@@ -3597,7 +3597,15 @@ function showMentionMenuMessage(message, input) {
     status.className = 'mention-empty-state';
     status.setAttribute('role', 'status');
     status.textContent = message;
-    menu.replaceChildren(status);
+    const children = [];
+    if (mentionPickerState.match?.kind === 'hashtag' && !mentionPickerState.match.query) {
+        const header = document.createElement('div');
+        header.className = 'mention-section-header';
+        header.textContent = '热门标签';
+        children.push(header);
+    }
+    children.push(status);
+    menu.replaceChildren(...children);
     menu.classList.remove('hidden');
     positionMentionMenu(input);
 }
@@ -3627,6 +3635,12 @@ function renderMentionMenu(payload, input, currentMatch) {
         ];
         mentionPickerState.activeIndex = mentionPickerState.items.length ? 0 : -1;
         menu.replaceChildren();
+        if (!currentMatch.query) {
+            const header = document.createElement('div');
+            header.className = 'mention-section-header';
+            header.textContent = '热门标签';
+            menu.appendChild(header);
+        }
         mentionPickerState.items.forEach((item, index) => {
             const button = document.createElement('button');
             button.type = 'button';
@@ -3692,7 +3706,7 @@ function updateMentionPicker(input) {
         return;
     }
     mentionPickerState.match = match;
-    showMentionMenuMessage('正在寻找用户...', input);
+    showMentionMenuMessage(match.kind === 'hashtag' ? '正在寻找标签...' : '正在寻找用户...', input);
     const currentMatch = match;
     window.clearTimeout(mentionPickerState.timer);
     const requestId = ++mentionPickerState.requestId;
