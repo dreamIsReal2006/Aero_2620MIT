@@ -23,9 +23,25 @@ function installMentionPicker(textarea) {
   let timer;
   let requestId = 0;
 
-  const hide = () => { match = null; items = []; activeIndex = -1; menu.classList.add('hidden'); };
+  const hide = () => {
+    requestId += 1;
+    window.clearTimeout(timer);
+    match = null;
+    items = [];
+    activeIndex = -1;
+    menu.classList.add('hidden');
+  };
+  const showMessage = (message) => {
+    const status = document.createElement('div');
+    status.className = 'mention-empty-state';
+    status.setAttribute('role', 'status');
+    status.textContent = message;
+    menu.replaceChildren(status);
+    menu.classList.remove('hidden');
+    position();
+  };
   const position = () => {
-    if (!match || menu.classList.contains('hidden')) return;
+    if (!match) return;
     const rect = textarea.getBoundingClientRect();
     const style = getComputedStyle(textarea);
     const mirror = document.createElement('div');
@@ -39,8 +55,10 @@ function installMentionPicker(textarea) {
     mirror.scrollTop = textarea.scrollTop;
     const caret = marker.getBoundingClientRect();
     mirror.remove();
-    menu.style.left = `${Math.max(8, Math.min(caret.left, window.innerWidth - 296))}px`;
-    menu.style.top = `${Math.max(8, Math.min(caret.bottom + 6, window.innerHeight - 280))}px`;
+    const menuWidth = Math.min(280, window.innerWidth - 16);
+    const menuHeight = Math.min(menu.offsetHeight || 48, 250);
+    menu.style.left = `${Math.max(8, Math.min(caret.left, window.innerWidth - menuWidth - 8))}px`;
+    menu.style.top = `${Math.max(8, Math.min(caret.bottom + 6, window.innerHeight - menuHeight - 8))}px`;
   };
   const choose = (user) => {
     if (!match || !user?.username) return;
@@ -95,27 +113,32 @@ function installMentionPicker(textarea) {
         menu.appendChild(button);
       });
     });
-    menu.classList.toggle('hidden', !items.length);
-    position();
+    if (items.length) {
+      menu.classList.remove('hidden');
+      position();
+    } else showMessage('暂无关注用户');
   };
   const update = () => {
     const prefix = textarea.value.slice(0, textarea.selectionStart);
     const found = prefix.match(/(^|[\s([{])@([A-Za-z0-9_]*)$/);
     if (!found || textarea.selectionStart !== textarea.selectionEnd) { hide(); return; }
     match = { start: textarea.selectionStart - found[0].length + found[1].length, end: textarea.selectionStart, query: found[2] };
+    showMessage('正在寻找用户...');
+    const currentMatch = match;
     window.clearTimeout(timer);
     const currentRequest = ++requestId;
     timer = window.setTimeout(async () => {
       try {
-        const response = await fetch(`${getValidUrl('users/search-mention')}?q=${encodeURIComponent(match.query)}`, { headers: apiHeaders() });
-        if (response.ok && currentRequest === requestId) render(await response.json());
-      } catch { if (currentRequest === requestId) hide(); }
-    }, 100);
+          const response = await fetch(`${getValidUrl('api/users/search-mention')}?q=${encodeURIComponent(currentMatch.query)}`, { headers: apiHeaders() });
+        if (!response.ok) throw new Error(`Mention search returned ${response.status}`);
+        if (currentRequest === requestId) render(await response.json());
+      } catch { if (currentRequest === requestId) showMessage('暂时无法加载用户'); }
+    }, 80);
   };
   const onKeydown = (event) => {
     if (menu.classList.contains('hidden')) return;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      if (!items.length) return;
+      if (!items.length) { event.preventDefault(); return; }
       event.preventDefault();
       activeIndex = (activeIndex + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
       menu.querySelectorAll('.mention-user-item').forEach((button) => {

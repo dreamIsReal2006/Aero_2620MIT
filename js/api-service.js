@@ -3508,10 +3508,24 @@ function positionMentionMenu(input) {
 }
 
 function closeMentionMenu() {
+    mentionPickerState.requestId += 1;
+    window.clearTimeout(mentionPickerState.timer);
     mentionPickerState.match = null;
     mentionPickerState.items = [];
     mentionPickerState.activeIndex = -1;
     mentionPickerState.menu?.classList.add('hidden');
+}
+
+function showMentionMenuMessage(message, input) {
+    const menu = mentionPickerState.menu;
+    if (!menu) return;
+    const status = document.createElement('div');
+    status.className = 'mention-empty-state';
+    status.setAttribute('role', 'status');
+    status.textContent = message;
+    menu.replaceChildren(status);
+    menu.classList.remove('hidden');
+    positionMentionMenu(input);
 }
 
 function selectMention(user) {
@@ -3554,8 +3568,12 @@ function renderMentionMenu(payload, input) {
             menu.appendChild(button);
         });
     });
-    menu.classList.toggle('hidden', !mentionPickerState.items.length);
-    if (mentionPickerState.items.length) positionMentionMenu(input);
+    if (mentionPickerState.items.length) {
+        menu.classList.remove('hidden');
+        positionMentionMenu(input);
+    } else {
+        showMentionMenuMessage('暂无关注用户', input);
+    }
 }
 
 function updateMentionPicker(input) {
@@ -3565,23 +3583,26 @@ function updateMentionPicker(input) {
         return;
     }
     mentionPickerState.match = match;
+    showMentionMenuMessage('正在寻找用户...', input);
     window.clearTimeout(mentionPickerState.timer);
     const requestId = ++mentionPickerState.requestId;
     mentionPickerState.timer = window.setTimeout(async () => {
         try {
             const response = await fetch(`${API_BASE}/users/search-mention?q=${encodeURIComponent(match.query)}`, { headers: authHeaders({ Accept: 'application/json' }) });
-            if (!response.ok || requestId !== mentionPickerState.requestId) return;
+            if (requestId !== mentionPickerState.requestId) return;
+            if (!response.ok) throw new Error(`Mention search returned ${response.status}`);
             renderMentionMenu(await response.json(), input);
         } catch (error) {
-            if (requestId === mentionPickerState.requestId) closeMentionMenu();
+            if (requestId === mentionPickerState.requestId) showMentionMenuMessage('暂时无法加载用户', input);
         }
-    }, 100);
+    }, 80);
 }
 
 function onMentionKeydown(event) {
     const menu = mentionPickerState.menu;
     if (!menu || menu.classList.contains('hidden')) return;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        if (!mentionPickerState.items.length) { event.preventDefault(); return; }
         event.preventDefault();
         const direction = event.key === 'ArrowDown' ? 1 : -1;
         mentionPickerState.activeIndex = (mentionPickerState.activeIndex + direction + mentionPickerState.items.length) % mentionPickerState.items.length;
