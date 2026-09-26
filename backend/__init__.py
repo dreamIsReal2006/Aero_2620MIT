@@ -13,6 +13,38 @@ logger = logging.getLogger(__name__)
 db = SQLAlchemy()  # creates database object
 
 
+def initialize_database(app):
+    """Run optional schema maintenance outside the web server startup path."""
+    with app.app_context():
+        db.session.execute(text("SELECT 1"))
+        db.create_all()
+        try:
+            db.session.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS language_preference VARCHAR(2)"
+            ))
+            db.session.commit()
+        except Exception as error:
+            db.session.rollback()
+            logger.warning("Skipping language_preference column check/alter: %s", error)
+        db.session.execute(text(
+            "UPDATE users SET role = 'admin' "
+            "WHERE is_admin IS TRUE AND role <> 'admin'"
+        ))
+        db.session.execute(text(
+            "UPDATE users SET is_admin = TRUE "
+            "WHERE role = 'admin' AND is_admin IS NOT TRUE"
+        ))
+        db.session.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_messages_conversation "
+            "ON messages (sender_id, recipient_id, created_at DESC)"
+        ))
+        db.session.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_messages_reverse_conversation "
+            "ON messages (recipient_id, sender_id, created_at DESC)"
+        ))
+        db.session.commit()
+
+
 def create_app():
     base_dir = Path(__file__).resolve().parent.parent
     app = Flask(
@@ -156,42 +188,6 @@ def create_app():
     from backend.notification import routes as notification_routes
 
     app.register_blueprint(notification_bp)
-
-    try:
-        with app.app_context():
-            db.session.execute(text("SELECT 1"))
-            db.create_all()
-            try:
-                db.session.execute(text(
-                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS language_preference VARCHAR(2)"
-                ))
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                logger.warning(f"Skipping language_preference column check/alter: {e}")
-            db.session.execute(text(
-                "UPDATE users SET role = 'admin' "
-                "WHERE is_admin IS TRUE AND role <> 'admin'"
-            ))
-            db.session.execute(text(
-                "UPDATE users SET is_admin = TRUE "
-                "WHERE role = 'admin' AND is_admin IS NOT TRUE"
-            ))
-            db.session.execute(text(
-                "CREATE INDEX IF NOT EXISTS idx_messages_conversation "
-                "ON messages (sender_id, recipient_id, created_at DESC)"
-            ))
-            db.session.execute(text(
-                "CREATE INDEX IF NOT EXISTS idx_messages_reverse_conversation "
-                "ON messages (recipient_id, sender_id, created_at DESC)"
-            ))
-            db.session.commit()
-    except Exception:
-        logger.error(
-            "Supabase PostgreSQL connection or schema initialization failed",
-            exc_info=True,
-        )
-        raise
 
     from backend.admin import admin_bp
     from backend.admin import routes as admin_routes

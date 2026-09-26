@@ -53,3 +53,13 @@ app.include_router(router)
 # Keep every existing Flask blueprint and static route reachable at its exact
 # path while individual domains are migrated to native FastAPI routers.
 app.mount("/", WSGIMiddleware(flask_app))
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", "10000")),
+    )
