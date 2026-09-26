@@ -572,11 +572,28 @@
         document.getElementById('tab-following')?.addEventListener('click', () => loadPosts('following'));
         const routeParams = new URLSearchParams(window.location.search);
         const initialFeedType = routeParams.get('tab') === 'following' ? 'following' : 'for_you';
+        const profilePath = window.location.pathname.match(/^\/profile\/([^/]+)\/?$/);
+        const hashtagPath = window.location.pathname.match(/^\/hashtag\/([^/]+)\/?$/);
+        if (profilePath && !routeParams.has('user')) {
+            routeParams.set('user', decodeURIComponent(profilePath[1]));
+            history.replaceState({}, '', `${window.location.pathname}?${routeParams.toString()}`);
+        }
         const sharedProfile = (routeParams.get('user') || routeParams.get('profile') || '').trim();
         const legacyProfile = window.location.hash.match(/^#profile\/(\d+)$/);
-        if (sharedProfile) navigate('profile', { userId: /^\d+$/.test(sharedProfile) ? Number(sharedProfile) : sharedProfile });
+        if (hashtagPath) {
+            navigate('main');
+            window.AeroHashtags?.showPage(decodeURIComponent(hashtagPath[1]), false);
+        }
+        else if (sharedProfile) navigate('profile', { userId: /^\d+$/.test(sharedProfile) ? Number(sharedProfile) : sharedProfile });
         else if (legacyProfile) navigate('profile', { userId: Number(legacyProfile[1]) });
         else navigate('main');
+        window.addEventListener('popstate', () => {
+            const currentHashtag = window.location.pathname.match(/^\/hashtag\/([^/]+)\/?$/);
+            if (currentHashtag) {
+                navigate('main');
+                window.AeroHashtags?.showPage(decodeURIComponent(currentHashtag[1]), false);
+            } else window.AeroAPI?.renderFeed('for_you');
+        });
         setActiveFeedTab(initialFeedType);
         setFabAuthState(Boolean(localStorage.getItem('aero_token')));
         setupScrollPerformance();

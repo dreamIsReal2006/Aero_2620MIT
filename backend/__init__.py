@@ -131,6 +131,9 @@ def create_app():
         Mute,
         ChatGroup,
         ChatGroupMember,
+        Hashtag,
+        PostHashtag,
+        UserHashtagInterest,
     )
 
     from backend.auth import auth_bp

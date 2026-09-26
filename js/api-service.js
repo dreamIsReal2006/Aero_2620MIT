@@ -160,28 +160,80 @@ function safeRegex(value) {
 
 function renderMentionText(value) {
     const escaped = escapeHtml(value ?? '');
-    return escaped.replace(/(^|[^A-Za-z0-9_])@([A-Za-z0-9_]{1,50})\b/g, '$1<a href="#" class="mention-tag" data-mention-username="$2">@$2</a>');
+    return escaped.replace(/(^|[^A-Za-z0-9_])@([A-Za-z0-9_.-]{1,50})|(^|[\s([{])#([\p{L}\p{N}_][\p{L}\p{N}_.-]{0,99})/gu,
+        (match, mentionPrefix, username, hashtagPrefix, hashtag) => {
+            if (username) {
+                const profilePath = `/profile/${encodeURIComponent(username)}`;
+                return `${mentionPrefix}<a href="${escapeHtml(profilePath)}" class="mention-link mention-tag" data-mention-username="${escapeHtml(username)}">@${escapeHtml(username)}</a>`;
+            }
+            const topicPath = `/hashtag/${encodeURIComponent(hashtag)}`;
+            return `${hashtagPrefix}<a href="${escapeHtml(topicPath)}" class="hashtag-link" data-hashtag="${escapeHtml(hashtag)}">#${escapeHtml(hashtag)}</a>`;
+        });
 }
 
 window.AeroMentionText = renderMentionText;
 
+async function showHashtagPage(tag, updateHistory = true) {
+    const normalizedTag = String(tag || '').replace(/^#/, '').trim();
+    const feed = document.getElementById('posts-feed');
+    if (!normalizedTag || !feed) return;
+    if (updateHistory) history.pushState({}, '', `/hashtag/${encodeURIComponent(normalizedTag)}`);
+    feed.innerHTML = `<header class="hashtag-topic-header"><button type="button" class="hashtag-topic-back">Back to feed</button><h1>#${escapeHtml(normalizedTag)}</h1></header><div class="hashtag-topic-posts" role="feed" aria-live="polite"><p class="hashtag-topic-state">Loading posts...</p></div>`;
+    feed.querySelector('.hashtag-topic-back')?.addEventListener('click', () => {
+        history.pushState({}, '', '/');
+        AeroAPI.renderFeed('for_you');
+    });
+    try {
+        const response = await fetch(`${API_BASE}/hashtags/${encodeURIComponent(normalizedTag)}/posts?limit=50`, { headers: authHeaders() });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.message || 'Unable to load hashtag posts');
+        const list = feed.querySelector('.hashtag-topic-posts');
+        if (!list) return;
+        if (!payload.posts?.length) { list.innerHTML = '<p class="hashtag-topic-state">No posts with this hashtag yet.</p>'; return; }
+        list.replaceChildren(...payload.posts.map((post) => {
+            const article = document.createElement('article');
+            article.className = 'post-card glass-card liquid-glass liquid-glass-interactive';
+            const author = document.createElement('strong');
+            author.className = 'post-author';
+            author.textContent = `@${post.username || 'User'}`;
+            const content = document.createElement('div');
+            content.className = 'post-content';
+            content.innerHTML = renderMentionText(post.content || '');
+            article.append(author, content);
+            return article;
+        }));
+    } catch (error) {
+        const state = feed.querySelector('.hashtag-topic-state');
+        if (state) state.textContent = error.message || 'Unable to load hashtag posts.';
+    }
+}
+
+window.AeroHashtags = { showPage: showHashtagPage };
+
 document.addEventListener('click', async (event) => {
+    if (!(event.target instanceof Element)) return;
     const mention = event.target.closest('.mention-tag');
-    if (!mention) return;
+    const hashtag = event.target.closest('.hashtag-link');
+    if (!mention && !hashtag) return;
     event.preventDefault();
+    event.stopPropagation();
+    if (hashtag) {
+        showHashtagPage(hashtag.dataset.hashtag || hashtag.textContent.slice(1));
+        return;
+    }
     const username = mention.dataset.mentionUsername || '';
     if (!username) return;
     try {
-        const response = await fetch(`${API_BASE}/search?q=${encodeURIComponent(username)}`, {
+        const response = await fetch(`${API_BASE}/users/profile?username=${encodeURIComponent(username)}`, {
             headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
         });
         const payload = await response.json().catch(() => ({}));
-        const user = (payload.users || []).find((item) => String(item.username || '').toLowerCase() === username.toLowerCase());
-        if (user?.id) window.navigateToUserProfile?.(Number(user.id));
+        if (payload.user?.id) window.navigateToUserProfile?.(Number(payload.user.id));
+        else throw new Error('Profile not found');
     } catch (error) {
         window.showNotice?.('Unable to open this profile.', 'error');
     }
-});
+}, true);
 
 function formatRelativeTime(timestamp) {
     if (timestamp === null || timestamp === undefined || timestamp === '') return 'Just now';
@@ -2533,6 +2585,26 @@ const AeroAPI = {
                     }
                 }, { threshold: 0.6 });
                 observer.observe(postEl);
+                if (feedTypeState === 'for_you' && localStorage.getItem('aero_token')) {
+                    let dwellTimer;
+                    let dwellRecorded = false;
+                    const dwellObserver = new IntersectionObserver(([entry]) => {
+                        if (entry.isIntersecting && !dwellRecorded && !dwellTimer) {
+                            dwellTimer = window.setTimeout(() => {
+                                dwellRecorded = true;
+                                fetch(`${API_BASE}/posts/${post.id}/dwell`, {
+                                    method: 'POST',
+                                    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ seconds: 3 })
+                                }).catch(() => {});
+                            }, 3000);
+                        } else if (!entry.isIntersecting && dwellTimer) {
+                            window.clearTimeout(dwellTimer);
+                            dwellTimer = null;
+                        }
+                    }, { threshold: 0.6 });
+                    dwellObserver.observe(postEl);
+                }
             }
             const header = document.createElement('div');
             header.className = 'post-header';
@@ -3478,9 +3550,11 @@ const mentionPickerState = { menu: null, timer: null, requestId: 0, items: [], a
 function mentionAtCaret(input) {
     if (input.selectionStart !== input.selectionEnd) return null;
     const prefix = input.value.slice(0, input.selectionStart);
-    const match = prefix.match(/(^|[\s([{])@([A-Za-z0-9_]*)$/);
+    const match = prefix.match(/(^|[\s([{])([@#])([\p{L}\p{N}_.-]*)$/u);
     if (!match) return null;
-    return { start: input.selectionStart - match[0].length + match[1].length, end: input.selectionStart, query: match[2] };
+    const kind = match[2] === '@' ? 'mention' : 'hashtag';
+    if (kind === 'mention' && !/^[A-Za-z0-9_.-]*$/.test(match[3])) return null;
+    return { start: input.selectionStart - match[0].length + match[1].length, end: input.selectionStart, query: match[3], kind };
 }
 
 function positionMentionMenu(input) {
@@ -3528,11 +3602,11 @@ function showMentionMenuMessage(message, input) {
     positionMentionMenu(input);
 }
 
-function selectMention(user) {
+function selectMention(item) {
     const input = document.getElementById('modal-post-input');
     const match = mentionPickerState.match;
-    if (!input || !match || !user?.username) return;
-    const insertion = `@${user.username} `;
+    if (!input || !match || !item) return;
+    const insertion = match.kind === 'mention' ? `@${item.user.username} ` : `#${item.tag} `;
     input.value = `${input.value.slice(0, match.start)}${insertion}${input.value.slice(match.end)}`;
     const cursor = match.start + insertion.length;
     input.focus();
@@ -3541,9 +3615,44 @@ function selectMention(user) {
     updateCreatePostState();
 }
 
-function renderMentionMenu(payload, input) {
+function renderMentionMenu(payload, input, currentMatch) {
     const menu = mentionPickerState.menu;
     if (!menu) return;
+    if (currentMatch.kind === 'hashtag') {
+        const tags = Array.isArray(payload.hashtags) ? payload.hashtags : [];
+        const exact = tags.some(item => item.tag.toLowerCase() === currentMatch.query.toLowerCase());
+        mentionPickerState.items = [
+            ...(currentMatch.query && !exact ? [{ tag: currentMatch.query, create: true }] : []),
+            ...tags.map(item => ({ tag: item.tag, postCount: item.post_count, create: false }))
+        ];
+        mentionPickerState.activeIndex = mentionPickerState.items.length ? 0 : -1;
+        menu.replaceChildren();
+        mentionPickerState.items.forEach((item, index) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `mention-user-item${index === mentionPickerState.activeIndex ? ' is-active' : ''}`;
+            button.dataset.mentionIndex = String(index);
+            button.setAttribute('role', 'option');
+            button.setAttribute('aria-selected', String(index === mentionPickerState.activeIndex));
+            const label = document.createElement('strong');
+            label.textContent = item.create ? `创建标签 #${item.tag}` : `#${item.tag}`;
+            button.appendChild(label);
+            if (!item.create) {
+                const count = document.createElement('small');
+                count.className = 'mention-following-badge';
+                count.textContent = `${item.postCount || 0} 帖子`;
+                button.appendChild(count);
+            }
+            button.addEventListener('mousedown', event => event.preventDefault());
+            button.addEventListener('click', () => selectMention(item));
+            menu.appendChild(button);
+        });
+        if (mentionPickerState.items.length) {
+            menu.classList.remove('hidden');
+            positionMentionMenu(input);
+        } else showMentionMenuMessage('暂无热门标签', input);
+        return;
+    }
     const groups = [
         { label: 'Following', users: payload.friends || [] },
         { label: 'Other people', users: payload.others || [] }
@@ -3564,7 +3673,7 @@ function renderMentionMenu(payload, input) {
             button.dataset.mentionIndex = String(mentionPickerState.items.findIndex(item => item.user.id === user.id));
             button.innerHTML = `${user.avatar_url ? `<img src="${escapeHtml(user.avatar_url)}" alt="">` : '<span class="mention-avatar-fallback" aria-hidden="true"></span>'}<span class="mention-user-copy"><strong>@${escapeHtml(user.username)}</strong><small>${escapeHtml(user.display_name || user.username)}</small></span>${group.label === 'Following' ? '<span class="mention-following-badge">Following</span>' : ''}`;
             button.addEventListener('mousedown', event => event.preventDefault());
-            button.addEventListener('click', () => selectMention(user));
+            button.addEventListener('click', () => selectMention({ user }));
             menu.appendChild(button);
         });
     });
@@ -3572,7 +3681,7 @@ function renderMentionMenu(payload, input) {
         menu.classList.remove('hidden');
         positionMentionMenu(input);
     } else {
-        showMentionMenuMessage('暂无关注用户', input);
+        showMentionMenuMessage(currentMatch.query ? '没有匹配的用户' : '暂无关注用户', input);
     }
 }
 
@@ -3584,16 +3693,18 @@ function updateMentionPicker(input) {
     }
     mentionPickerState.match = match;
     showMentionMenuMessage('正在寻找用户...', input);
+    const currentMatch = match;
     window.clearTimeout(mentionPickerState.timer);
     const requestId = ++mentionPickerState.requestId;
     mentionPickerState.timer = window.setTimeout(async () => {
         try {
-            const response = await fetch(`${API_BASE}/users/search-mention?q=${encodeURIComponent(match.query)}`, { headers: authHeaders({ Accept: 'application/json' }) });
+            const endpoint = currentMatch.kind === 'mention' ? 'users/search-mention' : 'hashtags/search';
+            const response = await fetch(`${API_BASE}/${endpoint}?q=${encodeURIComponent(currentMatch.query)}`, { headers: authHeaders({ Accept: 'application/json' }) });
             if (requestId !== mentionPickerState.requestId) return;
             if (!response.ok) throw new Error(`Mention search returned ${response.status}`);
-            renderMentionMenu(await response.json(), input);
+            renderMentionMenu(await response.json(), input, currentMatch);
         } catch (error) {
-            if (requestId === mentionPickerState.requestId) showMentionMenuMessage('暂时无法加载用户', input);
+            if (requestId === mentionPickerState.requestId) showMentionMenuMessage(currentMatch.kind === 'mention' ? '暂时无法加载用户' : '暂时无法加载标签', input);
         }
     }, 80);
 }
@@ -3614,7 +3725,7 @@ function onMentionKeydown(event) {
         menu.querySelector('.mention-user-item.is-active')?.scrollIntoView({ block: 'nearest' });
     } else if (event.key === 'Enter' && mentionPickerState.activeIndex >= 0) {
         event.preventDefault();
-        selectMention(mentionPickerState.items[mentionPickerState.activeIndex].user);
+        selectMention(mentionPickerState.items[mentionPickerState.activeIndex]);
     } else if (event.key === 'Escape') {
         closeMentionMenu();
     }

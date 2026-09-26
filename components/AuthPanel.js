@@ -12,8 +12,8 @@ export default function AuthPanel({ onAuthenticated }) {
   const submit = async (event) => {
     event.preventDefault(); setError(''); setLoading(true);
     try {
-      const path = mode === 'signin' ? '/auth/signin' : '/auth/signup';
-      const response = await fetch(getValidUrl(path.slice(1)), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      const path = mode === 'signin' ? 'api/auth/signin' : 'api/auth/signup';
+      const response = await fetch(getValidUrl(path), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message || data.error || 'Unable to authenticate');
       const token = data.token || data.access_token || data.accessToken;

@@ -5,7 +5,7 @@ from backend.auth.routes import optional_token, token_required
 from backend.interact import interact_bp
 from backend.models import Post, Like, Comment, CommentLike, Notification
 from backend.mentions import add_mention_notifications
-from backend.feed.services import update_interest_embedding
+from backend.feed.services import update_hashtag_interests, update_interest_embedding
 
 
 @interact_bp.route("/test", methods=["GET"])
@@ -57,6 +57,7 @@ def like_post(current_user, post_id):
     db.session.commit()
     if existing_like is None:
         update_interest_embedding(user_id, post.id)
+        update_hashtag_interests(user_id, post.id)
 
     # Count the current likes
     like_count = Like.query.filter_by(
@@ -171,6 +172,7 @@ def create_comment(current_user, post_id):
         ))
     db.session.commit()
     update_interest_embedding(user_id, post.id)
+    update_hashtag_interests(user_id, post.id)
 
     return jsonify({
         "message": "Comment created successfully",
@@ -236,6 +238,8 @@ def create_reply(current_user, comment_id):
     db.session.add(reply)
     add_mention_notifications(content, current_user, parent_comment.post_id, "comment")
     db.session.commit()
+    update_interest_embedding(user_id, parent_comment.post_id)
+    update_hashtag_interests(user_id, parent_comment.post_id)
 
     return jsonify({
         "message": "Reply created successfully",

@@ -1,15 +1,80 @@
 import json
 import logging
+import re
 import threading
 
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from backend import db
+from backend.models import Hashtag, PostHashtag, UserHashtagInterest
 
 logger = logging.getLogger(__name__)
 _embedding_model = None
 _embedding_model_lock = threading.Lock()
+HASHTAG_PATTERN = re.compile(r"(?<![A-Za-z0-9_])#([\w][\w.-]{0,99})", re.UNICODE)
+
+
+def extract_hashtags(content):
+    return {match.group(1).casefold() for match in HASHTAG_PATTERN.finditer(content or "")}
+
+
+def index_post_hashtags(post_id, content):
+    for tag in extract_hashtags(content):
+        db.session.execute(
+            pg_insert(Hashtag).values(tag=tag).on_conflict_do_nothing(index_elements=[Hashtag.tag])
+        )
+        hashtag_id = db.session.query(Hashtag.id).filter_by(tag=tag).scalar()
+        if hashtag_id:
+            db.session.execute(
+                pg_insert(PostHashtag).values(post_id=post_id, hashtag_id=hashtag_id)
+                .on_conflict_do_nothing(index_elements=[PostHashtag.post_id, PostHashtag.hashtag_id])
+            )
+
+
+def update_hashtag_interests(user_id, post_id, amount=0.2):
+    try:
+        hashtag_ids = db.session.query(PostHashtag.hashtag_id).filter_by(post_id=post_id).all()
+        for (hashtag_id,) in hashtag_ids:
+            db.session.execute(
+                pg_insert(UserHashtagInterest)
+                .values(user_id=user_id, hashtag_id=hashtag_id, weight=amount)
+                .on_conflict_do_update(
+                    index_elements=[UserHashtagInterest.user_id, UserHashtagInterest.hashtag_id],
+                    set_={
+                        "weight": func.least(UserHashtagInterest.weight + amount, 1.0),
+                        "updated_at": func.now(),
+                    },
+                )
+            )
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Unable to update hashtag interests for user %s", user_id)
+
+
+def get_for_you_candidate_ids(user_id, limit):
+    return db.session.execute(
+        text(
+            "SELECT p.id FROM posts p "
+            "JOIN users u ON u.id = :user_id "
+            "LEFT JOIN LATERAL ("
+            " SELECT AVG(interest.weight) AS match_score "
+            " FROM post_hashtags post_tag "
+            " JOIN user_hashtag_interests interest ON interest.hashtag_id = post_tag.hashtag_id "
+            " WHERE post_tag.post_id = p.id AND interest.user_id = u.id"
+            ") tag_score ON TRUE "
+            "ORDER BY ("
+            " 0.5 * CASE WHEN p.embedding IS NULL OR u.interest_embedding IS NULL THEN 0.0 "
+            " ELSE GREATEST(1.0 - (p.embedding <=> u.interest_embedding), 0.0) END "
+            " + 0.3 * COALESCE(tag_score.match_score, 0.0) "
+            " + 0.2 * EXP(-GREATEST(EXTRACT(EPOCH FROM (NOW() - p.created_at)), 0.0) / 172800.0)"
+            ") DESC, p.created_at DESC "
+            "LIMIT :limit"
+        ),
+        {"user_id": user_id, "limit": max(int(limit), 1)},
+    ).scalars().all()
 
 
 def _get_embedding_model():

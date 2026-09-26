@@ -23,6 +23,8 @@ from backend.models import (
     Message,
     Notification,
     Post,
+    Hashtag,
+    PostHashtag,
     Report,
     User,
     UserInteraction,
@@ -32,7 +34,13 @@ from backend.email_service import send_mention_email
 from backend.privacy import visible_author_ids as get_visible_author_ids
 from backend.presence import is_user_online
 from backend.storage import upload_file_to_supabase
-from backend.feed.services import generate_post_embedding, save_post_embedding
+from backend.feed.services import (
+    generate_post_embedding,
+    get_for_you_candidate_ids,
+    index_post_hashtags,
+    save_post_embedding,
+    update_hashtag_interests,
+)
 
 ALLOWED_MEDIA_TYPES = {
     "jpg": "image/", "jpeg": "image/", "png": "image/", "webp": "image/", "gif": "image/",
@@ -65,10 +73,7 @@ def apply_diversity_filter(posts):
 
 
 def _for_you_candidate_ids(user_id, limit):
-    return db.session.execute(
-        text("SELECT id FROM get_for_you_feed(:user_id, :limit_num)"),
-        {"user_id": user_id, "limit_num": limit},
-    ).scalars().all()
+    return get_for_you_candidate_ids(user_id, limit)
 
 
 def post_payload(post, current_user_id=None):
@@ -233,6 +238,40 @@ def search(current_user):
         "users": [{"id": user.id, "username": user.username, "email": user.email, "avatar_url": user.avatar_url or ""} for user in users],
         "posts": [{"id": post.id, "content": post.content, "username": post.author.username} for post in posts],
     })
+
+
+@feed_bp.get("/hashtags/search")
+@optional_token
+def search_hashtags(current_user):
+    query = str(request.args.get("q", "")).strip().lstrip("#")[:100]
+    visible_ids = visible_posts_query(current_user).with_entities(Post.id).subquery()
+    counts = db.session.query(
+        Hashtag.tag.label("tag"),
+        func.count(PostHashtag.post_id).label("post_count"),
+    ).join(PostHashtag, PostHashtag.hashtag_id == Hashtag.id).filter(
+        PostHashtag.post_id.in_(visible_ids)
+    ).group_by(Hashtag.id, Hashtag.tag)
+    if query:
+        counts = counts.filter(Hashtag.tag.ilike(f"%{query}%"))
+    results = counts.order_by(func.count(PostHashtag.post_id).desc(), func.lower(Hashtag.tag)).limit(5).all()
+    return jsonify({"hashtags": [{"tag": tag, "post_count": count} for tag, count in results]}), 200
+
+
+@feed_bp.get("/hashtags/<string:tag>/posts")
+@optional_token
+def get_hashtag_posts(current_user, tag):
+    normalized_tag = str(tag or "").strip().lstrip("#").casefold()
+    if not normalized_tag:
+        return jsonify({"message": "A hashtag is required", "posts": []}), 400
+    limit = min(max(request.args.get("limit", 20, type=int) or 20, 1), 50)
+    posts = visible_posts_query(current_user).join(
+        PostHashtag, PostHashtag.post_id == Post.id
+    ).join(
+        Hashtag, Hashtag.id == PostHashtag.hashtag_id
+    ).filter(
+        func.lower(Hashtag.tag) == normalized_tag
+    ).order_by(Post.created_at.desc(), Post.id.desc()).limit(limit).all()
+    return jsonify({"tag": normalized_tag, "posts": [post_payload(post, current_user.id if current_user else None) for post in posts]}), 200
 
 
 @feed_bp.get("/posts")
@@ -421,6 +460,7 @@ def create_post(current_user):
     )
     db.session.add(post)
     db.session.flush()
+    index_post_hashtags(post.id, content)
     mentioned_users = add_mention_notifications(content, current_user, post.id, "post")
     db.session.commit()
     for mentioned_user in mentioned_users:
@@ -589,6 +629,24 @@ def recommendation_feedback(current_user):
         db.session.add(UserInteraction(user_id=current_user.id, post_id=post_id, type="not_interested"))
         db.session.commit()
     return jsonify({"feedback": "not_interested"}), 200
+
+
+@feed_bp.post("/posts/<int:post_id>/dwell")
+@token_required
+def record_post_dwell(current_user, post_id):
+    post = db.session.get(Post, post_id)
+    if not post:
+        return jsonify({"message": "Post not found"}), 404
+    try:
+        seconds = float((request.get_json(silent=True) or {}).get("seconds", 0))
+    except (TypeError, ValueError):
+        seconds = 0
+    if seconds < 3:
+        return jsonify({"recorded": False}), 200
+    db.session.add(UserInteraction(user_id=current_user.id, post_id=post_id, type="dwell"))
+    db.session.commit()
+    update_hashtag_interests(current_user.id, post_id, min(seconds / 60 * 0.2, 0.2))
+    return jsonify({"recorded": True}), 201
 
 
 @feed_bp.post("/posts/<int:post_id>/share-stats")

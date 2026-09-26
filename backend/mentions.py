@@ -3,7 +3,7 @@ import re
 from backend import db
 from backend.models import Notification, User
 
-MENTION_PATTERN = re.compile(r"(?<![A-Za-z0-9_])@([A-Za-z0-9_]{1,50})")
+MENTION_PATTERN = re.compile(r"(?<![A-Za-z0-9_])@([A-Za-z0-9_.-]{1,50})")
 
 
 def add_mention_notifications(content, actor, post_id, context):

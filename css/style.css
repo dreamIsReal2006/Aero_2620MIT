@@ -3584,6 +3584,12 @@ body.dark-mode .comment-composer input::placeholder {
 .mention-user-copy strong { color: #20242a; font-size: 13px; }
 .mention-user-copy small { color: #73777d; font-size: 12px; }
 .mention-following-badge { color: #2563eb; font-size: 11px; font-weight: 600; }
+.mention-link, .hashtag-link { color: #1d9bf0; font-weight: 600; text-decoration: none; cursor: pointer; }
+.mention-link:hover, .hashtag-link:hover { color: #1476ba; text-decoration: underline; }
+.hashtag-topic-header { display: flex; align-items: center; gap: 16px; margin: 0 0 16px; padding: 4px; }
+.hashtag-topic-header h1 { margin: 0; color: #1d9bf0; font-size: 1.25rem; font-weight: 700; }
+.hashtag-topic-back { border: 0; background: transparent; color: #1d9bf0; cursor: pointer; font: inherit; }
+.hashtag-topic-state { padding: 18px; color: #73777d; text-align: center; }
 
 .create-post-header,
 .create-post-user,
