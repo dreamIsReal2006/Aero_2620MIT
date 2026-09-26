@@ -118,7 +118,7 @@ function openThreadsMediaViewer(mediaList, startIndex = 0) {
             media.controls = true;
             media.autoplay = true;
             media.playsInline = true;
-            media.preload = 'metadata';
+            media.preload = 'none';
             media.play().catch(() => {});
         }
         stage.appendChild(media);
@@ -164,7 +164,7 @@ function renderMentionText(value) {
         (match, mentionPrefix, username, hashtagPrefix, hashtag) => {
             if (username) {
                 const profilePath = `/profile/${encodeURIComponent(username)}`;
-                return `${mentionPrefix}<a href="${escapeHtml(profilePath)}" class="mention-link mention-tag" data-mention-username="${escapeHtml(username)}">@${escapeHtml(username)}</a>`;
+                return `${mentionPrefix}<a href="${escapeHtml(profilePath)}" class="mention-link mention-tag" data-username="${escapeHtml(username)}" data-mention-username="${escapeHtml(username)}">@${escapeHtml(username)}</a>`;
             }
             const topicPath = `/hashtag/${encodeURIComponent(hashtag)}`;
             return `${hashtagPrefix}<a href="${escapeHtml(topicPath)}" class="hashtag-link" data-hashtag="${escapeHtml(hashtag)}">#${escapeHtml(hashtag)}</a>`;
@@ -221,14 +221,14 @@ document.addEventListener('click', async (event) => {
         showHashtagPage(hashtag.dataset.hashtag || hashtag.textContent.slice(1));
         return;
     }
-    const username = mention.dataset.mentionUsername || '';
+    const username = mention.dataset.username || mention.dataset.mentionUsername || '';
     if (!username) return;
     try {
         const response = await fetch(`${API_BASE}/users/profile?username=${encodeURIComponent(username)}`, {
             headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
         });
         const payload = await response.json().catch(() => ({}));
-        if (payload.user?.id) window.navigateToUserProfile?.(Number(payload.user.id));
+        if (response.ok && payload.user?.id) window.navigateToUserProfile?.(Number(payload.user.id));
         else throw new Error('Profile not found');
     } catch (error) {
         window.showNotice?.('Unable to open this profile.', 'error');
@@ -2764,27 +2764,25 @@ const AeroAPI = {
                 media.className = `post-media-container${mediaList.length > 1 ? ' post-media-carousel' : ''}`;
                 mediaList.forEach((mediaUrl, index) => {
                     const isVideo = /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(mediaUrl);
-                    const mediaElement = document.createElement(isVideo ? 'video' : 'img');
-                    mediaElement.className = 'post-media-item';
-                    mediaElement.alt = isVideo ? '' : 'Post media';
-                    mediaElement.loading = 'lazy';
-                    mediaElement.tabIndex = 0;
-                    mediaElement.setAttribute('role', 'button');
-                    mediaElement.setAttribute('aria-label', `Open media ${index + 1} of ${mediaList.length}`);
-                    mediaElement.dataset.hdrFallback = String(!window.AeroMediaCapabilities?.isHDRSupported());
                     if (isVideo) {
-                        mediaElement.controls = true;
-                        mediaElement.preload = 'metadata';
-                        mediaElement.playsInline = true;
-                        const source = document.createElement('source');
-                        source.src = mediaUrl;
-                        source.type = /\.mov(?:$|\?)/i.test(mediaUrl) ? 'video/quicktime' : /\.webm(?:$|\?)/i.test(mediaUrl) ? 'video/webm' : /\.m4v(?:$|\?)/i.test(mediaUrl) ? 'video/x-m4v' : 'video/mp4';
-                        mediaElement.appendChild(source);
+                        const playButton = document.createElement('button');
+                        playButton.type = 'button';
+                        playButton.className = 'post-media-item post-video-placeholder';
+                        playButton.setAttribute('aria-label', `Play video ${index + 1} of ${mediaList.length}`);
+                        playButton.innerHTML = '<span class="post-video-placeholder-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg></span><span class="post-video-placeholder-label">Play video</span>';
+                        playButton.addEventListener('click', event => { event.stopPropagation(); window.openThreadsMediaViewer(mediaList, index); });
+                        media.appendChild(playButton);
                     } else {
+                        const mediaElement = document.createElement('img');
+                        mediaElement.className = 'post-media-item';
+                        mediaElement.alt = 'Post media';
+                        mediaElement.loading = 'lazy';
+                        mediaElement.tabIndex = 0;
+                        mediaElement.setAttribute('role', 'button');
+                        mediaElement.setAttribute('aria-label', `Open media ${index + 1} of ${mediaList.length}`);
+                        mediaElement.dataset.hdrFallback = String(!window.AeroMediaCapabilities?.isHDRSupported());
                         mediaElement.src = mediaUrl;
-                    }
-                    const openMedia = () => window.openThreadsMediaViewer(mediaList, index);
-                    if (!isVideo) {
+                        const openMedia = () => window.openThreadsMediaViewer(mediaList, index);
                         mediaElement.addEventListener('click', openMedia);
                         mediaElement.addEventListener('keydown', event => {
                             if (event.key === 'Enter' || event.key === ' ') {
@@ -2792,8 +2790,8 @@ const AeroAPI = {
                                 openMedia();
                             }
                         });
+                        media.appendChild(mediaElement);
                     }
-                    media.appendChild(mediaElement);
                 });
                 postEl.appendChild(media);
             }

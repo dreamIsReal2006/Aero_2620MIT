@@ -195,9 +195,15 @@ def get_profile_by_username(current_user):
     limit = request.args.get('limit', 10, type=int)
     offset = request.args.get('offset', 0, type=int)
     username = str(request.args.get("username", "")).strip()
-    if not username:
-        return jsonify({"message": "A username is required"}), 400
-    user = User.query.filter(func.lower(User.username) == username.lower()).first()
+    user_id = request.args.get("id", type=int)
+    if user_id:
+        user = db.session.get(User, user_id)
+    elif username:
+        user = User.query.filter(func.lower(User.username) == username.lower()).first()
+        if not user:
+            user = User.query.filter(func.lower(User.display_name) == username.lower()).first()
+    else:
+        return jsonify({"message": "A username or user ID is required"}), 400
     if not user:
         return jsonify({"message": "User not found"}), 404
 
