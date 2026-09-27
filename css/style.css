@@ -2054,15 +2054,29 @@ body.dark-mode .search-shell.is-open .search-bar {
     padding: 12px;
     border-radius: var(--g2-radius-pill);
     z-index: 100;
-    height: 204px;
-    overflow: hidden;
+    height: auto;
+    min-height: 204px;
+    overflow: visible;
 }
-.dock-scroll-wrapper { display: flex; flex-direction: column; align-items: center; gap: 12px; overflow-y: auto; overflow-x: visible; width: 100%; padding: 4px; scroll-behavior: smooth; -ms-overflow-style: none; scrollbar-width: none; }
+.dock-scroll-wrapper { display: flex; flex-direction: column; align-items: center; gap: 12px; overflow: visible; width: 100%; padding: 4px; }
 .dock-scroll-wrapper::-webkit-scrollbar { display: none; }
 
 .dock-left { left: 32px; }
 .dock-right { right: 32px; }
 .dock-left, .dock-right { width: 72px; min-height: 204px; justify-content: flex-start; align-items: center; padding: 12px 8px; }
+.dock-right { max-height: calc(100vh - 120px); min-height: 0; }
+.dock-right .dock-scroll-wrapper {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.dock-right .dock-scroll-wrapper::-webkit-scrollbar { display: none; }
 
 .dock-btn, .dock-item, .icon-btn {
     width: 44px;
@@ -2105,6 +2119,26 @@ body.dark-mode .search-shell.is-open .search-bar {
     stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
+}
+
+.material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    font-size: 24px;
+    vertical-align: middle;
+    user-select: none;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.dock-item:hover .material-symbols-outlined,
+.dock-btn:hover .material-symbols-outlined,
+.nav-item:hover .material-symbols-outlined,
+.mobile-bottom-nav-item:hover .material-symbols-outlined {
+    transform: scale(1.1);
+}
+
+[data-theme="dark"] .material-symbols-outlined,
+.dark-mode .material-symbols-outlined {
+    color: #e3e3e3;
 }
 
 #history-dock-btn .dock-icon {
@@ -2632,6 +2666,54 @@ body.dark-mode .action-bar-capsule {
     animation: dockActivePulse .3s ease both;
 }
 @keyframes dockActivePulse { from { transform: scale(.95); } to { transform: scale(1.05); } }
+.dock-item.active::before,
+.dock-item.active::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 36px;
+    height: 36px;
+    margin: 0;
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(.8);
+    z-index: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+}
+.dock-item.active::before {
+    border: 1.5px solid rgba(59, 130, 246, .5);
+    background: rgba(59, 130, 246, .1);
+    animation: rippleCentered1 2.2s cubic-bezier(.2, .8, .4, 1) infinite;
+}
+.dock-item.active::after {
+    border: 1px solid rgba(59, 130, 246, .35);
+    animation: rippleCentered2 2.2s cubic-bezier(.2, .8, .4, 1) infinite;
+    animation-delay: .7s;
+}
+ .dock-item.active .material-symbols-outlined,
+.dock-item.active svg {
+    position: relative;
+    z-index: 1;
+}
+@keyframes rippleCentered1 {
+    0% { transform: translate(-50%, -50%) scale(.85); opacity: .8; }
+    50% { opacity: .4; }
+    100% { transform: translate(-50%, -50%) scale(1.35); opacity: 0; }
+}
+@keyframes rippleCentered2 {
+    0% { transform: translate(-50%, -50%) scale(.85); opacity: .7; }
+    50% { opacity: .3; }
+    100% { transform: translate(-50%, -50%) scale(1.45); opacity: 0; }
+}
+[data-theme="dark"] .dock-item.active::before,
+.dark-mode .dock-item.active::before { border-color: rgba(96, 165, 250, .8); background: rgba(96, 165, 250, .2); }
+[data-theme="dark"] .dock-item.active::after,
+.dark-mode .dock-item.active::after { border-color: rgba(96, 165, 250, .6); }
+@media (prefers-reduced-motion: reduce) {
+    .dock-item.active::before,
+    .dock-item.active::after { animation: none; transform: translate(-50%, -50%) scale(1.1); opacity: .3; }
+}
 @media (min-width: 769px) {
     .chat-back-btn,
     #chat-back-button { display: none !important; }

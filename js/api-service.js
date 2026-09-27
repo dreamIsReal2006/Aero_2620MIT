@@ -3185,12 +3185,11 @@ const AeroAPI = {
         });
         const rightDock = document.querySelector('.dock-right');
         const rightDockScroll = rightDock?.querySelector('.dock-scroll-wrapper');
-        const scrollDockTo = (top) => rightDockScroll?.scrollTo({ top, behavior: 'smooth' });
-        rightDock?.addEventListener('mousemove', (event) => {
-            const bounds = rightDock.getBoundingClientRect();
-            scrollDockTo(event.clientY - bounds.top >= bounds.height / 2 ? rightDockScroll.scrollHeight : 0);
-        });
-        rightDock?.addEventListener('mouseleave', () => scrollDockTo(0));
+        rightDockScroll?.addEventListener('wheel', (event) => {
+            if (rightDockScroll.scrollHeight <= rightDockScroll.clientHeight || event.deltaY === 0) return;
+            event.preventDefault();
+            rightDockScroll.scrollTop += event.deltaY;
+        }, { passive: false });
         const mobileMenuButton = document.getElementById('mobile-menu-btn');
         const mobileDrawer = document.getElementById('mobile-nav-drawer');
         const mobileBackdrop = document.getElementById('mobile-nav-backdrop');
