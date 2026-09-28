@@ -2211,6 +2211,15 @@ const AeroAPI = {
         }
     },
 
+    async getPost(postId) {
+        const res = await fetch(`${API_BASE}/posts/${encodeURIComponent(postId)}`, {
+            headers: authHeaders()
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || 'Unable to load post');
+        return data;
+    },
+
     async createPost(content, images = []) {
         try {
             const res = await fetch(`${API_BASE}/posts`, {

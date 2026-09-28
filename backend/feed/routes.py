@@ -32,7 +32,7 @@ from backend.models import (
 )
 from backend.mentions import add_mention_notifications
 from backend.email_service import send_mention_email
-from backend.privacy import visible_author_ids as get_visible_author_ids
+from backend.privacy import can_view_user_content, visible_author_ids as get_visible_author_ids
 from backend.presence import is_user_online
 from backend.storage import upload_file_to_supabase
 from backend.feed.services import (
@@ -444,6 +444,15 @@ def upload_media(current_user):
         "hdr_candidate": extension in HDR_IMAGE_EXTENSIONS or extension in HDR_VIDEO_EXTENSIONS,
         "original_preserved": True,
     }), 201
+
+
+@feed_bp.get("/posts/<int:post_id>")
+@optional_token
+def get_post(current_user, post_id):
+    post = db.session.get(Post, post_id)
+    if not post or not can_view_user_content(current_user, post.author):
+        return jsonify({"message": "Post not found"}), 404
+    return jsonify(post_payload(post, current_user.id if current_user else None)), 200
 
 
 @feed_bp.post("/posts")

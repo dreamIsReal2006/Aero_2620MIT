@@ -3,10 +3,14 @@
         main: 'view-main',
         shorts: 'view-shorts',
         chat: 'view-chat',
-        profile: 'profile-view'
+        profile: 'profile-view',
+        post: 'post-detail-view'
     };
     let activeView = 'main';
     let activeProfileUserId = null;
+    let postDetailReturn = { view: 'main', userId: null };
+    let postDetailRequestId = 0;
+    let postDetailHistoryEntry = false;
     let isAuthenticated = Boolean(localStorage.getItem('aero_token'));
     let profileEditorUser = null;
     let profileEditorFile = null;
@@ -204,7 +208,7 @@
 
     function setActiveNavItem(view) {
         document.querySelectorAll('.dock-item').forEach((element) => element.classList.remove('active'));
-        if (view === 'profile') return;
+        if (view === 'profile' || view === 'post') return;
         const navId = view === 'main' ? 'home-nav-btn' : view === 'shorts' ? 'video-dock-btn' : 'chat-dock-btn';
         document.getElementById(navId)?.classList.add('active');
     }
@@ -248,7 +252,7 @@
         const isChat = view === 'chat';
         if (view === 'shorts') {
             fab.style.setProperty('display', 'flex', 'important');
-        } else if (view === 'profile') {
+        } else if (view === 'profile' || view === 'post') {
             fab.style.setProperty('display', 'none', 'important');
         } else {
             fab.style.setProperty('display', isChat ? 'none' : 'flex', 'important');
@@ -460,18 +464,23 @@
                 });
             }
 
-            container.innerHTML = posts.length ? posts.map((post) => `
-                <article class="post-card glass-card liquid-glass liquid-glass-interactive pop-in g2-card">
+            container.innerHTML = posts.length ? posts.map((post) => {
+                const postId = Number(post.id);
+                if (!Number.isInteger(postId) || postId <= 0) return '';
+                const username = String(user.username || 'user').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+                return `
+                <article class="post-card profile-post-card glass-card liquid-glass liquid-glass-interactive pop-in g2-card" data-post-id="${postId}" tabindex="0" role="link" aria-label="Open post by @${username}">
                     <div class="post-header">
                         <div class="post-author-identity">
-                            <span class="post-avatar ${user.is_online ? 'is-online' : ''}"><img src="${avatar || avatarValue.fallbackUrl}" data-avatar-fallback="${avatarValue.fallbackUrl}" alt="@${(user.username || 'User').replace(/"/g, '&quot;')}" onerror="this.onerror=null;this.src=this.dataset.avatarFallback" /></span>
-                            <span class="post-author">@${user.username || 'user'}${profileRoleBadge(user.role)}</span>
+                            <span class="post-avatar ${user.is_online ? 'is-online' : ''}"><img src="${avatar || avatarValue.fallbackUrl}" data-avatar-fallback="${avatarValue.fallbackUrl}" alt="@${username}" onerror="this.onerror=null;this.src=this.dataset.avatarFallback" /></span>
+                            <span class="post-author">@${username}${profileRoleBadge(user.role)}</span>
                             <time class="post-relative-time">${window.AeroFormatRelativeTime?.(post.created_at) || new Date(post.created_at || Date.now()).toLocaleDateString()}</time>
                         </div>
                     </div>
                     <div class="post-content">${window.AeroMentionText?.(post.content || '') || (post.content || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]))}</div>
                 </article>
-            `).join('') : '<div class="post-card glass-card text-center"><p>No posts yet.</p></div>';
+            `;
+            }).join('') : '<div class="post-card glass-card text-center"><p>No posts yet.</p></div>';
             bindProfileTabs(profileUserId, user, avatar);
         } catch (error) {
             header.innerHTML = `
@@ -509,15 +518,244 @@
                 return;
             }
             container.innerHTML = items.map((item) => {
+                const postId = Number(item.post_id || item.post?.id || item.id);
+                if (!Number.isInteger(postId) || postId <= 0) return '';
                 const content = contentType === 'replies' ? item.content : item.content;
                 const summary = contentType === 'replies' ? `<small class="profile-content-context">On @${escape(item.post?.username)}: ${escape(item.post?.content)}</small>` : '';
                 const renderedContent = window.AeroMentionText?.(content) || escape(content);
                 const fallbackUrl = profileAvatarValue(user).fallbackUrl;
-                return `<article class="post-card glass-card liquid-glass liquid-glass-interactive pop-in g2-card"><div class="post-header"><div class="post-author-identity"><span class="post-avatar ${user.is_online ? 'is-online' : ''}"><img src="${escape(avatar || fallbackUrl)}" data-avatar-fallback="${fallbackUrl}" alt="@${escape(user.username)}" onerror="this.onerror=null;this.src=this.dataset.avatarFallback"></span><span class="post-author">@${escape(user.username)}${profileRoleBadge(user.role)}</span><time class="post-relative-time">${window.AeroFormatRelativeTime?.(item.created_at) || new Date(item.created_at || Date.now()).toLocaleDateString()}</time></div></div><div class="post-content">${renderedContent}</div>${summary}</article>`;
+                return `<article class="post-card profile-post-card glass-card liquid-glass liquid-glass-interactive pop-in g2-card" data-post-id="${postId}" tabindex="0" role="link" aria-label="Open post by @${escape(user.username)}"><div class="post-header"><div class="post-author-identity"><span class="post-avatar ${user.is_online ? 'is-online' : ''}"><img src="${escape(avatar || fallbackUrl)}" data-avatar-fallback="${fallbackUrl}" alt="@${escape(user.username)}" onerror="this.onerror=null;this.src=this.dataset.avatarFallback"></span><span class="post-author">@${escape(user.username)}${profileRoleBadge(user.role)}</span><time class="post-relative-time">${window.AeroFormatRelativeTime?.(item.created_at) || new Date(item.created_at || Date.now()).toLocaleDateString()}</time></div></div><div class="post-content">${renderedContent}</div>${summary}</article>`;
             }).join('');
         } catch (error) {
             container.innerHTML = `<div class="post-card glass-card text-center"><p>${error.message}</p></div>`;
         }
+    }
+
+    const escapePostDetail = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
+
+    function postDetailMediaUrl(value) {
+        const source = typeof value === 'string' ? value : value?.url || '';
+        if (!source || /^(https?:|data:|blob:)/i.test(source)) return source;
+        return `${window.AeroConfig.API_ORIGIN}${source.startsWith('/') ? source : `/${source}`}`;
+    }
+
+    function renderPostDetailComment(comment, ownerId, depth = 0) {
+        const avatar = profileAvatarValue(comment);
+        const username = escapePostDetail(comment.username || `user${comment.user_id}`);
+        const content = window.AeroMentionText?.(comment.content || '') || escapePostDetail(comment.content);
+        const imageUrl = postDetailMediaUrl(comment.image_url);
+        const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
+        const canDelete = Number(comment.user_id) === Number(currentUser.id) || currentUser.is_admin === true || ['admin', 'moderator'].includes(currentUser.role);
+        const replies = Array.isArray(comment.replies) ? comment.replies.map((reply) => renderPostDetailComment(reply, ownerId, depth + 1)).join('') : '';
+        const commentId = Number(comment.id);
+
+        return `<article class="comment-item${depth ? ' reply-item' : ''}" data-detail-comment-id="${commentId}">
+            <div class="comment-header"><span class="comment-avatar-wrap"><img class="comment-avatar" src="${escapePostDetail(avatar.url)}" alt=""></span><div class="comment-meta-line"><strong>@${username}${profileRoleBadge(comment.role)}</strong><time class="comment-relative-time">${window.AeroFormatRelativeTime?.(comment.created_at) || ''}</time></div></div>
+            <p>${content}</p>${imageUrl ? `<img class="comment-gif" src="${escapePostDetail(imageUrl)}" alt="Comment attachment" loading="lazy">` : ''}
+            <div class="comment-actions"><button type="button" class="comment-action-btn" data-detail-comment-like data-liked="${Boolean(comment.is_liked)}" aria-label="${comment.is_liked ? 'Unlike' : 'Like'} comment">${comment.is_liked ? '♥' : '♡'} <span>${Number(comment.likes_count) || 0}</span></button><button type="button" class="comment-action-btn comment-reply-btn" data-detail-comment-reply="${commentId}" data-username="${username}">Reply</button>${canDelete ? '<button type="button" class="comment-action-btn" data-detail-comment-delete>Delete</button>' : ''}</div>${replies}
+        </article>`;
+    }
+
+    async function loadPostDetail(postId) {
+        const container = document.getElementById('post-detail-content');
+        if (!container) return;
+        const requestId = ++postDetailRequestId;
+        container.innerHTML = '<p class="post-detail-loading" role="status">Loading post...</p>';
+
+        try {
+            const post = await window.AeroAPI.getPost(postId);
+            if (requestId !== postDetailRequestId) return;
+            const authorAvatar = profileAvatarValue(post);
+            const username = escapePostDetail(post.username || 'User');
+            const content = window.AeroMentionText?.(post.content || '') || escapePostDetail(post.content);
+            const media = (Array.isArray(post.images) ? post.images : []).map(postDetailMediaUrl).filter(Boolean);
+            const mediaMarkup = media.length ? `<div class="post-media-container post-detail-media">${media.map((url, index) => /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(url)
+                ? `<button type="button" class="post-media-item post-video-placeholder" data-detail-media-index="${index}" aria-label="Play video ${index + 1} of ${media.length}"><span class="post-video-placeholder-icon" aria-hidden="true">▶</span><span class="post-video-placeholder-label">Play video</span></button>`
+                : `<img class="post-media-item" src="${escapePostDetail(url)}" alt="Post media" loading="lazy" data-detail-media-index="${index}" tabindex="0" role="button" aria-label="Open media ${index + 1} of ${media.length}">`).join('')}</div>` : '';
+            const relativeTime = window.AeroFormatRelativeTime?.(post.created_at) || new Date(post.created_at || Date.now()).toLocaleDateString();
+
+            container.innerHTML = `<article class="post-card glass-card liquid-glass liquid-glass-interactive g2-card" data-post-id="${Number(post.id)}">
+                <header class="post-header"><div class="post-author-info post-author-identity"><a class="post-author-link" href="#profile/${Number(post.user_id)}" aria-label="Open @${username} profile"><span class="post-avatar ${post.is_online ? 'is-online' : ''}"><img src="${escapePostDetail(authorAvatar.url)}" alt=""></span><span class="post-author">@${username}${profileRoleBadge(post.role)}</span></a><time class="post-relative-time">${escapePostDetail(relativeTime)}</time></div></header>
+                <div class="post-content">${content}</div>${mediaMarkup}
+                <div class="post-actions"><div class="action-capsule">
+                    <button type="button" class="post-action-btn${post.is_liked ? ' is-liked' : ''}" data-detail-like aria-label="${post.is_liked ? 'Unlike' : 'Like'} post">${post.is_liked ? '♥' : '♡'} <span>${Number(post.likes_count) || 0}</span></button>
+                    <button type="button" class="post-action-btn" data-detail-comment aria-label="Go to comments">♧ <span>${Number(post.comments_count) || 0}</span></button>
+                    <button type="button" class="post-action-btn" data-detail-repost aria-label="Repost">↻</button>
+                    <button type="button" class="post-action-btn" data-detail-bookmark aria-label="${post.is_bookmarked ? 'Remove bookmark' : 'Bookmark post'}">${post.is_bookmarked ? '★' : '☆'}</button>
+                    <button type="button" class="post-action-btn" data-detail-share aria-label="Copy post link">↗</button>
+                </div></div>
+                <section class="comments-panel"><div class="comments-list" data-detail-comments aria-live="polite"></div><form class="comment-composer" data-detail-comment-form><input type="text" maxlength="1000" placeholder="Write a comment..." aria-label="Write a comment"><button type="submit" class="comment-send-btn" aria-label="Send comment">➤</button></form></section>
+            </article>`;
+
+            const likeButton = container.querySelector('[data-detail-like]');
+            const likeCount = likeButton.querySelector('span');
+            likeButton.addEventListener('click', async () => {
+                if (likeButton.disabled) return;
+                const wasLiked = Boolean(post.is_liked);
+                post.is_liked = !wasLiked;
+                likeButton.disabled = true;
+                likeButton.classList.toggle('is-liked', post.is_liked);
+                likeButton.setAttribute('aria-label', `${post.is_liked ? 'Unlike' : 'Like'} post`);
+                likeButton.firstChild.textContent = post.is_liked ? '♥ ' : '♡ ';
+                likeCount.textContent = String(Math.max(0, (Number(likeCount.textContent) || 0) + (post.is_liked ? 1 : -1)));
+                try {
+                    const result = wasLiked ? await window.AeroAPI.cancelLikePost(post.id) : await window.AeroAPI.likePost(post.id);
+                    likeCount.textContent = String(result.like_count ?? likeCount.textContent);
+                } catch (error) {
+                    post.is_liked = wasLiked;
+                    likeButton.classList.toggle('is-liked', wasLiked);
+                    likeButton.setAttribute('aria-label', `${wasLiked ? 'Unlike' : 'Like'} post`);
+                    likeButton.firstChild.textContent = wasLiked ? '♥ ' : '♡ ';
+                    likeCount.textContent = String(Math.max(0, (Number(likeCount.textContent) || 0) + (wasLiked ? 1 : -1)));
+                    window.showNotice?.(error.message || 'Unable to update like.', 'error');
+                } finally { likeButton.disabled = false; }
+            });
+
+            container.querySelector('[data-detail-comment]').addEventListener('click', () => container.querySelector('[data-detail-comment-form] input').focus());
+            container.querySelector('[data-detail-repost]').addEventListener('click', async () => {
+                try {
+                    await window.AeroAPI.repostPost(post.id);
+                    window.showNotice?.('Post reposted.', 'success');
+                } catch (error) { window.showNotice?.(error.message || 'Unable to repost.', 'error'); }
+            });
+            const bookmarkButton = container.querySelector('[data-detail-bookmark]');
+            bookmarkButton.addEventListener('click', async () => {
+                try {
+                    const result = await window.AeroAPI.toggleBookmark(post.id);
+                    post.is_bookmarked = Boolean(result.bookmarked);
+                    bookmarkButton.textContent = post.is_bookmarked ? '★' : '☆';
+                    bookmarkButton.setAttribute('aria-label', post.is_bookmarked ? 'Remove bookmark' : 'Bookmark post');
+                } catch (error) { window.showNotice?.(error.message || 'Unable to update bookmark.', 'error'); }
+            });
+            container.querySelector('[data-detail-share]').addEventListener('click', async () => {
+                const permalink = new URL(window.location.href);
+                permalink.hash = `post/${post.id}`;
+                try {
+                    await navigator.clipboard.writeText(permalink.href);
+                    window.AeroAPI.recordShareStats(post.id, 'copy').catch(() => {});
+                    window.showNotice?.('Post link copied.', 'success');
+                } catch (error) { window.showNotice?.('Unable to copy post link.', 'error'); }
+            });
+            container.querySelector('.post-author-link').addEventListener('click', (event) => {
+                event.preventDefault();
+                window.navigateToUserProfile?.(Number(post.user_id));
+            });
+            container.querySelectorAll('[data-detail-media-index]').forEach((mediaElement) => {
+                const openMedia = () => window.openThreadsMediaViewer?.(media, Number(mediaElement.dataset.detailMediaIndex));
+                mediaElement.addEventListener('click', openMedia);
+                if (mediaElement.tagName === 'IMG') mediaElement.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openMedia();
+                    }
+                });
+            });
+
+            const commentsList = container.querySelector('[data-detail-comments]');
+            const loadComments = async () => {
+                commentsList.innerHTML = '<p class="comments-loading">Loading comments...</p>';
+                try {
+                    const comments = await window.AeroAPI.getComments(post.id);
+                    commentsList.innerHTML = comments.length ? comments.map((comment) => renderPostDetailComment(comment, post.user_id)).join('') : '<p class="comments-empty">No comments yet.</p>';
+                    commentsList.querySelectorAll('[data-detail-comment-like]').forEach((button) => {
+                        button.addEventListener('click', async () => {
+                            const comment = button.closest('[data-detail-comment-id]');
+                            const commentId = Number(comment.dataset.detailCommentId);
+                            const wasLiked = button.dataset.liked === 'true';
+                            button.disabled = true;
+                            try {
+                                const result = await window.AeroAPI.toggleCommentLike(commentId, wasLiked);
+                                button.dataset.liked = String(Boolean(result.liked));
+                                button.firstChild.textContent = result.liked ? '♥ ' : '♡ ';
+                                button.querySelector('span').textContent = String(result.like_count ?? 0);
+                            } catch (error) { window.showNotice?.(error.message || 'Unable to update comment like.', 'error'); }
+                            finally { button.disabled = false; }
+                        });
+                    });
+                    commentsList.querySelectorAll('[data-detail-comment-reply]').forEach((button) => {
+                        button.addEventListener('click', () => {
+                            const form = container.querySelector('[data-detail-comment-form]');
+                            const input = form.querySelector('input');
+                            form.dataset.parentId = button.dataset.detailCommentReply;
+                            input.placeholder = `Reply to @${button.dataset.username}...`;
+                            input.focus();
+                        });
+                    });
+                    commentsList.querySelectorAll('[data-detail-comment-delete]').forEach((button) => {
+                        button.addEventListener('click', async () => {
+                            const comment = button.closest('[data-detail-comment-id]');
+                            try {
+                                await window.AeroAPI.deleteComment(Number(comment.dataset.detailCommentId));
+                                comment.remove();
+                            } catch (error) { window.showNotice?.(error.message || 'Unable to delete comment.', 'error'); }
+                        });
+                    });
+                } catch (error) {
+                    commentsList.innerHTML = `<p class="comments-empty">${escapePostDetail(error.message || 'Unable to load comments.')}</p>`;
+                }
+            };
+            const commentForm = container.querySelector('[data-detail-comment-form]');
+            commentForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const input = commentForm.querySelector('input');
+                const content = input.value.trim();
+                if (!content) return;
+                try {
+                    await window.AeroAPI.sendComment(post.id, content, Number(commentForm.dataset.parentId) || null);
+                    input.value = '';
+                    input.placeholder = 'Write a comment...';
+                    delete commentForm.dataset.parentId;
+                    post.comments_count = (Number(post.comments_count) || 0) + 1;
+                    container.querySelector('[data-detail-comment] span').textContent = String(post.comments_count);
+                    await loadComments();
+                } catch (error) { window.showNotice?.(error.message || 'Unable to send comment.', 'error'); }
+            });
+            await loadComments();
+        } catch (error) {
+            if (requestId === postDetailRequestId) container.innerHTML = `<p class="post-detail-error" role="alert">${escapePostDetail(error.message || 'Unable to load post.')}</p>`;
+        }
+    }
+
+    function navigateToPostDetail(postId, options = {}) {
+        const id = Number(postId);
+        if (!Number.isInteger(id) || id <= 0) return false;
+        if (activeView !== 'post') postDetailReturn = { view: activeView === 'profile' ? 'profile' : 'main', userId: activeProfileUserId };
+        postDetailHistoryEntry = options.pushHistory !== false;
+        if (postDetailHistoryEntry) history.pushState({ postDetailId: id }, '', `${window.location.pathname}${window.location.search}#post/${id}`);
+        switchView('post');
+        loadPostDetail(id);
+        return true;
+    }
+
+    function closePostDetail() {
+        if (postDetailHistoryEntry) {
+            postDetailHistoryEntry = false;
+            history.back();
+            return;
+        }
+        const returnView = postDetailReturn || { view: 'main', userId: null };
+        if (/^#post\/\d+$/.test(window.location.hash)) history.replaceState({}, '', `${window.location.pathname}${window.location.search}`);
+        switchView(returnView.view, { userId: returnView.userId });
+    }
+
+    function setupProfilePostNavigation() {
+        const container = document.getElementById('profile-posts-container');
+        if (!container) return;
+        const openCard = (card) => navigateToPostDetail(card.dataset.postId);
+        const isInteractive = (target) => target.closest('button, a, input, textarea, video, .post-actions, .post-location-link, .avatar-link');
+
+        container.addEventListener('click', (event) => {
+            const card = event.target.closest('.profile-post-card');
+            if (!card || !container.contains(card) || isInteractive(event.target)) return;
+            openCard(card);
+        });
+        container.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            const card = event.target.closest('.profile-post-card');
+            if (!card || !container.contains(card) || isInteractive(event.target)) return;
+            event.preventDefault();
+            openCard(card);
+        });
     }
 
     function bindProfileTabs(userId, user, avatar) {
@@ -590,6 +828,8 @@
             }
         });
         document.getElementById('start-nfc-share')?.addEventListener('click', (event) => startNFCShare(event.currentTarget.dataset.profileUrl));
+        document.getElementById('post-detail-back')?.addEventListener('click', closePostDetail);
+        setupProfilePostNavigation();
         document.addEventListener('click', (event) => {
             const adminLink = event.target.closest('#admin-dashboard-link');
             if (adminLink) {
@@ -642,14 +882,27 @@
         }
         const sharedProfile = (routeParams.get('user') || routeParams.get('profile') || '').trim();
         const legacyProfile = window.location.hash.match(/^#profile\/(\d+)$/);
+        const postRoute = window.location.hash.match(/^#post\/(\d+)$/);
         if (hashtagPath) {
             navigate('main');
             window.AeroHashtags?.showPage(decodeURIComponent(hashtagPath[1]), false);
         }
+        else if (postRoute) navigateToPostDetail(postRoute[1], { pushHistory: false });
         else if (sharedProfile) navigate('profile', { userId: /^\d+$/.test(sharedProfile) ? Number(sharedProfile) : sharedProfile });
         else if (legacyProfile) navigate('profile', { userId: Number(legacyProfile[1]) });
         else navigate('main');
         window.addEventListener('popstate', () => {
+            const currentPost = window.location.hash.match(/^#post\/(\d+)$/);
+            if (currentPost) {
+                navigateToPostDetail(currentPost[1], { pushHistory: false });
+                return;
+            }
+            if (activeView === 'post') {
+                postDetailHistoryEntry = false;
+                const returnView = postDetailReturn || { view: 'main', userId: null };
+                switchView(returnView.view, { userId: returnView.userId });
+                return;
+            }
             const currentHashtag = window.location.pathname.match(/^\/hashtag\/([^/]+)\/?$/);
             if (currentHashtag) {
                 navigate('main');
@@ -669,6 +922,7 @@
     window.setActiveNavItem = setActiveNavItem;
     window.switchView = switchView;
     window.navigateToUserProfile = navigateToUserProfile;
+    window.navigateToPostDetail = navigateToPostDetail;
     window.AeroRouter = { navigate, switchView, get activeView() { return activeView; } };
     window.checkNFCSupport = checkNFCSupport;
     window.startNFCShare = startNFCShare;
