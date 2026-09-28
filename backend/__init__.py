@@ -114,6 +114,7 @@ def create_app():
     from backend.models import (
         User,
         Post,
+        PostVote,
         Comment,
         Follow,
         Like,
@@ -141,6 +142,14 @@ def create_app():
         for name in ("hashtags", "post_hashtags", "user_hashtag_interests")
     ]
     with app.app_context():
+        db.session.execute(text(
+            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS poll_json TEXT"
+        ))
+        db.session.commit()
+        db.metadata.create_all(
+            bind=db.engine,
+            tables=[db.metadata.tables["post_votes"]],
+        )
         existing_tables = set(inspect(db.engine).get_table_names())
         if not {table.name for table in hashtag_tables}.issubset(existing_tables):
             db.metadata.create_all(bind=db.engine, tables=hashtag_tables)

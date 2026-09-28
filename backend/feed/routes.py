@@ -24,6 +24,7 @@ from backend.models import (
     Message,
     Notification,
     Post,
+    PostVote,
     Hashtag,
     PostHashtag,
     Report,
@@ -56,6 +57,74 @@ POST_CACHE_TTL_SECONDS = 15
 _post_response_cache = {}
 _post_cache_lock = threading.Lock()
 logger = logging.getLogger(__name__)
+
+
+def normalize_poll(data):
+    if data is None:
+        return None
+    if not isinstance(data, dict):
+        raise ValueError("Invalid poll")
+    options = data.get("options")
+    if not isinstance(options, list) or not 2 <= len(options) <= 4:
+        raise ValueError("Polls need between 2 and 4 options")
+    options = [str(option).strip() for option in options]
+    if any(not option or len(option) > 40 for option in options):
+        raise ValueError("Poll options must contain 1 to 40 characters")
+    if len({option.casefold() for option in options}) != len(options):
+        raise ValueError("Poll options must be different")
+    try:
+        expires_at = dt.datetime.fromisoformat(
+            str(data.get("expires_at", "")).replace("Z", "+00:00")
+        )
+    except ValueError as error:
+        raise ValueError("Invalid poll expiration time") from error
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=dt.timezone.utc)
+    now = dt.datetime.now(dt.timezone.utc)
+    if expires_at <= now or expires_at > now + dt.timedelta(days=30):
+        raise ValueError("Poll expiration must be within the next 30 days")
+    return {"options": options, "expires_at": expires_at.isoformat()}
+
+
+def poll_payload(post, current_user_id=None):
+    if not post.poll_json:
+        return None
+    try:
+        poll = json.loads(post.poll_json)
+        options = poll["options"]
+        expires_at = dt.datetime.fromisoformat(poll["expires_at"].replace("Z", "+00:00"))
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=dt.timezone.utc)
+    vote_counts = dict(db.session.query(
+        PostVote.option_index,
+        func.count(PostVote.id),
+    ).filter_by(post_id=post.id).group_by(PostVote.option_index).all())
+    user_vote = PostVote.query.filter_by(
+        post_id=post.id, user_id=current_user_id
+    ).first() if current_user_id is not None else None
+    remaining_seconds = max(0, int((expires_at - dt.datetime.now(dt.timezone.utc)).total_seconds()))
+    if remaining_seconds == 0:
+        time_remaining = "Voting ended"
+    elif remaining_seconds >= 86400:
+        time_remaining = f"Ends in {remaining_seconds // 86400}d {(remaining_seconds % 86400) // 3600}h"
+    elif remaining_seconds >= 3600:
+        time_remaining = f"Ends in {remaining_seconds // 3600}h {(remaining_seconds % 3600) // 60}m"
+    else:
+        time_remaining = f"Ends in {max(1, remaining_seconds // 60)}m"
+    total_votes = sum(vote_counts.values())
+    return {
+        "options": [
+            {"text": text, "votes": int(vote_counts.get(index, 0))}
+            for index, text in enumerate(options)
+        ],
+        "total_votes": total_votes,
+        "user_voted_option": user_vote.option_index if user_vote else None,
+        "expires_at": expires_at.isoformat(),
+        "expired": remaining_seconds == 0,
+        "time_remaining_str": time_remaining,
+    }
 
 
 def apply_diversity_filter(posts):
@@ -104,6 +173,7 @@ def post_payload(post, current_user_id=None):
         "is_online": is_user_online(post.author, current_user_id),
         "content": post.content,
         "images": json.loads(post.images_json or "[]"),
+        "poll": poll_payload(post, current_user_id),
         "likes_count": likes_count,
         "comments_count": comments_count,
         "is_liked": is_liked,
@@ -139,6 +209,7 @@ def optimized_post_payload(
         "is_online": is_user_online(post.author, current_user_id),
         "content": post.content,
         "images": json.loads(post.images_json or "[]"),
+        "poll": poll_payload(post, current_user_id),
         "likes_count": likes_count,
         "comments_count": comments_count,
         "is_liked": post.id in liked_ids,
@@ -333,6 +404,7 @@ def get_posts(current_user):
             Post.user_id,
             Post.content,
             Post.images_json,
+            Post.poll_json,
             Post.created_at,
             Post.parent_id,
             Post.type,
@@ -455,13 +527,43 @@ def get_post(current_user, post_id):
     return jsonify(post_payload(post, current_user.id if current_user else None)), 200
 
 
+@feed_bp.post("/posts/<int:post_id>/vote")
+@token_required
+def vote_post(current_user, post_id):
+    post = db.session.get(Post, post_id)
+    if not post or not can_view_user_content(current_user, post.author):
+        return jsonify({"message": "Post not found"}), 404
+    poll = poll_payload(post, current_user.id)
+    if poll is None:
+        return jsonify({"message": "This post has no poll"}), 404
+    if poll["expired"]:
+        return jsonify({"message": "This poll has ended"}), 410
+    data = request.get_json(silent=True) or {}
+    option_index = data.get("option_index")
+    if isinstance(option_index, bool) or not isinstance(option_index, int) or not 0 <= option_index < len(poll["options"]):
+        return jsonify({"message": "Invalid poll option"}), 400
+    vote = PostVote.query.filter_by(post_id=post.id, user_id=current_user.id).first()
+    if vote:
+        vote.option_index = option_index
+    else:
+        db.session.add(PostVote(post_id=post.id, user_id=current_user.id, option_index=option_index))
+    db.session.commit()
+    with _post_cache_lock:
+        _post_response_cache.clear()
+    return jsonify({"poll": poll_payload(post, current_user.id)}), 200
+
+
 @feed_bp.post("/posts")
 @token_required
 def create_post(current_user):
     data = request.get_json(silent=True) or {}
     content = str(data.get("content", "")).strip()
     images = data.get("images", [])
-    if (not content and not images) or len(content) > 5000 or not isinstance(images, list) or len(images) > 10:
+    try:
+        poll = normalize_poll(data.get("poll"))
+    except ValueError as error:
+        return jsonify({"message": str(error)}), 400
+    if (not content and not images and not poll) or len(content) > 5000 or not isinstance(images, list) or len(images) > 10:
         return jsonify({"message": "Invalid post content or number of media files"}), 400
     post_type = str(data.get("type", "original")).strip().lower()
     if post_type not in {"original", "repost", "quote"}:
@@ -469,6 +571,7 @@ def create_post(current_user):
     post = Post(
         content=content,
         images_json=json.dumps(images),
+        poll_json=json.dumps(poll) if poll else None,
         user_id=current_user.id,
         parent_id=data.get("parentId"),
         type=post_type,

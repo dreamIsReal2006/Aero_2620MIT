@@ -22,6 +22,7 @@ const composerTranslations = {
     review_replies: 'Review and approve replies', share_to: 'Also share to...', dont_share: 'Don’t share', facebook: 'Facebook', instagram: 'Instagram',
     select_publish_time: 'Schedule post...', complete: 'Done', recommended_tags: 'Add suggested tag', scheduled_post: 'Schedule', no_drafts: 'No drafts yet', unnamed_draft: 'Untitled draft',
     selected_gif: 'Selected GIF', remove_gif: 'Remove GIF', choose_topic: 'Choose community or topic', post_attachments: 'Post attachments and tools',
+    poll_option_placeholder: 'Option {number}', add_poll_option: 'Add another option', remove_poll_option: 'Remove option', remove_poll: 'Remove poll', poll_duration: 'Poll duration', poll_1_hour: '1 hour', poll_6_hours: '6 hours', poll_12_hours: '12 hours', poll_24_hours: '24 hours', poll_3_days: '3 days', poll_7_days: '7 days', poll_option_required: 'Enter text for every poll option.', poll_options_distinct: 'Poll options must be different.', poll_thread_unavailable: 'Polls can only be added to a single post.',
     unsupported_voice: 'Voice input is not supported in this browser.', unsupported_audio: 'Audio attachments are not available yet.', unable_upload: 'Unable to upload media', unable_publish: 'Unable to publish post',
     device_location: 'This device cannot provide a location.', location_failed: 'Unable to get your location.', remove_thread_post: 'Remove thread post',
   },
@@ -34,13 +35,13 @@ const composerTranslations = {
     review_replies: '审核并批准回复', share_to: '同时分享到...', dont_share: '不分享', facebook: 'Facebook', instagram: 'Instagram',
     select_publish_time: '预设发布时间...', complete: '完成', recommended_tags: '添加推荐标签', scheduled_post: '定时发布', no_drafts: '还没有草稿', unnamed_draft: '未命名草稿',
     selected_gif: '所选 GIF', remove_gif: '移除 GIF', choose_topic: '选择社群或话题', post_attachments: '帖子附件和工具',
+    poll_option_placeholder: '选项 {number}', add_poll_option: '添加另一选项', remove_poll_option: '移除选项', remove_poll: '移除投票', poll_duration: '投票时长', poll_1_hour: '1 小时', poll_6_hours: '6 小时', poll_12_hours: '12 小时', poll_24_hours: '24 小时', poll_3_days: '3 天', poll_7_days: '7 天', poll_option_required: '请填写所有投票选项。', poll_options_distinct: '投票选项不能重复。', poll_thread_unavailable: '投票仅支持单条帖子。',
     unsupported_voice: '此浏览器暂不支持语音输入。', unsupported_audio: '音频附件暂不可用。', unable_upload: '无法上传媒体', unable_publish: '无法发布帖子',
     device_location: '此设备无法获取位置。', location_failed: '无法获取位置。', remove_thread_post: '删除串文',
   },
 };
 
 async function getFeedPage(feedType, userId, cursor, limit) {
-  if (feedType !== 'for_you') return getPostsFeed(feedType, userId, cursor, limit);
   const params = new URLSearchParams({ feed_type: feedType, limit: String(limit) });
   if (cursor) params.set('cursor', cursor);
   try {
@@ -270,6 +271,7 @@ function installMentionPicker(textarea) {
 export default function FeedShell() {
   const [user, setUser] = useState(null); const [active, setActive] = useState('Home'); const [tab, setTab] = useState('for_you'); const [posts, setPosts] = useState([]); const [currentCursor, setCurrentCursor] = useState(null); const [isLoadingMore, setIsLoadingMore] = useState(false); const [hasMore, setHasMore] = useState(true); const [query, setQuery] = useState(''); const [search, setSearch] = useState({ users: [], posts: [] }); const [composerOpen, setComposerOpen] = useState(false); const [draft, setDraft] = useState('');
   const [threadPosts, setThreadPosts] = useState([{ id: 1, content: '', files: [] }]);
+  const [pollData, setPollData] = useState(null);
   const [composerView, setComposerView] = useState('compose');
   const [savedDrafts, setSavedDrafts] = useState([]);
   const [activePanel, setActivePanel] = useState('none');
@@ -383,7 +385,7 @@ export default function FeedShell() {
     });
   };
   const addThreadPost = () => {
-    if (threadPosts.length >= 10) return;
+    if (threadPosts.length >= 10 || pollData) return;
     setActivePanel('none');
     setActiveSubpanel('none');
     setThreadPosts((current) => [...current, { id: Date.now(), content: '', files: [] }]);
@@ -405,12 +407,14 @@ export default function FeedShell() {
     }
     setComposerOpen(false);
     setComposerView('compose');
+    setPollData(null);
     setActivePanel('none');
     setActiveSubpanel('none');
   };
   const loadDraft = (saved) => {
     setThreadPosts(saved.posts.map((post, index) => ({ id: Date.now() + index, content: post.content || '', files: [] })));
     setTopic(saved.topic || 'profile');
+    setPollData(null);
     setComposerView('compose');
   };
   const uploadPostMedia = async (file) => {
@@ -423,7 +427,13 @@ export default function FeedShell() {
   };
   const publish = async (event) => {
     event.preventDefault();
-    const entries = threadPosts.filter((post) => post.content.trim() || post.files.length || (post === threadPosts[0] && selectedGif));
+    if (pollData) {
+      if (threadPosts.length > 1) { setComposerError(t('poll_thread_unavailable')); return; }
+      const options = pollData.options.map((option) => option.trim());
+      if (options.some((option) => !option)) { setComposerError(t('poll_option_required')); return; }
+      if (new Set(options.map((option) => option.toLocaleLowerCase())).size !== options.length) { setComposerError(t('poll_options_distinct')); return; }
+    }
+    const entries = threadPosts.filter((post) => post.content.trim() || post.files.length || (post === threadPosts[0] && (selectedGif || pollData)));
     if (!entries.length) return;
     setComposerError('');
     const button = event.currentTarget.querySelector('[type="submit"]');
@@ -440,6 +450,10 @@ export default function FeedShell() {
         review_replies: reviewReplies,
         share_to: shareTo,
         topic,
+        poll: pollData ? {
+          options: pollData.options.map((option) => option.trim()),
+          expires_at: new Date(Date.now() + pollData.durationHours * 60 * 60 * 1000).toISOString(),
+        } : null,
       };
       const endpoint = payloadPosts.length > 1 ? 'api/posts/chain' : 'api/posts';
       const requestBody = payloadPosts.length > 1 ? body : { ...payloadPosts[0], ...body };
@@ -454,6 +468,7 @@ export default function FeedShell() {
       setPosts((current) => [...createdPosts, ...current]);
       setThreadPosts([{ id: Date.now(), content: '', files: [] }]);
       setSelectedGif('');
+      setPollData(null);
       setScheduledAt('');
       setComposerOpen(false);
       setComposerView('compose');
@@ -552,12 +567,25 @@ export default function FeedShell() {
                   </div>}
                 </div>
                 <button type="button" title={t('voice_input')} aria-label={t('voice_input')} onClick={() => setComposerError(t('unsupported_voice'))}><Icon name="mic" /></button>
-                <button type="button" title={t('poll')} aria-label={t('poll')} onClick={() => { setActivePanel('none'); setActiveSubpanel('none'); appendToPost(0, `${threadPosts[0].content.trim() ? '\n' : ''}${t('poll')}: `); }}><Icon name="poll" /></button>
+                <button type="button" className={pollData ? 'is-active' : ''} title={t('poll')} aria-label={t('poll')} aria-expanded={Boolean(pollData)} disabled={threadPosts.length > 1} onClick={() => { setActivePanel('none'); setActiveSubpanel('none'); setComposerError(''); setPollData((current) => current ? null : { options: ['', ''], durationHours: 24 }); }}><Icon name="poll" /></button>
                 <button type="button" title={t('quote')} aria-label={t('quote')} onClick={() => { setActivePanel('none'); setActiveSubpanel('none'); appendToPost(0, '“”'); }}><Icon name="quote" /></button>
                 <button type="button" title={t('location')} aria-label={t('location')} onClick={() => { setActivePanel('none'); setActiveSubpanel('none'); if (!navigator.geolocation) setComposerError(t('device_location')); else navigator.geolocation.getCurrentPosition(({ coords }) => appendToPost(0, ` 📍${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`), () => setComposerError(t('location_failed'))); }}><Icon name="pin" /></button>
                 <button type="button" title={t('audio')} aria-label={t('audio')} onClick={() => setComposerError(t('unsupported_audio'))}><Icon name="audio" /></button>
                 <input ref={uploadInputRef} type="file" accept="image/*,video/*" multiple hidden onChange={(event) => { const files = [...threadPosts[0].files, ...Array.from(event.target.files || [])].slice(0, 10); updateThreadPost(0, { files }); event.target.value = ''; }} />
               </div>
+              {pollData && <section className="threads-poll-builder" aria-label={t('poll')}>
+                <div className="threads-poll-options">
+                  {pollData.options.map((option, index) => <div className="threads-poll-input-group" key={index}>
+                    <input type="text" className="threads-poll-option-input" value={option} maxLength={40} placeholder={t('poll_option_placeholder').replace('{number}', String(index + 1))} aria-label={t('poll_option_placeholder').replace('{number}', String(index + 1))} onChange={(event) => setPollData((current) => ({ ...current, options: current.options.map((value, optionIndex) => optionIndex === index ? event.target.value : value) }))} />
+                    {index >= 2 && <button type="button" className="threads-remove-poll-option" aria-label={t('remove_poll_option')} onClick={() => setPollData((current) => ({ ...current, options: current.options.filter((_, optionIndex) => optionIndex !== index) }))}>×</button>}
+                  </div>)}
+                </div>
+                {pollData.options.length < 4 && <button type="button" className="threads-add-poll-option" onClick={() => setPollData((current) => current.options.length < 4 ? { ...current, options: [...current.options, ''] } : current)}><Icon name="plus" />{t('add_poll_option')}</button>}
+                <footer className="threads-poll-builder-footer">
+                  <label>{t('poll_duration')}<select value={pollData.durationHours} onChange={(event) => setPollData((current) => ({ ...current, durationHours: Number(event.target.value) }))}><option value={1}>{t('poll_1_hour')}</option><option value={6}>{t('poll_6_hours')}</option><option value={12}>{t('poll_12_hours')}</option><option value={24}>{t('poll_24_hours')}</option><option value={72}>{t('poll_3_days')}</option><option value={168}>{t('poll_7_days')}</option></select></label>
+                  <button type="button" className="threads-remove-poll" onClick={() => setPollData(null)}>{t('remove_poll')}</button>
+                </footer>
+              </section>}
               {isPanelOpen('gif') && <div className={`threads-gif-picker threads-dropdown-menu${activePanel.endsWith('-closing') ? ' is-closing' : ''}`}>{['https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif', 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif', 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif'].map((url) => <button type="button" key={url} onClick={() => { setSelectedGif(url); setActivePanel('none'); }}><img src={url} alt={t('select_gif')} /></button>)}</div>}
               {composerError && <p className="threads-compose-error" role="status">{composerError}</p>}
             </div>
@@ -579,7 +607,7 @@ export default function FeedShell() {
                     </div>
                   </div>}
                 </div>
-                <button type="button" className="threads-add-post-button" onClick={addThreadPost} disabled={threadPosts.length >= 10}><Icon name="plus" />{t('add_to_thread')}</button>
+                <button type="button" className="threads-add-post-button" onClick={addThreadPost} disabled={threadPosts.length >= 10 || Boolean(pollData)}><Icon name="plus" />{t('add_to_thread')}</button>
               </div>
               <button type="submit" className="threads-publish-button" disabled={!threadPosts.some((post) => post.content.trim() || post.files.length) && !selectedGif}>{scheduledAt ? t('scheduled_post') : t('post')}</button>
             </footer>

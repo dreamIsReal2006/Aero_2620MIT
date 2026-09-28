@@ -23,6 +23,8 @@ class Post(db.Model):
         nullable=False
     )
 
+    poll_json = db.Column(db.Text, nullable=True)
+
     created_at = db.Column(
         db.DateTime,
         default=datetime.utcnow,
