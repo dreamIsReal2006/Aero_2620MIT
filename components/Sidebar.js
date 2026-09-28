@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { Icon, Glass } from './ui';
 
 const leftItems = [['home', 'Home'], ['video', 'Shorts'], ['chat', 'Chat']];
@@ -12,7 +13,69 @@ function SidebarIcon({ name }) {
 }
 
 function Dock({ side, items, active, onNavigate }) {
-  return <Glass className={`fixed top-[120px] z-30 hidden min-h-[204px] w-[68px] flex-col items-center gap-3 rounded-full p-3 md:flex ${side === 'left' ? 'left-8' : 'right-8 right-dock'}`}><div className="dock-scroll-wrapper flex flex-col gap-3 overflow-visible p-1" onWheel={(event) => { const list = event.currentTarget; if (list.scrollHeight <= list.clientHeight || event.deltaY === 0) return; event.preventDefault(); list.scrollTop += event.deltaY; }}>{items.map(([icon, label]) => <button key={label} onClick={() => onNavigate?.(label)} className={`dock-item relative grid h-11 w-11 place-items-center rounded-full transition duration-200 hover:scale-[1.08] hover:bg-[#0A84FF]/10 active:scale-95 ${active === label ? 'active z-[1] bg-black/[.06] text-[#0A84FF] shadow-[0_0_0_5px_rgba(10,132,255,.1)]' : ''}`} aria-label={label} title={label}><SidebarIcon name={icon} /></button>)}</div></Glass>;
+  const scrollListRef = useRef(null);
+
+  useEffect(() => {
+    const list = scrollListRef.current;
+    if (!list || side !== 'right') return;
+
+    let pointerY = null;
+    let animationFrame = 0;
+    let previousFrameTime = 0;
+
+    const stopScrolling = () => {
+      pointerY = null;
+      previousFrameTime = 0;
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = 0;
+    };
+
+    const animateScroll = (time) => {
+      if (pointerY === null) return;
+
+      const rect = list.getBoundingClientRect();
+      const edgeSize = Math.min(50, rect.height / 3);
+      const localY = pointerY - rect.top;
+      let direction = 0;
+      let intensity = 0;
+
+      if (localY < edgeSize) {
+        direction = -1;
+        intensity = (edgeSize - localY) / edgeSize;
+      } else if (localY > rect.height - edgeSize) {
+        direction = 1;
+        intensity = (localY - (rect.height - edgeSize)) / edgeSize;
+      }
+
+      if (!direction || !intensity || (direction < 0 && list.scrollTop <= 0) || (direction > 0 && list.scrollTop >= list.scrollHeight - list.clientHeight)) {
+        animationFrame = 0;
+        previousFrameTime = 0;
+        return;
+      }
+
+      const elapsed = previousFrameTime ? Math.min(time - previousFrameTime, 32) : 16;
+      previousFrameTime = time;
+      list.scrollTop += direction * 420 * Math.min(intensity, 1) * elapsed / 1000;
+      animationFrame = window.requestAnimationFrame(animateScroll);
+    };
+
+    const handlePointerMove = (event) => {
+      if (event.pointerType !== 'mouse') return;
+      pointerY = event.clientY;
+      if (!animationFrame) animationFrame = window.requestAnimationFrame(animateScroll);
+    };
+
+    list.addEventListener('pointermove', handlePointerMove);
+    list.addEventListener('pointerleave', stopScrolling);
+
+    return () => {
+      stopScrolling();
+      list.removeEventListener('pointermove', handlePointerMove);
+      list.removeEventListener('pointerleave', stopScrolling);
+    };
+  }, [side]);
+
+  return <Glass className={`fixed top-[120px] z-30 hidden w-[68px] flex-col items-center gap-3 rounded-full p-3 md:flex ${side === 'left' ? 'left-8 min-h-[204px]' : 'right-8 right-dock'}`}><div ref={scrollListRef} className="dock-scroll-wrapper flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto p-1" onWheel={(event) => { const list = event.currentTarget; if (list.scrollHeight <= list.clientHeight || event.deltaY === 0) return; event.preventDefault(); list.scrollTop += event.deltaY; }}>{items.map(([icon, label]) => <button key={label} onClick={() => onNavigate?.(label)} className={`dock-item relative grid h-11 w-11 shrink-0 place-items-center rounded-full transition duration-200 hover:scale-[1.08] hover:bg-[#0A84FF]/10 active:scale-95 ${active === label ? 'active z-[1] bg-black/[.06] text-[#0A84FF] shadow-[0_0_0_5px_rgba(10,132,255,.1)]' : ''}`} aria-label={label} title={label}><SidebarIcon name={icon} /></button>)}</div></Glass>;
 }
 
 export default function Sidebar({ active, onNavigate }) {
