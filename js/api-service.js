@@ -95,11 +95,13 @@ function openThreadsMediaViewer(mediaList, startIndex = 0) {
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-label', 'Media viewer');
-    modal.innerHTML = '<button type="button" class="threads-media-close" aria-label="Close media viewer">&times;</button><button type="button" class="threads-media-nav threads-media-prev" aria-label="Previous media">&#8592;</button><div class="threads-media-stage"></div><button type="button" class="threads-media-nav threads-media-next" aria-label="Next media">&#8594;</button>';
+    modal.innerHTML = '<button type="button" class="threads-media-close" aria-label="Close media viewer">&times;</button><button type="button" class="threads-media-nav lightbox-nav-btn threads-media-prev lightbox-prev-btn" aria-label="Previous media"><span class="material-symbols-outlined" aria-hidden="true">arrow_back_ios</span></button><div class="threads-media-stage"></div><button type="button" class="threads-media-nav lightbox-nav-btn threads-media-next lightbox-next-btn" aria-label="Next media"><span class="material-symbols-outlined" aria-hidden="true">arrow_forward_ios</span></button><div class="lightbox-pagination-dots" id="lightbox-pagination-dots" aria-hidden="true"></div>';
     const stage = modal.querySelector('.threads-media-stage');
     const closeButton = modal.querySelector('.threads-media-close');
     const previousButton = modal.querySelector('.threads-media-prev');
     const nextButton = modal.querySelector('.threads-media-next');
+    const paginationContainer = modal.querySelector('#lightbox-pagination-dots');
+    let touchStartX = null;
     const close = () => {
         modal.querySelector('video')?.pause();
         document.removeEventListener('keydown', onKeyDown);
@@ -122,11 +124,13 @@ function openThreadsMediaViewer(mediaList, startIndex = 0) {
             media.play().catch(() => {});
         }
         stage.appendChild(media);
-        previousButton.hidden = items.length < 2;
-        nextButton.hidden = items.length < 2;
+        previousButton.hidden = items.length < 2 || currentIndex === 0;
+        nextButton.hidden = items.length < 2 || currentIndex === items.length - 1;
+        paginationContainer.style.display = items.length > 1 ? 'flex' : 'none';
+        paginationContainer.innerHTML = items.map((_, index) => `<span class="lightbox-dot${index === currentIndex ? ' active' : ''}"></span>`).join('');
     };
     const change = (direction) => {
-        currentIndex = (currentIndex + direction + items.length) % items.length;
+        currentIndex = Math.min(Math.max(currentIndex + direction, 0), items.length - 1);
         render();
     };
     const onKeyDown = (event) => {
@@ -137,6 +141,13 @@ function openThreadsMediaViewer(mediaList, startIndex = 0) {
     closeButton.addEventListener('click', close);
     previousButton.addEventListener('click', () => change(-1));
     nextButton.addEventListener('click', () => change(1));
+    stage.addEventListener('touchstart', (event) => { touchStartX = event.changedTouches[0]?.clientX ?? null; }, { passive: true });
+    stage.addEventListener('touchend', (event) => {
+        if (touchStartX === null) return;
+        const delta = event.changedTouches[0].clientX - touchStartX;
+        touchStartX = null;
+        if (Math.abs(delta) > 50) change(delta < 0 ? 1 : -1);
+    }, { passive: true });
     modal.addEventListener('click', event => { if (event.target === modal || event.target === stage) close(); });
     document.addEventListener('keydown', onKeyDown);
     document.body.appendChild(modal);
@@ -3413,7 +3424,8 @@ function openShareModal(post) {
             exportPostCard(overlay.dataset.postId, overlay.dataset.content, overlay.dataset.username, {
                 displayName: overlay.dataset.displayName,
                 avatarUrl: overlay.dataset.avatarUrl,
-                createdAt: overlay.dataset.createdAt
+                createdAt: overlay.dataset.createdAt,
+                images: JSON.parse(overlay.dataset.images || '[]')
             });
             AeroAPI.recordShareStats(overlay.dataset.postId, 'share').catch(() => {});
         });
@@ -3481,6 +3493,7 @@ function openShareModal(post) {
     overlay.dataset.displayName = post.display_name || post.name || post.username || 'User';
     overlay.dataset.avatarUrl = post.avatar_url || post.author_avatar || '';
     overlay.dataset.createdAt = post.created_at || '';
+    overlay.dataset.images = JSON.stringify(Array.isArray(post.images) ? post.images : []);
     overlay.querySelector('.share-modal-preview').textContent = `${post.username || 'User'}: ${post.content || 'Aero post'}`;
     overlay.classList.add('is-open');
 }
@@ -3514,11 +3527,16 @@ function exportPostCard(postId, content, username, details = {}) {
     const handle = `@${username || 'user'}`;
     const createdAt = details.createdAt ? new Date(details.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Aero post';
     const postUrl = `${window.location.origin}${window.location.pathname}#post-${encodeURIComponent(postId)}`;
+    const images = (Array.isArray(details.images) ? details.images : [])
+        .map((image) => typeof image === 'string' ? image : image?.url || '')
+        .filter((url) => url && !/\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(url))
+        .map((url) => /^(https?:|data:|blob:)/i.test(url) ? url : `${API_ORIGIN}${url.startsWith('/') ? url : `/${url}`}`);
     const avatarMarkup = avatarUrl
         ? `<img src="${escape(avatarUrl)}" crossorigin="anonymous" alt="" style="width:52px;height:52px;border-radius:50%;object-fit:cover;">`
         : `<div style="width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#0a84ff,#00c6ff);color:#fff;font-size:22px;font-weight:800;">${escape((displayName || 'U').charAt(0).toUpperCase())}</div>`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=96x96&margin=0&data=${encodeURIComponent(postUrl)}`;
     const postContentHtml = escape(content || 'Aero post').replace(/\r?\n/g, '<br>');
+    const mediaMarkup = images.length ? `<div class="export-card-media-grid image-count-${Math.min(images.length, 4)}">${images.map((url) => `<div class="export-media-item"><img src="${escape(url)}" crossorigin="anonymous" alt="Post attachment"></div>`).join('')}</div>` : '';
     const template = document.createElement('div');
     template.id = 'export-card-template';
     template.setAttribute('aria-hidden', 'true');
@@ -3529,6 +3547,7 @@ function exportPostCard(postId, content, username, details = {}) {
             <div style="flex:0 0 auto;color:#667085;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">Aero Post</div>
         </div>
         <div style="flex:1;overflow:hidden;font-size:21px;line-height:1.52;font-weight:500;word-break:break-word;color:#26313d;">${postContentHtml}</div>
+        ${mediaMarkup}
         <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-top:22px;padding-top:16px;border-top:1px solid rgba(22,32,45,.1);">
             <div style="min-width:0;"><div style="font-size:11px;color:#667085;margin-bottom:9px;">${escape(createdAt)}</div><div style="display:flex;align-items:center;gap:7px;"><strong style="font-size:21px;letter-spacing:-.04em;color:#087cff;">Aero</strong><span style="font-size:12px;color:#667085;">Share via Aero</span></div></div>
             <div style="padding:5px;border-radius:12px;background:#fff;box-shadow:0 5px 14px rgba(20,40,60,.1);"><img crossorigin="anonymous" src="${escape(qrUrl)}" alt="" style="display:block;width:64px;height:64px;"></div>

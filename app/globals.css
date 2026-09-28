@@ -64,6 +64,14 @@ body:has(.threads-media-modal) { overflow: hidden; }
 .threads-media-stage { position: relative !important; display: flex !important; align-items: center !important; justify-content: center !important; max-width: 90vw !important; max-height: 85vh !important; overflow: hidden !important; border-radius: 16px !important; box-shadow: 0 20px 40px rgba(0, 0, 0, .5) !important; }
 .threads-media-content { display: block; max-width: 90vw !important; max-height: 85vh !important; object-fit: contain !important; border-radius: 12px; }
 @media (max-width: 640px) { .threads-media-stage { padding: 56px 16px; } .threads-media-prev { left: 12px; } .threads-media-next { right: 12px; } }
+.threads-media-nav { width: 48px; height: 48px; border: 1px solid rgba(255,255,255,.15); background: rgba(0,0,0,.45); backdrop-filter: blur(8px); transition: background-color .2s ease, transform .2s ease; }
+.threads-media-nav:hover, .threads-media-nav:focus-visible { background: rgba(0,0,0,.75); transform: translateY(-50%) scale(1.08); }
+.threads-media-nav[hidden] { display: none !important; }
+.threads-media-nav .material-symbols-outlined { font-size: 20px; }
+.lightbox-pagination-dots { position: absolute; bottom: 24px; left: 50%; z-index: 10000; display: flex; align-items: center; gap: 8px; padding: 6px 12px; transform: translateX(-50%); border-radius: 20px; background: rgba(0,0,0,.35); backdrop-filter: blur(6px); }
+.lightbox-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: rgba(255,255,255,.4); transition: transform .25s cubic-bezier(.4,0,.2,1), background-color .25s ease, box-shadow .25s ease; }
+.lightbox-dot.active { transform: scale(1.25); background: #fff; box-shadow: 0 0 6px rgba(255,255,255,.8); }
+@media (max-width: 768px) { .lightbox-nav-btn { display: none !important; } }
 .feed-sentinel { display: flex; min-height: 56px; align-items: center; justify-content: center; }
 .loading-spinner { width: 22px; height: 22px; border: 2px solid rgba(10,132,255,.2); border-top-color: var(--aero-accent); border-radius: 50%; animation: feed-spin .7s linear infinite; }
 @keyframes feed-spin { to { transform: rotate(360deg); } }
@@ -244,3 +252,37 @@ body:has(.threads-media-modal) { overflow: hidden; }
 .post-video-placeholder-icon { display: grid; width: 48px; height: 48px; place-items: center; border: 1px solid rgba(255,255,255,.45); border-radius: 50%; background: rgba(0,0,0,.35); }
 .post-video-placeholder-icon svg { width: 20px; height: 20px; fill: currentColor; }
 .post-video-placeholder-label { font-size: 13px; font-weight: 600; }
+
+#view-chat, #chat-view, .chat-page-container, .chat-wrapper {
+	width: min(1080px, calc(100vw - 180px));
+	height: min(850px, max(0px, calc(100dvh - 160px)));
+	min-height: min(520px, max(0px, calc(100dvh - 160px)));
+	max-height: 850px;
+	box-sizing: border-box;
+	margin: 0 auto 16px;
+	padding: 16px;
+	border-radius: 24px;
+}
+.chat-wrapper, .chat-wrapper .chat-sidebar, .chat-wrapper .chat-panel, .chat-wrapper .chat-messages { min-width: 0; min-height: 0; }
+#view-shorts, #shorts-view, .shorts-page-container, .shorts-container {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: min(1100px, calc(100vw - 180px));
+	height: min(850px, max(0px, calc(100dvh - 160px)));
+	min-height: 0;
+	max-height: 850px;
+	box-sizing: border-box;
+	margin: 0 auto 16px;
+	padding: 16px;
+	overflow: hidden;
+	scroll-snap-type: none;
+}
+#shorts-stage, .shorts-stage { display: flex; flex: 1 1 auto; align-items: center; justify-content: center; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
+#shorts-stage .short-card, .shorts-stage .short-card, .shorts-video-card { position: relative; flex: 0 1 auto; width: auto; height: min(720px, 100%); min-width: 0; min-height: 0; max-width: 100%; aspect-ratio: 9 / 16; align-self: center; overflow: hidden; border: 1px solid rgba(255,255,255,.2); border-radius: 20px; background: #000; box-shadow: 0 12px 36px rgba(0,0,0,.15); }
+#shorts-stage .short-card > video, .shorts-stage .short-card > video, .shorts-video-card video, .shorts-video-card img { display: block; width: 100%; height: 100%; min-height: 0; border-radius: inherit; object-fit: cover; }
+@media (max-width: 768px) {
+	#view-chat, #chat-view, .chat-page-container, .chat-wrapper { width: 100%; height: calc(100dvh - 152px - env(safe-area-inset-bottom)); min-height: min(360px, calc(100dvh - 152px - env(safe-area-inset-bottom))); max-height: none; margin: 0 auto 16px; padding: 8px !important; border-radius: 16px; }
+	#view-shorts, #shorts-view, .shorts-page-container, .shorts-container { width: 100%; height: calc(100dvh - 152px - env(safe-area-inset-bottom)); max-height: none; margin: 0 auto 16px; padding: 8px; }
+	#shorts-stage .short-card, .shorts-stage .short-card, .shorts-video-card { width: min(100%, calc((100dvh - 152px - env(safe-area-inset-bottom)) * 9 / 16)); height: auto; max-height: 100%; border-radius: 16px; }
+}
