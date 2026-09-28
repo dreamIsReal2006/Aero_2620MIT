@@ -276,6 +276,59 @@
         });
     }
 
+    function setupDockEdgeScroll() {
+        const dockList = document.querySelector('.dock-right .dock-scroll-wrapper');
+        if (!dockList) return;
+
+        let pointerY = null;
+        let animationFrame = 0;
+        let previousFrameTime = 0;
+
+        const stopScrolling = () => {
+            pointerY = null;
+            previousFrameTime = 0;
+            window.cancelAnimationFrame(animationFrame);
+            animationFrame = 0;
+        };
+
+        const scrollAtEdge = (time) => {
+            if (pointerY === null) return;
+
+            const rect = dockList.getBoundingClientRect();
+            const edgeSize = Math.min(45, rect.height / 3);
+            const localY = pointerY - rect.top;
+            let direction = 0;
+            let intensity = 0;
+
+            if (localY < edgeSize) {
+                direction = -1;
+                intensity = (edgeSize - localY) / edgeSize;
+            } else if (localY > rect.height - edgeSize) {
+                direction = 1;
+                intensity = (localY - (rect.height - edgeSize)) / edgeSize;
+            }
+
+            if (!direction || !intensity ||
+                (direction < 0 && dockList.scrollTop <= 0) ||
+                (direction > 0 && dockList.scrollTop >= dockList.scrollHeight - dockList.clientHeight)) {
+                animationFrame = 0;
+                previousFrameTime = 0;
+                return;
+            }
+
+            const elapsed = previousFrameTime ? Math.min(time - previousFrameTime, 32) : 16;
+            previousFrameTime = time;
+            dockList.scrollTop += direction * 360 * Math.min(intensity, 1) * elapsed / 1000;
+            animationFrame = window.requestAnimationFrame(scrollAtEdge);
+        };
+
+        dockList.addEventListener('mousemove', (event) => {
+            pointerY = event.clientY;
+            if (!animationFrame) animationFrame = window.requestAnimationFrame(scrollAtEdge);
+        });
+        dockList.addEventListener('mouseleave', stopScrolling);
+    }
+
     function setActiveFeedTab(type = 'for_you') {
         const forYouTab = document.getElementById('tab-for-you');
         const followingTab = document.getElementById('tab-following');
@@ -606,6 +659,7 @@
         setActiveFeedTab(initialFeedType);
         setFabAuthState(Boolean(localStorage.getItem('aero_token')));
         setupScrollPerformance();
+        setupDockEdgeScroll();
         window.addEventListener('resize', syncFabForViewport, { passive: true });
         window.addEventListener('resize', updateTabIndicator, { passive: true });
         updateTabIndicator();

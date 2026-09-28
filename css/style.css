@@ -2064,19 +2064,23 @@ body.dark-mode .search-shell.is-open .search-bar {
 .dock-left { left: 32px; }
 .dock-right { right: 32px; }
 .dock-left, .dock-right { width: 72px; min-height: 204px; justify-content: flex-start; align-items: center; padding: 12px 8px; }
-.dock-right { max-height: calc(100vh - 120px); min-height: 0; }
+.dock-right { height: 190px; max-height: 190px; min-height: 0; padding: 10px 8px; }
 .dock-right .dock-scroll-wrapper {
     min-height: 0;
     flex: 1 1 auto;
+    gap: 14px;
+    padding: 4px;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
+    scroll-behavior: auto;
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
 .dock-right .dock-scroll-wrapper::-webkit-scrollbar { display: none; }
+.dock-right .dock-btn { width: 40px; height: 40px; min-width: 40px; min-height: 40px; flex-shrink: 0; }
 
 .dock-btn, .dock-item, .icon-btn {
     width: 44px;
