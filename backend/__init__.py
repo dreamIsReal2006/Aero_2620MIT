@@ -142,10 +142,18 @@ def create_app():
         for name in ("hashtags", "post_hashtags", "user_hashtag_interests")
     ]
     with app.app_context():
-        db.session.execute(text(
-            "ALTER TABLE posts ADD COLUMN IF NOT EXISTS poll_json TEXT"
-        ))
-        db.session.commit()
+        try:
+            db.session.execute(text("SET LOCAL statement_timeout = '3s'"))
+            db.session.execute(text(
+                "ALTER TABLE posts ADD COLUMN IF NOT EXISTS poll_json TEXT"
+            ))
+            db.session.commit()
+        except Exception as error:
+            db.session.rollback()
+            logger.warning(
+                "Skipping poll_json column migration during app startup: %s",
+                error,
+            )
         db.metadata.create_all(
             bind=db.engine,
             tables=[db.metadata.tables["post_votes"]],
