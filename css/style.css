@@ -2818,6 +2818,27 @@ body.dark-mode .action-bar-capsule {
 .shorts-empty-content { display: grid; justify-items: center; gap: 14px; text-align: center; }
 .shorts-empty-upload { padding: 10px 18px; border: 1px solid rgba(255,255,255,.7); border-radius: 999px; color: var(--text-primary); background: rgba(255,255,255,.42); box-shadow: 0 8px 24px rgba(0,0,0,.08); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); cursor: pointer; font-weight: 700; }
 html.dark-mode .shorts-empty-upload, body.dark-mode .shorts-empty-upload { border-color: rgba(255,255,255,.12); color: var(--text-primary); background: #2C2C2E; }
+.composer-poll-builder-panel { margin: 10px 0 12px; animation: composerPollIn .2s cubic-bezier(.16,1,.3,1) both; }
+.poll-builder-card { display: grid; gap: 10px; padding: 12px; border: 1px solid rgba(0,0,0,.1); border-radius: 14px; background: rgba(255,255,255,.64); }
+.poll-options-inputs { display: grid; gap: 8px; }
+.poll-option-row { display: flex; min-width: 0; gap: 6px; }
+.poll-opt-input { width: 100%; min-width: 0; height: 42px; padding: 0 12px; border: 1px solid rgba(0,0,0,.14); border-radius: 10px; outline: none; background: rgba(255,255,255,.88); color: var(--text-primary); font: inherit; font-size: 14px; }
+.poll-opt-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(10,132,255,.12); }
+.poll-opt-del-btn, .poll-remove-all-btn { border: 0; background: transparent; color: var(--text-secondary); cursor: pointer; }
+.poll-opt-del-btn { width: 38px; flex: 0 0 38px; border-radius: 10px; font-size: 20px; }
+.poll-opt-del-btn:hover, .poll-remove-all-btn:hover { color: #d94b62; }
+.poll-add-opt-btn { display: inline-flex; width: fit-content; min-height: 34px; align-items: center; padding: 5px 9px; border: 0; border-radius: 8px; background: transparent; color: var(--accent-primary); cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; }
+.poll-add-opt-btn:hover { background: var(--accent-light-fill); }
+.poll-builder-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 9px; border-top: 1px solid var(--border-subtle); color: var(--text-secondary); font-size: 12px; }
+.poll-duration-control { display: flex; align-items: center; gap: 8px; }
+.poll-duration-control select { max-width: 130px; height: 32px; padding: 0 8px; border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--bg-glass); color: var(--text-primary); font: inherit; font-size: 12px; }
+.poll-duration-control select option { background: var(--bg-card); color: var(--text-primary); }
+[data-theme="dark"] .poll-builder-card, body.dark-mode .poll-builder-card { border-color: rgba(255,255,255,.12); background: rgba(255,255,255,.04); }
+[data-theme="dark"] .poll-opt-input, body.dark-mode .poll-opt-input { border-color: rgba(255,255,255,.14); background: rgba(255,255,255,.06); color: var(--text-primary); }
+[data-theme="dark"] .poll-opt-input::placeholder, body.dark-mode .poll-opt-input::placeholder { color: var(--text-secondary); opacity: 1; }
+[data-theme="dark"] .poll-duration-control select, body.dark-mode .poll-duration-control select { color-scheme: dark; border-color: rgba(255,255,255,.16); background: #252528; color: var(--text-primary); }
+.threads-toolbar [data-threads-action="poll"].is-active { background: var(--accent-light-fill); color: var(--accent-primary); }
+@keyframes composerPollIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 .thread-poll-container { display: grid; gap: 9px; margin: 0 0 16px; }
 .thread-poll-option { position: relative; isolation: isolate; display: flex; width: 100%; min-height: 48px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 15px; overflow: hidden; border: 1px solid rgba(0,0,0,.14); border-radius: 12px; background: rgba(255,255,255,.6); color: #20242a; cursor: pointer; font: inherit; text-align: left; transition: border-color .2s ease, background-color .2s ease, transform .2s ease; }
 .thread-poll-option:hover:not(:disabled) { transform: translateY(-1px); border-color: rgba(0,0,0,.28); background: rgba(0,0,0,.035); }

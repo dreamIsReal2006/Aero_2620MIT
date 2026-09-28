@@ -3578,7 +3578,105 @@ function exportPostCard(postId, content, username, details = {}) {
 
 const threadsPostState = [{ content: '', files: [], gif: '' }];
 let threadsActivePostIndex = 0;
+const staticPollState = { active: false, options: ['', ''], duration: 24 };
 const mentionPickerState = { menu: null, timer: null, requestId: 0, items: [], activeIndex: -1, match: null };
+
+function staticPollText(key, values = {}) {
+    return window.AeroI18n?.t(key, values) || key;
+}
+
+function renderStaticPollUI() {
+    const options = staticPollState.options.map((option, index) => {
+        const label = staticPollText('poll_option_placeholder', { number: index + 1 });
+        const removeLabel = staticPollText('poll_remove_option', { number: index + 1 });
+        return `<div class="poll-option-row"><input type="text" class="poll-opt-input" data-idx="${index}" value="${escapeHtml(option)}" placeholder="${escapeHtml(label)}" maxlength="40" aria-label="${escapeHtml(label)}">${staticPollState.options.length > 2 ? `<button type="button" class="poll-opt-del-btn" data-idx="${index}" aria-label="${escapeHtml(removeLabel)}">×</button>` : ''}</div>`;
+    }).join('');
+    const durations = [[1, 'poll_1_hour'], [6, 'poll_6_hours'], [12, 'poll_12_hours'], [24, 'poll_24_hours'], [72, 'poll_3_days'], [168, 'poll_7_days']];
+    const addOption = staticPollText('poll_add_option');
+    const durationLabel = staticPollText('poll_duration');
+    const removePoll = staticPollText('poll_remove');
+    return `<div class="poll-builder-card"><div class="poll-options-inputs">${options}</div>${staticPollState.options.length < 4 ? `<button type="button" class="poll-add-opt-btn" id="poll-add-opt-action">+ ${escapeHtml(addOption)}</button>` : ''}<div class="poll-builder-footer"><label class="poll-duration-control"><span>${escapeHtml(durationLabel)}</span><select id="poll-duration-select" aria-label="${escapeHtml(durationLabel)}">${durations.map(([hours, key]) => `<option value="${hours}">${escapeHtml(staticPollText(key))}</option>`).join('')}</select></label><button type="button" class="poll-remove-all-btn" id="poll-remove-all-action">${escapeHtml(removePoll)}</button></div></div>`;
+}
+
+function bindStaticPollEvents(container) {
+    const durationSelect = container.querySelector('#poll-duration-select');
+    if (durationSelect) durationSelect.value = String(staticPollState.duration);
+    container.querySelector('#poll-add-opt-action')?.addEventListener('click', () => {
+        if (staticPollState.options.length >= 4) return;
+        staticPollState.options.push('');
+        container.innerHTML = renderStaticPollUI();
+        bindStaticPollEvents(container);
+        container.querySelector('.poll-option-row:last-child .poll-opt-input')?.focus();
+        updateThreadsComposerState();
+    });
+    container.querySelectorAll('.poll-opt-del-btn').forEach((button) => button.addEventListener('click', () => {
+        if (staticPollState.options.length <= 2) return;
+        staticPollState.options.splice(Number(button.dataset.idx), 1);
+        container.innerHTML = renderStaticPollUI();
+        bindStaticPollEvents(container);
+        updateThreadsComposerState();
+    }));
+    container.querySelectorAll('.poll-opt-input').forEach((input) => input.addEventListener('input', () => {
+        staticPollState.options[Number(input.dataset.idx)] = input.value;
+        updateThreadsComposerState();
+    }));
+    durationSelect?.addEventListener('change', () => { staticPollState.duration = Number(durationSelect.value) || 24; });
+    container.querySelector('#poll-remove-all-action')?.addEventListener('click', () => {
+        staticPollState.active = false;
+        staticPollState.options = ['', ''];
+        document.getElementById('static-composer-poll-builder')?.remove();
+        document.querySelector('#threads-compose-overlay [data-threads-action="poll"]')?.classList.remove('is-active');
+        document.getElementById('threads-add-chain-btn').disabled = threadsPostState.length >= 10;
+        updateThreadsComposerState();
+    });
+}
+
+function toggleStaticPollBuilder(overlay) {
+    const existing = document.getElementById('static-composer-poll-builder');
+    if (existing) {
+        existing.remove();
+        staticPollState.active = false;
+        staticPollState.options = ['', ''];
+        staticPollState.duration = 24;
+        overlay.querySelector('[data-threads-action="poll"]')?.classList.remove('is-active');
+    } else {
+        if (threadsPostState.length > 1) {
+            const error = document.getElementById('threads-compose-error');
+            error.textContent = staticPollText('poll_thread_single');
+            error.classList.remove('hidden');
+            return;
+        }
+        staticPollState.active = true;
+        staticPollState.options = ['', ''];
+        staticPollState.duration = 24;
+        const textarea = overlay.querySelector('.threads-post-item[data-index="0"] .threads-textarea');
+        const content = textarea?.closest('.threads-post-content');
+        if (!content) return;
+        const panel = document.createElement('div');
+        panel.id = 'static-composer-poll-builder';
+        panel.className = 'composer-poll-builder-panel';
+        panel.innerHTML = renderStaticPollUI();
+        textarea.insertAdjacentElement('afterend', panel);
+        bindStaticPollEvents(panel);
+        overlay.querySelector('[data-threads-action="poll"]')?.classList.add('is-active');
+    }
+    document.getElementById('threads-add-chain-btn').disabled = staticPollState.active || threadsPostState.length >= 10;
+    updateThreadsComposerState();
+}
+
+function updateStaticPollLanguage(overlay) {
+    const pollButton = overlay.querySelector('[data-threads-action="poll"]');
+    const pollLabel = staticPollText('poll');
+    if (pollButton) {
+        pollButton.title = pollLabel;
+        pollButton.setAttribute('aria-label', pollLabel);
+    }
+    const panel = document.getElementById('static-composer-poll-builder');
+    if (panel && staticPollState.active) {
+        panel.innerHTML = renderStaticPollUI();
+        bindStaticPollEvents(panel);
+    }
+}
 
 function mentionAtCaret(input) {
     if (input.selectionStart !== input.selectionEnd) return null;
@@ -3786,7 +3884,8 @@ function updateThreadsComposerState() {
     textareas.forEach((textarea, index) => {
         if (threadsPostState[index]) threadsPostState[index].content = textarea.value;
     });
-    submitButton.disabled = !threadsPostState.some((post) => post.content.trim() || post.files.length || post.gif);
+    const validPoll = staticPollState.active && staticPollState.options.every((option) => option.trim()) && new Set(staticPollState.options.map((option) => option.trim().toLocaleLowerCase())).size === staticPollState.options.length;
+    submitButton.disabled = !threadsPostState.some((post) => post.content.trim() || post.files.length || post.gif) && !validPoll;
 }
 
 function updateThreadsUser() {
@@ -3839,11 +3938,15 @@ function closeThreadsCompose(saveDraft = true) {
     document.getElementById('threads-topic-menu')?.classList.add('hidden');
     document.getElementById('threads-options-menu')?.classList.add('hidden');
     document.getElementById('threads-schedule-field')?.classList.add('hidden');
+    document.getElementById('static-composer-poll-builder')?.remove();
     document.getElementById('threads-gif-picker')?.classList.add('hidden');
     document.getElementById('threads-emoji-picker')?.classList.add('hidden');
     closeThreadsPanels();
     threadsPostState.splice(0, threadsPostState.length, { content: '', files: [], gif: '' });
     threadsActivePostIndex = 0;
+    staticPollState.active = false;
+    staticPollState.options = ['', ''];
+    staticPollState.duration = 24;
     const root = document.querySelector('#threads-compose-editor .threads-post-item[data-index="0"]');
     if (root) {
         const textarea = root.querySelector('.threads-textarea');
@@ -3855,6 +3958,10 @@ function closeThreadsCompose(saveDraft = true) {
     const submitButton = document.getElementById('threads-submit-btn');
     if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Post'; }
     document.getElementById('threads-compose-error')?.classList.add('hidden');
+    const pollButton = overlay.querySelector('[data-threads-action="poll"]');
+    pollButton?.classList.remove('is-active');
+    if (pollButton) pollButton.disabled = false;
+    document.getElementById('threads-add-chain-btn').disabled = false;
 }
 
 function closeThreadsPanels(exceptId = '') {
@@ -3953,28 +4060,39 @@ function renderThreadsDrafts() {
 
 async function publishThreadsPosts() {
     updateThreadsComposerState();
-    const entries = threadsPostState.filter((post) => post.content.trim() || post.files.length || post.gif);
+    const entries = threadsPostState.filter((post) => post.content.trim() || post.files.length || post.gif || (staticPollState.active && post === threadsPostState[0]));
     if (!entries.length) return;
     const button = document.getElementById('threads-submit-btn');
     const error = document.getElementById('threads-compose-error');
     button.disabled = true;
     error.classList.add('hidden');
     try {
+        if (staticPollState.active) {
+            if (threadsPostState.length !== 1) throw new Error('投票仅支持单条帖子。');
+            const options = staticPollState.options.map((option) => option.trim());
+            if (options.some((option) => !option)) throw new Error(staticPollText('poll_option_required'));
+            if (new Set(options.map((option) => option.toLocaleLowerCase())).size !== options.length) throw new Error(staticPollText('poll_option_duplicate'));
+        }
         const posts = await Promise.all(entries.map(async (post) => ({
             content: post.content.trim(),
             images: [...await Promise.all(post.files.map((file) => AeroAPI.uploadMedia(file))), ...(post.gif ? [post.gif] : [])],
         })));
-        const response = await fetch(`${API_BASE}/posts/chain`, {
+        const poll = staticPollState.active ? {
+            options: staticPollState.options.map((option) => option.trim()),
+            expires_at: new Date(Date.now() + staticPollState.duration * 60 * 60 * 1000).toISOString(),
+        } : null;
+        const metadata = {
+            reply_permission: document.getElementById('threads-reply-permission').value,
+            review_replies: document.getElementById('threads-review-replies').checked,
+            share_to: document.getElementById('threads-share-to').value,
+            scheduled_at: document.getElementById('threads-scheduled-at').value || null,
+            topic: document.querySelector('.selected-topic')?.textContent || '',
+        };
+        const isSinglePost = posts.length === 1;
+        const response = await fetch(`${API_BASE}/posts${isSinglePost ? '' : '/chain'}`, {
             method: 'POST',
             headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                posts,
-                reply_permission: document.getElementById('threads-reply-permission').value,
-                review_replies: document.getElementById('threads-review-replies').checked,
-                share_to: document.getElementById('threads-share-to').value,
-                scheduled_at: document.getElementById('threads-scheduled-at').value || null,
-                topic: document.querySelector('.selected-topic')?.textContent || '',
-            }),
+            body: JSON.stringify(isSinglePost ? { ...posts[0], ...metadata, poll } : { ...metadata, posts }),
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.message || 'Unable to publish thread');
@@ -3995,6 +4113,8 @@ function openCreatePostModal(event) {
 function setupCreatePostExperience() {
     const overlay = document.getElementById('threads-compose-overlay');
     if (!overlay) return;
+    updateStaticPollLanguage(overlay);
+    window.addEventListener('aero:language-change', () => updateStaticPollLanguage(overlay));
     if (!mentionPickerState.menu) {
         mentionPickerState.menu = document.createElement('div');
         mentionPickerState.menu.className = 'mention-dropdown-menu hidden';
@@ -4076,10 +4196,14 @@ function setupCreatePostExperience() {
             }
             closeThreadsPanels();
         }
-        if (action === 'poll' || action === 'quote') {
+        if (action === 'poll') {
+            closeThreadsPanels();
+            toggleStaticPollBuilder(overlay);
+        }
+        if (action === 'quote') {
             closeThreadsPanels();
             const textarea = overlay.querySelector(`.threads-post-item[data-index="${threadsActivePostIndex}"] .threads-textarea`);
-            if (textarea) { textarea.value += action === 'poll' ? `${textarea.value ? '\n' : ''}Poll: ` : '“”'; updateThreadsComposerState(); textarea.focus(); }
+            if (textarea) { textarea.value += '“”'; updateThreadsComposerState(); textarea.focus(); }
         }
         if (action === 'location') {
             closeThreadsPanels();
