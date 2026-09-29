@@ -357,6 +357,7 @@
     }
 
     async function loadProfileView(userId = null) {
+        await window.AeroMentionDirectoryReady;
         const section = document.getElementById('profile-view');
         const container = document.getElementById('profile-posts-container');
         const header = document.getElementById('profile-header');
@@ -498,6 +499,7 @@
     }
 
     async function loadProfileContent(userId, contentType, user, avatar) {
+        await window.AeroMentionDirectoryReady;
         const container = document.getElementById('profile-posts-container');
         if (!container) return;
         container.innerHTML = '<div class="profile-loading" aria-live="polite">Loading...</div>';
@@ -558,6 +560,7 @@
     }
 
     async function loadPostDetail(postId) {
+        await window.AeroMentionDirectoryReady;
         const container = document.getElementById('post-detail-content');
         if (!container) return;
         const requestId = ++postDetailRequestId;
@@ -892,6 +895,10 @@
         else if (sharedProfile) navigate('profile', { userId: /^\d+$/.test(sharedProfile) ? Number(sharedProfile) : sharedProfile });
         else if (legacyProfile) navigate('profile', { userId: Number(legacyProfile[1]) });
         else navigate('main');
+        const chatUserId = Number(routeParams.get('user_id'));
+        if (Number.isInteger(chatUserId) && chatUserId > 0) {
+            window.setTimeout(() => window.AeroOpenChatWithUser?.(chatUserId), 0);
+        }
         window.addEventListener('popstate', () => {
             const currentPost = window.location.hash.match(/^#post\/(\d+)$/);
             if (currentPost) {

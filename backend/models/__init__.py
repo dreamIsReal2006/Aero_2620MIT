@@ -11,6 +11,9 @@ from backend.models.notification import Notification
 from backend.models.comment_like import CommentLike
 from backend.models.video import Video
 from backend.models.message import Message
+from backend.models.chat_email_cooldown import ChatEmailCooldown
+from backend.models.user_custom_gif import UserCustomGif
+from backend.models.media_processing_job import MediaProcessingJob
 from backend.models.video_comment import VideoComment
 from backend.models.video_like import VideoLike
 from backend.models.note import Note

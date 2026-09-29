@@ -3,11 +3,17 @@ import datetime as dt
 import logging
 import math
 import base64
+import re
+import subprocess
+import tempfile
 import threading
 import time
+import uuid
+from io import BytesIO
 from pathlib import Path
 
 from flask import current_app, jsonify, request
+from PIL import Image, ImageOps
 from sqlalchemy import false, func, or_, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import contains_eager, load_only
@@ -29,6 +35,7 @@ from backend.models import (
     PostHashtag,
     Report,
     User,
+    MediaProcessingJob,
     UserInteraction,
 )
 from backend.mentions import add_mention_notifications
@@ -54,6 +61,7 @@ HDR_IMAGE_EXTENSIONS = {"avif", "heic", "heif"}
 HDR_VIDEO_EXTENSIONS = {"mp4", "webm", "mov", "m4v"}
 VIDEO_UPLOAD_LIMIT = 1024 * 1024 * 1024
 POST_CACHE_TTL_SECONDS = 15
+MAX_IMAGE_DIMENSION = 2048
 _post_response_cache = {}
 _post_cache_lock = threading.Lock()
 logger = logging.getLogger(__name__)
@@ -487,6 +495,118 @@ def get_posts(current_user):
     return jsonify(response)
 
 
+def _optimize_uploaded_image(file):
+    try:
+        file.stream.seek(0)
+        with Image.open(file.stream) as source:
+            image = ImageOps.exif_transpose(source)
+            has_alpha = image.mode in {"RGBA", "LA"} or "transparency" in image.info
+            image = image.convert("RGBA" if has_alpha else "RGB")
+            image.thumbnail((MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION), Image.Resampling.LANCZOS)
+            optimized = BytesIO()
+            image.save(optimized, format="WEBP", quality=82, method=6)
+            optimized.seek(0)
+            optimized.filename = f"{Path(secure_filename(file.filename)).stem or 'image'}.webp"
+            optimized.mimetype = "image/webp"
+            return optimized
+    except Exception:
+        file.stream.seek(0)
+        logger.exception("Unable to optimize uploaded image; storing original instead")
+        return file
+
+
+def _set_media_job_state(app, job_id, **changes):
+    with app.app_context():
+        job = db.session.get(MediaProcessingJob, job_id)
+        if not job:
+            return
+        for key, value in changes.items():
+            setattr(job, key, value)
+        db.session.commit()
+
+
+def _transcode_post_video(app, job_id, user_id, source_path, folder):
+    output_path = f"{source_path}.mp4"
+    try:
+        import imageio_ffmpeg
+
+        ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        probe = subprocess.run(
+            [ffmpeg, "-hide_banner", "-i", source_path],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        probe_output = probe.stderr or probe.stdout
+        duration_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", probe_output)
+        duration = None
+        if duration_match:
+            duration = int(duration_match.group(1)) * 3600 + int(duration_match.group(2)) * 60 + float(duration_match.group(3))
+        _set_media_job_state(app, job_id, status="processing", progress=5)
+        scale_filter = "scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2"
+        process = subprocess.Popen(
+            [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", source_path,
+             "-map", "0:v:0", "-map", "0:a?", "-vf", scale_filter,
+             "-c:v", "libx264", "-preset", "fast", "-crf", "24",
+             "-c:a", "aac", "-b:a", "128k", "-pix_fmt", "yuv420p",
+             "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", output_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            bufsize=1,
+        )
+        last_progress = 5
+        for line in process.stdout or ():
+            if not line.startswith("out_time_ms=") or not duration:
+                continue
+            try:
+                elapsed = int(line.partition("=")[2]) / 1_000_000
+            except ValueError:
+                continue
+            progress = min(94, max(5, 5 + int(elapsed / duration * 89)))
+            if progress >= last_progress + 2:
+                _set_media_job_state(app, job_id, status="processing", progress=progress)
+                last_progress = progress
+        if process.wait() != 0 or not Path(output_path).is_file():
+            raise RuntimeError("Video transcoding failed. Try another MP4, MOV, or WebM file.")
+
+        upload = BytesIO(Path(output_path).read_bytes())
+        upload.filename = f"post-{uuid.uuid4().hex}.mp4"
+        upload.mimetype = "video/mp4"
+        media_url = upload_file_to_supabase(upload, folder)
+        _set_media_job_state(app, job_id, status="completed", progress=100, media_url=media_url, error_message="")
+    except Exception as error:
+        logger.exception("Unable to transcode post video job %s", job_id)
+        _set_media_job_state(
+            app,
+            job_id,
+            status="failed",
+            error_message=str(error)[:500] or "Video processing failed",
+        )
+    finally:
+        for path in (source_path, output_path):
+            try:
+                Path(path).unlink(missing_ok=True)
+            except OSError:
+                logger.warning("Unable to remove temporary media file %s", path)
+
+
+@feed_bp.get("/uploads/jobs/<string:job_id>")
+@token_required
+def get_upload_job(current_user, job_id):
+    job = db.session.get(MediaProcessingJob, job_id)
+    if not job or job.user_id != current_user.id:
+        return jsonify({"message": "Upload job not found"}), 404
+    return jsonify({
+        "job_id": job.id,
+        "status": job.status,
+        "progress": job.progress,
+        "url": job.media_url or None,
+        "message": job.error_message or None,
+    }), 200
+
+
 @feed_bp.post("/uploads")
 @token_required
 def upload_media(current_user):
@@ -505,8 +625,36 @@ def upload_media(current_user):
         return jsonify({"message": "Supported media: JPG, PNG, WEBP, HEIC, HEIF, MP4, WEBM, MOV, or M4V"}), 400
     if extension in HDR_VIDEO_EXTENSIONS and request.content_length and request.content_length > VIDEO_UPLOAD_LIMIT:
         return jsonify({"message": "Video files must be 1 GB or smaller"}), 413
+    folder = request.form.get("folder", "posts")
+    if extension in HDR_VIDEO_EXTENSIONS:
+        source_file = None
+        try:
+            source_file = tempfile.NamedTemporaryFile(prefix="aero-post-video-", suffix=f".{extension}", delete=False)
+            source_path = source_file.name
+            source_file.close()
+            file.save(source_path)
+            job_id = str(uuid.uuid4())
+            db.session.add(MediaProcessingJob(id=job_id, user_id=current_user.id, status="queued", progress=0))
+            db.session.commit()
+            app = current_app._get_current_object()
+            threading.Thread(
+                target=_transcode_post_video,
+                args=(app, job_id, current_user.id, source_path, folder),
+                daemon=True,
+                name=f"post-video-{job_id}",
+            ).start()
+            return jsonify({"job_id": job_id, "status": "queued"}), 202
+        except Exception:
+            db.session.rollback()
+            if source_file:
+                Path(source_file.name).unlink(missing_ok=True)
+            logger.exception("Unable to enqueue post video transcode")
+            return jsonify({"message": "Unable to process this video upload"}), 500
+    original_file = file
+    if extension in ALLOWED_MEDIA_TYPES and ALLOWED_MEDIA_TYPES[extension] == "image/" and extension != "gif":
+        file = _optimize_uploaded_image(file)
+    image_optimized = file is not original_file
     try:
-        folder = request.form.get("folder", "posts")
         public_url = upload_file_to_supabase(file, folder)
     except (RuntimeError, ValueError) as error:
         return jsonify({"message": str(error)}), 500
@@ -514,7 +662,8 @@ def upload_media(current_user):
         "url": public_url,
         "media_kind": "video" if extension in HDR_VIDEO_EXTENSIONS else "image",
         "hdr_candidate": extension in HDR_IMAGE_EXTENSIONS or extension in HDR_VIDEO_EXTENSIONS,
-        "original_preserved": True,
+        "optimized": image_optimized,
+        "original_preserved": not image_optimized,
     }), 201
 
 

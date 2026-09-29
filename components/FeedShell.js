@@ -23,7 +23,7 @@ const composerTranslations = {
     select_publish_time: 'Schedule post...', complete: 'Done', recommended_tags: 'Add suggested tag', scheduled_post: 'Schedule', no_drafts: 'No drafts yet', unnamed_draft: 'Untitled draft',
     selected_gif: 'Selected GIF', remove_gif: 'Remove GIF', choose_topic: 'Choose community or topic', post_attachments: 'Post attachments and tools',
     poll_option_placeholder: 'Option {number}', add_poll_option: 'Add another option', remove_poll_option: 'Remove option', remove_poll: 'Remove poll', poll_duration: 'Poll duration', poll_1_hour: '1 hour', poll_6_hours: '6 hours', poll_12_hours: '12 hours', poll_24_hours: '24 hours', poll_3_days: '3 days', poll_7_days: '7 days', poll_option_required: 'Enter text for every poll option.', poll_options_distinct: 'Poll options must be different.', poll_thread_unavailable: 'Polls can only be added to a single post.',
-    unsupported_voice: 'Voice input is not supported in this browser.', unsupported_audio: 'Audio attachments are not available yet.', unable_upload: 'Unable to upload media', unable_publish: 'Unable to publish post',
+    unsupported_voice: 'Voice input is not supported in this browser.', unsupported_audio: 'Audio attachments are not available yet.', unable_upload: 'Unable to upload media', unable_publish: 'Unable to publish post', optimizing_media: 'Optimizing media…', uploading_media: 'Uploading media…', compressing_video: 'Compressing video…', publishing_post: 'Publishing post…',
     device_location: 'This device cannot provide a location.', location_failed: 'Unable to get your location.', remove_thread_post: 'Remove thread post',
   },
   zh: {
@@ -36,10 +36,96 @@ const composerTranslations = {
     select_publish_time: '预设发布时间...', complete: '完成', recommended_tags: '添加推荐标签', scheduled_post: '定时发布', no_drafts: '还没有草稿', unnamed_draft: '未命名草稿',
     selected_gif: '所选 GIF', remove_gif: '移除 GIF', choose_topic: '选择社群或话题', post_attachments: '帖子附件和工具',
     poll_option_placeholder: '选项 {number}', add_poll_option: '添加另一选项', remove_poll_option: '移除选项', remove_poll: '移除投票', poll_duration: '投票时长', poll_1_hour: '1 小时', poll_6_hours: '6 小时', poll_12_hours: '12 小时', poll_24_hours: '24 小时', poll_3_days: '3 天', poll_7_days: '7 天', poll_option_required: '请填写所有投票选项。', poll_options_distinct: '投票选项不能重复。', poll_thread_unavailable: '投票仅支持单条帖子。',
-    unsupported_voice: '此浏览器暂不支持语音输入。', unsupported_audio: '音频附件暂不可用。', unable_upload: '无法上传媒体', unable_publish: '无法发布帖子',
+    unsupported_voice: '此浏览器暂不支持语音输入。', unsupported_audio: '音频附件暂不可用。', unable_upload: '无法上传媒体', unable_publish: '无法发布帖子', optimizing_media: '正在优化媒体…', uploading_media: '正在上传媒体…', compressing_video: '正在压缩视频…', publishing_post: '正在发布帖子…',
     device_location: '此设备无法获取位置。', location_failed: '无法获取位置。', remove_thread_post: '删除串文',
   },
 };
+
+const postPreviewUrls = new WeakMap();
+
+function getPostPreviewUrl(file) {
+  if (!postPreviewUrls.has(file)) postPreviewUrls.set(file, URL.createObjectURL(file));
+  return postPreviewUrls.get(file);
+}
+
+function releasePostPreviewUrl(file) {
+  const url = postPreviewUrls.get(file);
+  if (url) URL.revokeObjectURL(url);
+  postPreviewUrls.delete(file);
+}
+
+async function optimizePostImage(file) {
+  if (!file?.type?.startsWith('image/') || ['image/gif', 'image/svg+xml'].includes(file.type)) return file;
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const scale = Math.min(1, 2048 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext('2d');
+    if (!context) return file;
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    let blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', 0.84));
+    if (!blob || blob.type !== 'image/webp') {
+      context.fillStyle = '#fff';
+      context.globalCompositeOperation = 'destination-over';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.84));
+    }
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'image'}${blob.type === 'image/webp' ? '.webp' : '.jpg'}`, { type: blob.type, lastModified: file.lastModified });
+  } catch {
+    return file;
+  } finally {
+    bitmap?.close?.();
+  }
+}
+
+function uploadPostFile(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const request = new XMLHttpRequest();
+    request.open('POST', getValidUrl('api/uploads'));
+    Object.entries(apiHeaders()).forEach(([name, value]) => request.setRequestHeader(name, value));
+    request.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) onProgress?.({ phase: 'uploading', percent: Math.round((event.loaded / event.total) * 70) });
+    });
+    request.addEventListener('load', () => {
+      let payload = {};
+      try { payload = JSON.parse(request.responseText || '{}'); } catch {}
+      if (request.status < 200 || request.status >= 300) reject(new Error(payload.message || 'Unable to upload media'));
+      else resolve({ status: request.status, payload });
+    });
+    request.addEventListener('error', () => reject(new Error('Unable to upload media. Check your connection and try again.')));
+    onProgress?.({ phase: 'uploading', percent: 0 });
+    request.send(formData);
+  });
+}
+
+async function uploadPostMediaFile(file, onProgress) {
+  onProgress?.({ phase: 'compressing', percent: 0 });
+  const optimized = await optimizePostImage(file);
+  const { status, payload } = await uploadPostFile(optimized, onProgress);
+  let url = payload.url;
+  if (status === 202 && payload.job_id) {
+    const deadline = Date.now() + 20 * 60 * 1000;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => window.setTimeout(resolve, 900));
+      const response = await fetch(getValidUrl(`api/uploads/jobs/${encodeURIComponent(payload.job_id)}`), { headers: apiHeaders() });
+      const job = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(job.message || 'Unable to check video processing status');
+      onProgress?.({ phase: job.status === 'failed' ? 'failed' : 'processing', percent: 70 + Math.round((Number(job.progress) || 0) * 0.3) });
+      if (job.status === 'completed' && job.url) { url = job.url; break; }
+      if (job.status === 'failed') throw new Error(job.message || 'Video processing failed');
+    }
+    if (!url) throw new Error('Video processing timed out. Please try again.');
+  }
+  if (!url) throw new Error('Media upload completed without a URL');
+  onProgress?.({ phase: 'complete', percent: 100 });
+  return String(url).startsWith('http') ? url : getValidUrl(url);
+}
 
 async function getFeedPage(feedType, userId, cursor, limit) {
   const params = new URLSearchParams({ feed_type: feedType, limit: String(limit) });
@@ -208,10 +294,11 @@ function installMentionPicker(textarea) {
   };
   const update = () => {
     const prefix = textarea.value.slice(0, textarea.selectionStart);
-    const found = prefix.match(/(^|[\s([{])([@#])([\p{L}\p{N}_.-]*)$/u);
+    const found = prefix.match(/(^|[\s([{])([@#])([\p{L}\p{N}_ .-]*)$/u);
     if (!found || textarea.selectionStart !== textarea.selectionEnd) { hide(); return; }
     const kind = found[2] === '@' ? 'mention' : 'hashtag';
-    if (kind === 'mention' && !/^[A-Za-z0-9_.-]*$/.test(found[3])) { hide(); return; }
+    if (kind === 'mention' && !/^[A-Za-z0-9_ ]*$/.test(found[3])) { hide(); return; }
+    if (kind === 'hashtag' && found[3].includes(' ')) { hide(); return; }
     match = { start: textarea.selectionStart - found[0].length + found[1].length, end: textarea.selectionStart, query: found[3], kind };
     showMessage(kind === 'hashtag' ? '正在寻找标签...' : '正在寻找用户...');
     const currentMatch = match;
@@ -283,6 +370,7 @@ export default function FeedShell() {
   const [scheduledAt, setScheduledAt] = useState('');
   const [selectedGif, setSelectedGif] = useState('');
   const [composerError, setComposerError] = useState('');
+  const [mediaUploadProgress, setMediaUploadProgress] = useState(null);
   const [language, setLanguage] = useState('en');
   const uploadInputRef = useRef(null);
   const activeComposerTextareaRef = useRef(null);
@@ -405,6 +493,7 @@ export default function FeedShell() {
     if (save && threadPosts.some((post) => post.content.trim() || post.files.length)) {
       persistDrafts([{ id: Date.now(), posts: threadPosts.map(({ content }) => ({ content })), topic, updatedAt: new Date().toISOString() }, ...savedDrafts]);
     }
+    threadPosts.forEach((post) => post.files.forEach(releasePostPreviewUrl));
     setComposerOpen(false);
     setComposerView('compose');
     setPollData(null);
@@ -416,14 +505,6 @@ export default function FeedShell() {
     setTopic(saved.topic || 'profile');
     setPollData(null);
     setComposerView('compose');
-  };
-  const uploadPostMedia = async (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await fetch(getValidUrl('api/uploads'), { method: 'POST', headers: apiHeaders(), body: formData });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.message || 'Unable to upload media');
-    return payload.url;
   };
   const publish = async (event) => {
     event.preventDefault();
@@ -439,10 +520,22 @@ export default function FeedShell() {
     const button = event.currentTarget.querySelector('[type="submit"]');
     button.disabled = true;
     try {
+      const mediaFiles = entries.flatMap((post) => post.files);
+      const progressValues = Array(mediaFiles.length).fill(0);
+      let mediaIndex = 0;
+      if (mediaFiles.length) setMediaUploadProgress({ phase: 'compressing', percent: 0 });
       const payloadPosts = await Promise.all(entries.map(async (post) => ({
         content: post.content.trim(),
-        images: [...await Promise.all(post.files.map(uploadPostMedia)), ...(post === threadPosts[0] && selectedGif ? [selectedGif] : [])],
+        images: [...await Promise.all(post.files.map((file) => {
+          const index = mediaIndex++;
+          return uploadPostMediaFile(file, (status) => {
+            progressValues[index] = status.percent;
+            const percent = progressValues.reduce((sum, value) => sum + value, 0) / Math.max(1, progressValues.length);
+            setMediaUploadProgress({ phase: status.phase, percent });
+          });
+        })), ...(post === threadPosts[0] && selectedGif ? [selectedGif] : [])],
       })));
+      if (mediaFiles.length) setMediaUploadProgress({ phase: 'publishing', percent: 100 });
       const body = {
         posts: payloadPosts,
         scheduled_at: scheduledAt || null,
@@ -466,6 +559,7 @@ export default function FeedShell() {
       if (!response.ok) throw new Error(result.message || 'Unable to publish post');
       const createdPosts = result.posts || [result.post || result];
       setPosts((current) => [...createdPosts, ...current]);
+      threadPosts.forEach((post) => post.files.forEach(releasePostPreviewUrl));
       setThreadPosts([{ id: Date.now(), content: '', files: [] }]);
       setSelectedGif('');
       setPollData(null);
@@ -476,6 +570,7 @@ export default function FeedShell() {
       setComposerError(error.message || 'Unable to publish post');
     } finally {
       button.disabled = false;
+      setMediaUploadProgress(null);
     }
   };
   const topicOptions = [
@@ -552,7 +647,7 @@ export default function FeedShell() {
                   <div className="threads-post-content">
                     {index > 0 && <div className="threads-post-byline"><strong>{user.username || user.display_name || 'User'}</strong><span>{index + 1}/{threadPosts.length}</span><button type="button" className="threads-remove-post" aria-label={t('remove_thread')} onClick={() => setThreadPosts((current) => current.filter((_, itemIndex) => itemIndex !== index))}>×</button></div>}
                     <textarea autoFocus={index === 0} data-thread-index={index} value={post.content} maxLength={5000} placeholder={t('write_something')} aria-label={`${t('add_to_thread')} ${index + 1}`} onFocus={(event) => { activeComposerTextareaRef.current = event.currentTarget; }} onSelect={(event) => { activeComposerTextareaRef.current = event.currentTarget; }} onChange={(event) => updateThreadPost(index, { content: event.target.value })} />
-                    {post.files.length > 0 && <div className="threads-upload-list">{post.files.map((file, fileIndex) => <span key={`${file.name}-${fileIndex}`}>{file.name}<button type="button" aria-label={t('remove_attachment')} onClick={() => updateThreadPost(index, { files: post.files.filter((_, itemIndex) => itemIndex !== fileIndex) })}>×</button></span>)}</div>}
+                    {post.files.length > 0 && <div className="threads-upload-previews">{post.files.map((file, fileIndex) => <div className="threads-upload-preview" key={`${file.name}-${file.lastModified}-${fileIndex}`}>{file.type.startsWith('video/') ? <video src={getPostPreviewUrl(file)} muted playsInline preload="metadata" /> : file.type.startsWith('image/') ? <img src={getPostPreviewUrl(file)} alt={`${file.name} preview`} /> : <span>{file.name}</span>}<span className="threads-upload-preview-name">{file.name}</span><button type="button" aria-label={t('remove_attachment')} onClick={() => { releasePostPreviewUrl(file); updateThreadPost(index, { files: post.files.filter((_, itemIndex) => itemIndex !== fileIndex) }); }}>×</button></div>)}</div>}
                   </div>
                 </div>)}
               </div>
@@ -571,7 +666,7 @@ export default function FeedShell() {
                 <button type="button" title={t('quote')} aria-label={t('quote')} onClick={() => { setActivePanel('none'); setActiveSubpanel('none'); appendToPost(0, '“”'); }}><Icon name="quote" /></button>
                 <button type="button" title={t('location')} aria-label={t('location')} onClick={() => { setActivePanel('none'); setActiveSubpanel('none'); if (!navigator.geolocation) setComposerError(t('device_location')); else navigator.geolocation.getCurrentPosition(({ coords }) => appendToPost(0, ` 📍${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`), () => setComposerError(t('location_failed'))); }}><Icon name="pin" /></button>
                 <button type="button" title={t('audio')} aria-label={t('audio')} onClick={() => setComposerError(t('unsupported_audio'))}><Icon name="audio" /></button>
-                <input ref={uploadInputRef} type="file" accept="image/*,video/*" multiple hidden onChange={(event) => { const files = [...threadPosts[0].files, ...Array.from(event.target.files || [])].slice(0, 10); updateThreadPost(0, { files }); event.target.value = ''; }} />
+                <input ref={uploadInputRef} type="file" accept="image/*,video/*" multiple hidden onChange={(event) => { const selected = Array.from(event.target.files || []); const files = [...threadPosts[0].files, ...selected].slice(0, 10); if (selected.length > 10 - threadPosts[0].files.length) setComposerError('A post can include at most 10 media files.'); updateThreadPost(0, { files }); event.target.value = ''; }} />
               </div>
               {pollData && <section className="threads-poll-builder" aria-label={t('poll')}>
                 <div className="threads-poll-options">
@@ -588,6 +683,7 @@ export default function FeedShell() {
               </section>}
               {isPanelOpen('gif') && <div className={`threads-gif-picker threads-dropdown-menu${activePanel.endsWith('-closing') ? ' is-closing' : ''}`}>{['https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif', 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif', 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif'].map((url) => <button type="button" key={url} onClick={() => { setSelectedGif(url); setActivePanel('none'); }}><img src={url} alt={t('select_gif')} /></button>)}</div>}
               {composerError && <p className="threads-compose-error" role="status">{composerError}</p>}
+              {mediaUploadProgress && <div className="media-upload-progress" role="status" aria-live="polite"><div className="media-upload-progress-label"><span>{mediaUploadProgress.phase === 'compressing' ? t('optimizing_media') : mediaUploadProgress.phase === 'processing' ? t('compressing_video') : mediaUploadProgress.phase === 'publishing' ? t('publishing_post') : t('uploading_media')}</span><span>{Math.round(mediaUploadProgress.percent)}%</span></div><progress max="100" value={mediaUploadProgress.percent} aria-label="Media upload progress" /></div>}
             </div>
             <footer className="threads-compose-footer">
               <div className="threads-compose-footer-left">

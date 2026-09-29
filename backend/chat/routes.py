@@ -1,15 +1,27 @@
 import json
+import logging
+import os
+import re
+import subprocess
+import tempfile
+import threading
+from datetime import datetime, timedelta
+from io import BytesIO
 from pathlib import Path
+from urllib.parse import urlencode
+from urllib.request import urlopen
 
-from flask import jsonify, request
+from flask import current_app, jsonify, request
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import joinedload, load_only
 from werkzeug.utils import secure_filename
 
 from backend import db
 from backend.auth.routes import token_required
 from backend.chat import chat_bp
-from backend.models import Block, ChatGroup, ChatGroupMember, Follow, Message, Mute, Note, Post, User
-from backend.presence import is_user_online
+from backend.email_service import send_chat_message_email
+from backend.models import Block, ChatEmailCooldown, ChatGroup, ChatGroupMember, Follow, Message, Mute, Note, Post, User, UserCustomGif
+from backend.presence import has_recent_presence, is_user_online
 from backend.storage import upload_file_to_supabase
 
 CHAT_UPLOAD_TYPES = {
@@ -20,6 +32,34 @@ CHAT_UPLOAD_TYPES = {
     "application/vnd.ms-excel": "document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "document",
 }
 CHAT_MESSAGE_LIMIT = 30
+CHAT_EMAIL_COOLDOWN = timedelta(minutes=15)
+MAX_VIDEO_UPLOAD_BYTES = 25 * 1024 * 1024
+MAX_CUSTOM_GIF_BYTES = 1_000_000
+CUSTOM_GIF_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm"}
+logger = logging.getLogger(__name__)
+
+
+def _send_offline_chat_email(app, recipient_id, sender_id, recipient_email, sender_name):
+    with app.app_context():
+        now = datetime.utcnow()
+        cutoff = now - CHAT_EMAIL_COOLDOWN
+        statement = pg_insert(ChatEmailCooldown).values(
+            recipient_id=recipient_id,
+            sender_id=sender_id,
+            last_sent_at=now,
+        ).on_conflict_do_update(
+            index_elements=[ChatEmailCooldown.recipient_id, ChatEmailCooldown.sender_id],
+            set_={"last_sent_at": now},
+            where=ChatEmailCooldown.last_sent_at <= cutoff,
+        ).returning(ChatEmailCooldown.sender_id)
+        try:
+            should_send = db.session.execute(statement).scalar_one_or_none() is not None
+            db.session.commit()
+            if should_send:
+                send_chat_message_email(recipient_email, sender_name, sender_id)
+        except Exception:
+            db.session.rollback()
+            logger.exception("Unable to queue offline chat email for recipient %s", recipient_id)
 
 
 def _user_payload(user, viewer_id=None):
@@ -55,6 +95,125 @@ def _group_payload(group, current_user_id):
 
 def _group_member(group_id, user_id):
     return ChatGroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
+
+
+@chat_bp.get("/chat/my-gifs")
+@token_required
+def get_my_gifs(current_user):
+    gifs = UserCustomGif.query.filter_by(user_id=current_user.id).order_by(
+        UserCustomGif.created_at.desc()
+    ).limit(100).all()
+    return jsonify({"gifs": [
+        {"id": gif.id, "gif_url": gif.gif_url, "created_at": f"{gif.created_at.isoformat()}Z"}
+        for gif in gifs
+    ]})
+
+
+@chat_bp.get("/chat/gifs")
+@token_required
+def search_chat_gifs(current_user):
+    api_key = os.getenv("GIPHY_API_KEY", "").strip()
+    if not api_key:
+        return jsonify({"gifs": [], "provider_configured": False})
+    query = str(request.args.get("q", "")).strip()[:80]
+    endpoint = "search" if query else "trending"
+    params = urlencode({"api_key": api_key, "limit": 24, "rating": "pg", **({"q": query} if query else {})})
+    try:
+        with urlopen(f"https://api.giphy.com/v1/gifs/{endpoint}?{params}", timeout=8) as response:
+            payload = json.load(response)
+        gifs = []
+        for item in payload.get("data", []):
+            images = item.get("images", {})
+            image = images.get("fixed_width_small") or images.get("fixed_width") or images.get("original") or {}
+            original = images.get("original") or image
+            if image.get("url") and original.get("url"):
+                gifs.append({"preview_url": image["url"], "gif_url": original["url"]})
+        return jsonify({"gifs": gifs, "provider_configured": True})
+    except Exception:
+        logger.exception("Unable to load GIF results from GIPHY")
+        return jsonify({"message": "GIF search is temporarily unavailable"}), 502
+
+
+@chat_bp.post("/chat/upload-video-to-gif")
+@token_required
+def upload_video_to_gif(current_user):
+    video = request.files.get("file")
+    if not video or not video.filename:
+        return jsonify({"message": "A video file is required"}), 400
+    extension = Path(secure_filename(video.filename)).suffix.lower()
+    if extension not in CUSTOM_GIF_EXTENSIONS:
+        return jsonify({"message": "Use an MP4, MOV, M4V, or WebM video"}), 400
+    video_bytes = video.stream.read(MAX_VIDEO_UPLOAD_BYTES + 1)
+    if not video_bytes:
+        return jsonify({"message": "The video file is empty"}), 400
+    if len(video_bytes) > MAX_VIDEO_UPLOAD_BYTES:
+        return jsonify({"message": "Videos must be 25 MB or smaller"}), 413
+
+    try:
+        import imageio_ffmpeg
+
+        ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        with tempfile.TemporaryDirectory(prefix="aero-chat-gif-") as temp_dir:
+            input_path = Path(temp_dir) / f"input{extension}"
+            input_path.write_bytes(video_bytes)
+            probe = subprocess.run(
+                [ffmpeg, "-hide_banner", "-i", str(input_path)],
+                capture_output=True,
+                text=True,
+                timeout=20,
+                check=False,
+            )
+            probe_output = probe.stderr or probe.stdout
+            duration_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)", probe_output)
+            if not duration_match:
+                return jsonify({"message": "The uploaded video could not be read"}), 400
+            duration = int(duration_match.group(1)) * 3600 + int(duration_match.group(2)) * 60 + float(duration_match.group(3))
+            if duration > 15:
+                return jsonify({"message": "Videos must be 15 seconds or shorter"}), 400
+
+            gif_path = Path(temp_dir) / "converted.gif"
+            gif_bytes = None
+            for width, fps, colors in ((320, 10, 96), (240, 8, 64), (180, 6, 48)):
+                filter_graph = (
+                    f"fps={fps},scale='min({width},iw)':-1:flags=lanczos,split[a][b];"
+                    f"[a]palettegen=max_colors={colors}[p];"
+                    "[b][p]paletteuse=dither=bayer:bayer_scale=4"
+                )
+                result = subprocess.run(
+                    [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(input_path),
+                     "-t", "15", "-vf", filter_graph, "-loop", "0", "-an", str(gif_path)],
+                    capture_output=True,
+                    text=True,
+                    timeout=90,
+                    check=False,
+                )
+                if result.returncode != 0:
+                    logger.warning("FFmpeg could not convert uploaded video: %s", result.stderr[-1000:])
+                    return jsonify({"message": "The uploaded video could not be converted"}), 400
+                gif_bytes = gif_path.read_bytes()
+                if len(gif_bytes) <= MAX_CUSTOM_GIF_BYTES:
+                    break
+            if not gif_bytes or len(gif_bytes) > MAX_CUSTOM_GIF_BYTES:
+                return jsonify({"message": "This video is too complex to compress below 1 MB"}), 413
+
+        upload = BytesIO(gif_bytes)
+        upload.filename = "custom.gif"
+        upload.mimetype = "image/gif"
+        gif_url = upload_file_to_supabase(upload, "chat-gifs")
+        gif = UserCustomGif(user_id=current_user.id, gif_url=gif_url)
+        db.session.add(gif)
+        db.session.commit()
+    except (RuntimeError, ValueError) as error:
+        db.session.rollback()
+        return jsonify({"message": str(error)}), 503
+    except subprocess.TimeoutExpired:
+        return jsonify({"message": "Video conversion timed out; try a shorter clip"}), 400
+    except Exception:
+        db.session.rollback()
+        logger.exception("Unable to convert custom chat GIF for user %s", current_user.id)
+        return jsonify({"message": "Unable to convert or store this GIF"}), 500
+
+    return jsonify({"id": gif.id, "gif_url": gif.gif_url, "size_bytes": len(gif_bytes)}), 201
 
 
 @chat_bp.get("/chat/groups")
@@ -419,7 +578,8 @@ def send_message(current_user):
     group = db.session.get(ChatGroup, group_id) if group_id else None
     if group_id and (not group or not _group_member(group_id, current_user.id)):
         return jsonify({"message": "Group not found"}), 404
-    if not group_id and (not db.session.get(User, recipient_id)):
+    recipient = None if group_id else db.session.get(User, recipient_id)
+    if not group_id and not recipient:
         return jsonify({"message": "A valid recipient and message are required"}), 400
     if (not content and not media_url) or len(content) > 2000 or len(media_url) > 500:
         return jsonify({"message": "A valid recipient and message are required"}), 400
@@ -428,4 +588,18 @@ def send_message(current_user):
     message = Message(sender_id=current_user.id, recipient_id=current_user.id if group_id else recipient_id, group_id=group_id or None, content=content, media_url=media_url, type=message_type, file_name=file_name, file_size=file_size)
     db.session.add(message)
     db.session.commit()
+    if recipient and recipient.email and not has_recent_presence(recipient):
+        app = current_app._get_current_object()
+        threading.Thread(
+            target=_send_offline_chat_email,
+            args=(
+                app,
+                recipient.id,
+                current_user.id,
+                recipient.email,
+                current_user.display_name or current_user.username,
+            ),
+            daemon=True,
+            name=f"chat-email-{recipient.id}-{current_user.id}",
+        ).start()
     return jsonify({"id": message.id, "group_id": message.group_id, "content": message.content, "media_url": message.media_url, "type": message.type, "file_name": message.file_name, "file_size": message.file_size, "sender_id": message.sender_id, "created_at": f"{message.created_at.isoformat()}Z"}), 201

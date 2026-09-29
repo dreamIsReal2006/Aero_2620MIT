@@ -110,6 +110,24 @@ def search_mention_users(current_user):
     }), 200
 
 
+@social_bp.get("/users/mention-directory")
+@optional_token
+def get_mention_directory(current_user):
+    followed_ids = db.session.query(Follow.following_id).filter_by(
+        follower_id=current_user.id,
+        status="approved",
+    ) if current_user else []
+    users_query = User.query.filter(
+        User.active.is_(True),
+        User.is_banned.is_(False),
+        (User.is_private.is_(False)) | User.id.in_(followed_ids),
+    )
+    if current_user:
+        users_query = users_query.filter(User.id != current_user.id)
+    users = users_query.with_entities(User.id, User.username).all()
+    return jsonify({"users": [{"id": user.id, "username": user.username} for user in users]}), 200
+
+
 @social_bp.post("/social/follow/<int:user_id>")
 @social_bp.post("/users/<int:user_id>/follow")
 @token_required

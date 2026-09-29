@@ -5,12 +5,30 @@ import { createPortal } from 'react-dom';
 import { Avatar, Glass, Icon } from './ui';
 import { getValidUrl } from '../lib/apiUrl';
 
-const inlineTagPattern = /(^|[^A-Za-z0-9_])@([A-Za-z0-9_.-]{1,50})|(^|[\s([{])#([\p{L}\p{N}_][\p{L}\p{N}_.-]{0,99})|📍\s*(-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?|[^,\n]+(?:,\s*[^,\n]+)?)/gu;
+let mentionDirectoryPromise;
 
-function renderTaggedContent(content) {
+function loadMentionDirectory() {
+  if (!mentionDirectoryPromise) {
+    mentionDirectoryPromise = fetch(getValidUrl('api/users/mention-directory'), {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${localStorage.getItem('aero_token') || ''}` },
+    }).then((response) => response.ok ? response.json() : { users: [] })
+      .then((payload) => Array.isArray(payload.users) ? payload.users : [])
+      .catch(() => []);
+  }
+  return mentionDirectoryPromise;
+}
+
+function renderTaggedContent(content, users) {
   const text = String(content || '');
   const parts = [];
   let cursor = 0;
+  const usernames = [...new Set(users.map((user) => String(user.username || '')).filter(Boolean))]
+    .sort((left, right) => right.length - left.length)
+    .map((username) => username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const mentionPattern = usernames.length
+    ? `(^|[^A-Za-z0-9_])@(${usernames.join('|')})(?![A-Za-z0-9_])`
+    : `(^|[^A-Za-z0-9_])@((?!))`;
+  const inlineTagPattern = new RegExp(`${mentionPattern}|(^|[\\s([{])#([\\p{L}\\p{N}_][\\p{L}\\p{N}_.-]{0,99})|📍\\s*(-?\\d+(?:\\.\\d+)?\\s*,\\s*-?\\d+(?:\\.\\d+)?|[^,\\n]+(?:,\\s*[^,\\n]+)?)`, 'giu');
   for (const match of text.matchAll(inlineTagPattern)) {
     const [whole, mentionPrefix, username, hashtagPrefix, hashtag, locationText] = match;
     const prefix = mentionPrefix ?? hashtagPrefix ?? '';
@@ -44,6 +62,7 @@ function pollTimeRemaining(expiresAt, now) {
 }
 
 export default function PostCard({ post, onAction }) {
+  const [mentionUsers, setMentionUsers] = useState([]);
   const [liked, setLiked] = useState(Boolean(post.is_liked));
   const [likesCount, setLikesCount] = useState(Number(post.likes_count || 0));
   const [bookmarked, setBookmarked] = useState(Boolean(post.is_bookmarked));
@@ -63,6 +82,12 @@ export default function PostCard({ post, onAction }) {
     const timer = window.setInterval(() => setPollNow(Date.now()), 30000);
     return () => window.clearInterval(timer);
   }, [poll?.expires_at]);
+
+  useEffect(() => {
+    let active = true;
+    loadMentionDirectory().then((users) => { if (active) setMentionUsers(users); });
+    return () => { active = false; };
+  }, []);
 
   const submitPollVote = async (optionIndex) => {
     if (!poll || votingOption !== null || poll.user_voted_option != null || Date.parse(poll.expires_at) <= Date.now()) return;
@@ -134,7 +159,7 @@ export default function PostCard({ post, onAction }) {
 
   return <Glass id={`post-${post.id}`} data-post-id={post.id} className="aero-pop mb-5 rounded-[20px] p-5 transition-transform duration-200 hover:-translate-y-0.5">
     <div className="mb-3 flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-2.5"><Avatar user={author} /><div className="min-w-0"><strong className="block truncate text-sm">@{author.username || 'User'}</strong><span className="text-xs text-[#65676b]">{post.created_at ? new Date(post.created_at).toLocaleDateString() : 'Just now'}</span></div></div><button onClick={() => onAction?.('menu', post)} className="rounded-full px-2 text-lg text-[#65676b] hover:bg-black/5" aria-label="Post options">•••</button></div>
-    <p className="mb-4 whitespace-pre-wrap text-[.96rem] leading-6">{renderTaggedContent(post.content || 'Shared a thought with Aero.')}</p>
+    <p className="mb-4 whitespace-pre-wrap text-[.96rem] leading-6">{renderTaggedContent(post.content || 'Shared a thought with Aero.', mentionUsers)}</p>
     {media.length > 0 && <div className={`post-media-container mb-3 ${media.length > 1 ? 'post-media-carousel' : ''}`}>{media.map((item, index) => { const url = mediaUrl(item); const video = isVideo(item); return video ? <button key={`${item}-${index}`} type="button" className="post-media-item post-video-placeholder" aria-label={`Play video ${index + 1} of ${media.length}`} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setViewerIndex(index); }}><span className="post-video-placeholder-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg></span><span className="post-video-placeholder-label">Play video</span></button> : <img key={`${item}-${index}`} src={url} alt="Post media" className="post-media-item" loading="lazy" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setViewerIndex(index); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setViewerIndex(index); } }} tabIndex={0} role="button" aria-label={`Open media ${index + 1} of ${media.length}`} />; })}</div>}
     {poll && pollOptions.length > 0 && <section className="thread-poll-container" aria-label="Post poll">
       {pollOptions.map((option, index) => {

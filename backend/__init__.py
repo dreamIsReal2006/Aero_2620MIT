@@ -140,6 +140,9 @@ def create_app():
         CommentLike,
         Video,
         Message,
+        ChatEmailCooldown,
+        UserCustomGif,
+        MediaProcessingJob,
         VideoComment,
         Note,
         VideoLike,
@@ -173,7 +176,12 @@ def create_app():
         try:
             db.metadata.create_all(
                 bind=db.engine,
-                tables=[db.metadata.tables["post_votes"]],
+                tables=[
+                    db.metadata.tables["post_votes"],
+                    db.metadata.tables["chat_email_cooldowns"],
+                    db.metadata.tables["user_custom_gifs"],
+                    db.metadata.tables["media_processing_jobs"],
+                ],
             )
             existing_tables = set(inspect(db.engine).get_table_names())
             if not {table.name for table in hashtag_tables}.issubset(existing_tables):

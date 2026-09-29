@@ -3,15 +3,25 @@ import re
 from backend import db
 from backend.models import Notification, User
 
-MENTION_PATTERN = re.compile(r"(?<![A-Za-z0-9_])@([A-Za-z0-9_.-]{1,50})")
-
-
 def add_mention_notifications(content, actor, post_id, context):
-    mentioned_names = {match.group(1).casefold() for match in MENTION_PATTERN.finditer(content or "")}
+    users = User.query.filter(
+        User.active.is_(True),
+        User.is_banned.is_(False),
+    ).all()
+    username_by_key = {user.username.casefold(): user for user in users}
+    usernames = sorted(username_by_key, key=len, reverse=True)
+    if not usernames:
+        return []
+
+    pattern = re.compile(
+        r"(?<![A-Za-z0-9_])@(" + "|".join(re.escape(name) for name in usernames) + r")(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    )
+    mentioned_names = {match.group(1).casefold() for match in pattern.finditer(content or "")}
     if not mentioned_names:
         return []
 
-    mentioned_users = User.query.filter(db.func.lower(User.username).in_(mentioned_names)).all()
+    mentioned_users = [username_by_key[name] for name in mentioned_names]
     message = f"@{actor.username} mentioned you in a {context}"
     recipients = []
     for user in mentioned_users:

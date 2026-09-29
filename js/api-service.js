@@ -84,6 +84,13 @@ function escapeHtml(value = '') {
         .replace(/'/g, '&#039;');
 }
 
+let mentionDirectoryUsers = [];
+window.AeroMentionDirectoryReady = fetch(`${API_BASE}/users/mention-directory`, {
+    headers: authHeaders({ Accept: 'application/json' })
+}).then((response) => response.ok ? response.json() : { users: [] })
+    .then((payload) => { mentionDirectoryUsers = Array.isArray(payload.users) ? payload.users : []; })
+    .catch(() => {});
+
 function openThreadsMediaViewer(mediaList, startIndex = 0) {
     const items = Array.isArray(mediaList) ? mediaList.filter(Boolean) : [];
     if (!items.length) return;
@@ -171,7 +178,14 @@ function safeRegex(value) {
 
 function renderMentionText(value) {
     const escaped = escapeHtml(value ?? '');
-    return escaped.replace(/(^|[^A-Za-z0-9_])@([A-Za-z0-9_.-]{1,50})|(^|[\s([{])#([\p{L}\p{N}_][\p{L}\p{N}_.-]{0,99})|📍\s*(-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?|[^,\n]+(?:,\s*[^,\n]+)?)/gu,
+    const usernames = [...new Set(mentionDirectoryUsers.map((user) => String(user.username || '')).filter(Boolean))]
+        .sort((left, right) => right.length - left.length);
+    const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const mentionPattern = usernames.length
+        ? `(^|[^A-Za-z0-9_])@(${usernames.map(escapeRegex).join('|')})(?![A-Za-z0-9_])`
+        : `(^|[^A-Za-z0-9_])@((?!))`;
+    const taggedTextPattern = new RegExp(`${mentionPattern}|(^|[\\s([{])#([\\p{L}\\p{N}_][\\p{L}\\p{N}_.-]{0,99})|📍\\s*(-?\\d+(?:\\.\\d+)?\\s*,\\s*-?\\d+(?:\\.\\d+)?|[^,\\n]+(?:,\\s*[^,\\n]+)?)`, 'giu');
+    return escaped.replace(taggedTextPattern,
         (match, mentionPrefix, username, hashtagPrefix, hashtag, locationText) => {
             if (locationText !== undefined) {
                 const location = locationText.trim();
@@ -190,6 +204,7 @@ function renderMentionText(value) {
 window.AeroMentionText = renderMentionText;
 
 async function showHashtagPage(tag, updateHistory = true) {
+    await window.AeroMentionDirectoryReady;
     const normalizedTag = String(tag || '').replace(/^#/, '').trim();
     const feed = document.getElementById('posts-feed');
     if (!normalizedTag || !feed) return;
@@ -1556,7 +1571,14 @@ async function selectChatGroup(group) {
     const activeAvatar = document.getElementById('chat-active-avatar');
     const activeName = document.getElementById('chat-active-name');
     const groupInfo = document.getElementById('chat-group-info-btn');
-    if (activeName) activeName.textContent = `${group.name} · ${group.member_count} members`;
+    if (activeName) {
+        activeName.textContent = `${group.name} · ${group.member_count} members`;
+        activeName.href = '#';
+        activeName.setAttribute('aria-disabled', 'true');
+    }
+    const avatarLink = document.getElementById('chat-active-avatar-link');
+    avatarLink?.setAttribute('aria-disabled', 'true');
+    if (avatarLink) avatarLink.href = '#';
     if (activeAvatar) {
         activeAvatar.classList.remove('is-online');
         activeAvatar.replaceChildren();
@@ -1579,7 +1601,16 @@ async function selectChatContact(contact) {
     setChatContactState(true);
     const activeAvatar = document.getElementById('chat-active-avatar');
     const activeName = document.getElementById('chat-active-name');
-    if (activeName) activeName.textContent = `@${contact.username}`;
+    if (activeName) {
+        activeName.textContent = `@${contact.username}`;
+        activeName.href = `#profile/${encodeURIComponent(contact.id)}`;
+        activeName.removeAttribute('aria-disabled');
+    }
+    const avatarLink = document.getElementById('chat-active-avatar-link');
+    if (avatarLink) {
+        avatarLink.href = `#profile/${encodeURIComponent(contact.id)}`;
+        avatarLink.removeAttribute('aria-disabled');
+    }
     if (activeAvatar) {
         activeAvatar.classList.toggle('is-online', Boolean(contact.is_online));
         activeAvatar.replaceChildren();
@@ -1616,6 +1647,31 @@ async function selectChatContact(contact) {
 }
 
 window.selectChatContact = selectChatContact;
+
+window.AeroOpenChatWithUser = async (userId) => {
+    const id = Number(userId);
+    if (!Number.isInteger(id) || id <= 0) return false;
+    if (!localStorage.getItem('aero_token')) {
+        window.showLoginModal?.('Please sign in to open this conversation.');
+        return false;
+    }
+    try {
+        window.AeroRouter?.navigate('chat');
+        await loadChatContacts();
+        let contact = chatContactCache.find((item) => Number(item.id) === id);
+        if (!contact) {
+            const response = await fetch(`${API_BASE}/users/profile?id=${encodeURIComponent(id)}`, { headers: authHeaders() });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.user) throw new Error(payload.message || 'Unable to open this conversation');
+            contact = { ...payload.user, is_muted: false };
+        }
+        await selectChatContact(contact);
+        return true;
+    } catch (error) {
+        window.showNotice?.(error.message || 'Unable to open this conversation', 'error');
+        return false;
+    }
+};
 
 async function loadChatMessages() {
     const options = arguments[0] || {};
@@ -1755,7 +1811,14 @@ function setupMediaAndChat() {
         document.getElementById('chat-group-leave-btn')?.classList.toggle('hidden', isOwner);
         membersModal?.classList.remove('hidden');
     };
-    document.getElementById('chat-active-name')?.addEventListener('click', openGroupMembers);
+    const openActiveProfile = (event) => {
+        event.preventDefault();
+        const contact = activeChatUser || window.activeChatUser;
+        if (contact?.is_group) openGroupMembers();
+        else if (contact) window.AeroRouter?.navigate('profile', { userId: contact.id });
+    };
+    document.getElementById('chat-active-name')?.addEventListener('click', openActiveProfile);
+    document.getElementById('chat-active-avatar-link')?.addEventListener('click', openActiveProfile);
     document.getElementById('chat-group-info-btn')?.addEventListener('click', openGroupMembers);
     document.getElementById('chat-group-members-close')?.addEventListener('click', () => closeModal(membersModal));
     membersModal?.addEventListener('click', (event) => { if (event.target === membersModal) closeModal(membersModal); });
@@ -1768,6 +1831,10 @@ function setupMediaAndChat() {
         activeChatUser = null;
         document.getElementById('chat-messages-list').replaceChildren();
         document.getElementById('chat-active-name').textContent = 'Select a contact';
+        document.getElementById('chat-active-name').href = '#';
+        document.getElementById('chat-active-name').setAttribute('aria-disabled', 'true');
+        document.getElementById('chat-active-avatar-link')?.setAttribute('href', '#');
+        document.getElementById('chat-active-avatar-link')?.setAttribute('aria-disabled', 'true');
         document.getElementById('chat-group-info-btn')?.classList.add('hidden');
         await loadChatContacts();
     });
@@ -1780,6 +1847,10 @@ function setupMediaAndChat() {
         activeChatUser = null;
         document.getElementById('chat-messages-list').replaceChildren();
         document.getElementById('chat-active-name').textContent = 'Select a contact';
+        document.getElementById('chat-active-name').href = '#';
+        document.getElementById('chat-active-name').setAttribute('aria-disabled', 'true');
+        document.getElementById('chat-active-avatar-link')?.setAttribute('href', '#');
+        document.getElementById('chat-active-avatar-link')?.setAttribute('aria-disabled', 'true');
         document.getElementById('chat-group-info-btn')?.classList.add('hidden');
         await loadChatContacts();
     });
@@ -1787,6 +1858,25 @@ function setupMediaAndChat() {
     const attachButton = document.getElementById('chat-attach-btn');
     const fileInput = document.getElementById('chat-file-input');
     const attachmentMenu = document.getElementById('chat-attachment-menu');
+    const emojiButton = document.getElementById('chat-emoji-btn');
+    const emojiPopover = document.getElementById('chat-emoji-popover');
+    const gifButton = document.getElementById('chat-gif-btn');
+    const gifPopover = document.getElementById('chat-gif-popover');
+    const gifResults = document.getElementById('chat-gif-results');
+    const gifSearch = document.getElementById('chat-gif-search');
+    const gifTabs = [...document.querySelectorAll('[data-gif-tab]')];
+    const chatPresetGifs = [
+        { name: 'Celebrate', url: 'https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif' },
+        { name: 'Happy', url: 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif' },
+        { name: 'Applause', url: 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif' },
+        { name: 'Laugh', url: 'https://media.giphy.com/media/10t57cXgo7x5kI/giphy.gif' },
+        { name: 'Wow', url: 'https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif' },
+        { name: 'Love', url: 'https://media.giphy.com/media/MDJ9IbxxvDUQM/giphy.gif' }
+    ];
+    let activeGifTab = 'trending';
+    let customGifCache = null;
+    let gifSearchTimer = 0;
+    let gifRenderRequest = 0;
     const muteButton = document.getElementById('chat-mute-btn');
     muteButton?.addEventListener('click', async () => {
         const contact = activeChatUser || window.activeChatUser;
@@ -1801,29 +1891,175 @@ function setupMediaAndChat() {
         setMuteButtonState(muteButton, !muted);
         await loadChatContacts();
     });
-    attachButton?.addEventListener('click', () => attachmentMenu?.classList.toggle('hidden'));
-    attachmentMenu?.addEventListener('click', (event) => { const button = event.target.closest('[data-attachment-kind]'); if (!button) return; fileInput.accept = button.dataset.attachmentKind === 'media' ? 'image/*,video/*' : button.dataset.attachmentKind === 'document' ? '.pdf,.txt,.doc,.docx,.xls,.xlsx' : 'image/*,video/*,.pdf,.txt,.doc,.docx,.xls,.xlsx'; attachmentMenu.classList.add('hidden'); fileInput.click(); });
-    fileInput?.addEventListener('change', () => fileInput.files[0] && window.selectChatAttachment?.(fileInput.files[0]));
-    window.selectChatAttachment = async (file) => { const formData = new FormData(); formData.append('file', file); const response = await fetch(`${API_BASE}/chat/uploads`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }, body: formData }); const data = await response.json().catch(() => ({})); if (!response.ok) { window.showNotice?.(data.message || 'Unable to upload attachment.', 'error'); return; } const input = getChatInput(); input.dataset.mediaUrl = data.url; input.dataset.messageType = data.type; input.dataset.fileName = data.file_name; input.dataset.fileSize = data.file_size; input.placeholder = data.file_name; input.focus(); };
-    document.getElementById('chat-lightbox-close')?.addEventListener('click', () => document.getElementById('chat-lightbox')?.classList.add('hidden'));
-    document.getElementById('chat-emoji-btn')?.addEventListener('click', () => { const input = getChatInput(); if (!input) return; input.value += ' 😊'; input.focus(); });
-    const chatGifUrls = ['https://media.giphy.com/media/26BRuo6sLetdllPAQ/giphy.gif', 'https://media.giphy.com/media/g9582DNuQppxC/giphy.gif', 'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif'];
-    document.getElementById('chat-gif-btn')?.addEventListener('click', () => {
-        const input = getChatInput();
-        if (!input) return;
-        const picker = document.createElement('div');
-        picker.className = 'chat-gif-picker';
-        picker.innerHTML = chatGifUrls.map((url) => `<button type="button" data-gif-url="${url}"><img src="${url}" alt="GIF"></button>`).join('');
-        document.getElementById('chat-form')?.appendChild(picker);
-        picker.addEventListener('click', (event) => {
-            const button = event.target.closest('[data-gif-url]');
-            if (!button) return;
-            input.dataset.mediaUrl = button.dataset.gifUrl;
-            input.dataset.messageType = 'gif';
-            input.value = '';
-            picker.remove();
+    const closeChatPickers = () => {
+        [attachmentMenu, emojiPopover, gifPopover].forEach((popover) => popover?.classList.add('hidden'));
+        pickerControls.forEach(([button]) => button?.setAttribute('aria-expanded', 'false'));
+    };
+    const toggleChatPicker = (button, popover) => {
+        const shouldOpen = popover?.classList.contains('hidden');
+        closeChatPickers();
+        if (shouldOpen) popover?.classList.remove('hidden');
+        button?.setAttribute('aria-expanded', String(Boolean(shouldOpen)));
+    };
+    attachButton?.setAttribute('aria-expanded', 'false');
+    attachButton?.addEventListener('click', () => toggleChatPicker(attachButton, attachmentMenu));
+    attachmentMenu?.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-attachment-kind]');
+        if (!button || !fileInput) return;
+        const kind = button.dataset.attachmentKind;
+        fileInput.accept = kind === 'media' ? 'image/*,video/*' : kind === 'document' ? '.pdf,.txt,.doc,.docx,.xls,.xlsx' : kind === 'video-gif' ? 'video/mp4,video/quicktime,video/webm,.m4v' : 'image/*,video/*,.pdf,.txt,.doc,.docx,.xls,.xlsx';
+        fileInput.dataset.convertToGif = String(kind === 'video-gif');
+        closeChatPickers();
+        fileInput.click();
+    });
+    fileInput?.addEventListener('change', () => {
+        const file = fileInput.files?.[0];
+        const convertToGif = fileInput.dataset.convertToGif === 'true';
+        delete fileInput.dataset.convertToGif;
+        if (file) window.selectChatAttachment?.(file, convertToGif);
+        fileInput.value = '';
+    });
+    window.selectChatAttachment = async (file, convertToGif = false) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const endpoint = convertToGif ? 'chat/upload-video-to-gif' : 'chat/uploads';
+        try {
+            const response = await fetch(`${API_BASE}/${endpoint}`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('aero_token')}` }, body: formData });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || 'Unable to upload attachment.');
+            const input = getChatInput();
+            if (!input) return;
+            if (convertToGif) {
+                input.dataset.mediaUrl = data.gif_url;
+                input.dataset.messageType = 'gif';
+                input.dataset.fileName = 'custom.gif';
+                input.dataset.fileSize = String(data.size_bytes || 0);
+                input.placeholder = 'GIF ready to send';
+                customGifCache = null;
+                window.showNotice?.('Compressed GIF added to My GIFs.', 'success');
+            } else {
+                input.dataset.mediaUrl = data.url;
+                input.dataset.messageType = data.type;
+                input.dataset.fileName = data.file_name;
+                input.dataset.fileSize = data.file_size;
+                input.placeholder = data.file_name;
+            }
             input.focus();
+        } catch (error) {
+            window.showNotice?.(error.message || 'Unable to upload attachment.', 'error');
+        }
+    };
+    document.getElementById('chat-lightbox-close')?.addEventListener('click', () => document.getElementById('chat-lightbox')?.classList.add('hidden'));
+    const emojiPicker = emojiPopover?.querySelector('emoji-picker');
+    const syncEmojiPickerTheme = () => {
+        const dark = document.documentElement.dataset.theme === 'dark'
+            || document.documentElement.classList.contains('dark-mode')
+            || document.body.classList.contains('dark-mode');
+        emojiPicker?.setAttribute('data-theme', dark ? 'dark' : 'light');
+    };
+    syncEmojiPickerTheme();
+    const themeObserver = new MutationObserver(syncEmojiPickerTheme);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+    themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    emojiButton?.setAttribute('aria-expanded', 'false');
+    emojiButton?.addEventListener('click', () => toggleChatPicker(emojiButton, emojiPopover));
+    emojiPicker?.addEventListener('emoji-click', (event) => {
+        const input = getChatInput();
+        const emoji = event.detail?.unicode;
+        if (!input || !emoji) return;
+        const start = input.selectionStart ?? input.value.length;
+        const end = input.selectionEnd ?? start;
+        input.setRangeText(emoji, start, end, 'end');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        closeChatPickers();
+        input.focus();
+    });
+    const renderChatGifResults = async () => {
+        if (!gifResults) return;
+        const requestId = ++gifRenderRequest;
+        const query = gifSearch?.value.trim() || '';
+        gifResults.innerHTML = '<p class="chat-gif-state">Loading GIFs...</p>';
+        let gifs = [];
+        if (activeGifTab === 'mine') {
+            if (!customGifCache) {
+                try {
+                    const response = await fetch(`${API_BASE}/chat/my-gifs`, { headers: authHeaders() });
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(payload.message || 'Unable to load My GIFs');
+                    customGifCache = Array.isArray(payload.gifs) ? payload.gifs : [];
+                } catch (error) {
+                    if (requestId === gifRenderRequest) gifResults.innerHTML = `<p class="chat-gif-state">${escapeHtml(error.message)}</p>`;
+                    return;
+                }
+            }
+            gifs = customGifCache.map((gif) => ({ preview_url: gif.gif_url, gif_url: gif.gif_url }));
+        } else {
+            try {
+                const response = await fetch(`${API_BASE}/chat/gifs${query ? `?q=${encodeURIComponent(query)}` : ''}`, { headers: authHeaders() });
+                const payload = await response.json().catch(() => ({}));
+                if (response.ok) gifs = payload.gifs || [];
+            } catch {}
+            if (!gifs.length) {
+                gifs = chatPresetGifs.filter((gif) => !query || gif.name.toLowerCase().includes(query.toLowerCase()))
+                    .map((gif) => ({ preview_url: gif.url, gif_url: gif.url }));
+            }
+        }
+        if (requestId !== gifRenderRequest) return;
+        gifResults.innerHTML = gifs.length
+            ? gifs.map((gif) => `<button type="button" class="chat-gif-item" data-gif-url="${escapeHtml(gif.gif_url)}" aria-label="Choose GIF"><img src="${escapeHtml(gif.preview_url || gif.gif_url)}" alt="" loading="lazy"></button>`).join('')
+            : '<p class="chat-gif-state">No GIFs found.</p>';
+    };
+    gifButton?.setAttribute('aria-expanded', 'false');
+    gifButton?.addEventListener('click', () => {
+        const wasHidden = gifPopover?.classList.contains('hidden');
+        toggleChatPicker(gifButton, gifPopover);
+        if (wasHidden) renderChatGifResults();
+    });
+    gifTabs.forEach((tab) => tab.addEventListener('click', () => {
+        activeGifTab = tab.dataset.gifTab;
+        gifTabs.forEach((item) => {
+            const active = item === tab;
+            item.classList.toggle('active', active);
+            item.setAttribute('aria-selected', String(active));
         });
+        if (gifSearch) gifSearch.disabled = activeGifTab === 'mine';
+        renderChatGifResults();
+    }));
+    gifSearch?.addEventListener('input', () => {
+        window.clearTimeout(gifSearchTimer);
+        gifSearchTimer = window.setTimeout(renderChatGifResults, 250);
+    });
+    gifResults?.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-gif-url]');
+        const url = button?.dataset.gifUrl;
+        const input = getChatInput();
+        if (!url || !input || !/^https:\/\//i.test(url)) return;
+        input.dataset.mediaUrl = url;
+        input.dataset.messageType = 'gif';
+        input.value = '';
+        input.placeholder = 'GIF ready to send';
+        closeChatPickers();
+        input.focus();
+    });
+    const pickerControls = [
+        [attachButton, attachmentMenu],
+        [emojiButton, emojiPopover],
+        [gifButton, gifPopover]
+    ];
+    document.addEventListener('click', (event) => {
+        const path = event.composedPath();
+        pickerControls.forEach(([button, popover]) => {
+            if (!popover || popover.classList.contains('hidden')) return;
+            if (!path.includes(button) && !path.includes(popover)) {
+                popover.classList.add('hidden');
+                button?.setAttribute('aria-expanded', 'false');
+            }
+        });
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        closeChatPickers();
+        pickerControls.forEach(([button]) => button?.setAttribute('aria-expanded', 'false'));
     });
     document.getElementById('chat-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -2096,6 +2332,90 @@ function closeNotice(overlay) {
     window.setTimeout(() => overlay.classList.add('hidden'), 240);
 }
 
+const threadPreviewUrls = new WeakMap();
+
+function threadPreviewUrl(file) {
+    if (!threadPreviewUrls.has(file)) threadPreviewUrls.set(file, URL.createObjectURL(file));
+    return threadPreviewUrls.get(file);
+}
+
+function releaseThreadPreview(file) {
+    const url = threadPreviewUrls.get(file);
+    if (url) URL.revokeObjectURL(url);
+    threadPreviewUrls.delete(file);
+}
+
+function releaseAllThreadPreviews() {
+    threadsPostState.forEach((post) => post.files.forEach(releaseThreadPreview));
+}
+
+async function optimizePostImage(file) {
+    if (!file?.type?.startsWith('image/') || file.type === 'image/gif' || file.type === 'image/svg+xml') return file;
+    let bitmap;
+    try {
+        bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+        const scale = Math.min(1, 2048 / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        const context = canvas.getContext('2d');
+        if (!context) return file;
+        context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        let blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', 0.84));
+        if (!blob || blob.type !== 'image/webp') {
+            context.fillStyle = '#fff';
+            context.globalCompositeOperation = 'destination-over';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.84));
+        }
+        if (!blob || blob.size >= file.size) return file;
+        const baseName = file.name.replace(/\.[^.]+$/, '') || 'image';
+        const extension = blob.type === 'image/webp' ? '.webp' : '.jpg';
+        return new File([blob], `${baseName}${extension}`, { type: blob.type, lastModified: file.lastModified });
+    } catch {
+        return file;
+    } finally {
+        bitmap?.close?.();
+    }
+}
+
+function uploadPostMediaRequest(file, onProgress) {
+    return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_BASE}/uploads`);
+        xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('aero_token') || ''}`);
+        xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) onProgress?.({ phase: 'uploading', percent: Math.round((event.loaded / event.total) * 70) });
+        });
+        xhr.addEventListener('load', () => {
+            let payload = {};
+            try { payload = JSON.parse(xhr.responseText || '{}'); } catch {}
+            if (xhr.status < 200 || xhr.status >= 300) reject(new Error(payload.message || 'Media upload failed'));
+            else resolve({ status: xhr.status, payload });
+        });
+        xhr.addEventListener('error', () => reject(new Error('Media upload failed. Check your connection and try again.')));
+        xhr.addEventListener('abort', () => reject(new Error('Media upload was cancelled.')));
+        onProgress?.({ phase: 'uploading', percent: 0 });
+        xhr.send(formData);
+    });
+}
+
+async function waitForPostMediaJob(jobId, onProgress) {
+    const deadline = Date.now() + 20 * 60 * 1000;
+    while (Date.now() < deadline) {
+        await new Promise((resolve) => window.setTimeout(resolve, 900));
+        const response = await fetch(`${API_BASE}/uploads/jobs/${encodeURIComponent(jobId)}`, { headers: authHeaders() });
+        const job = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(job.message || 'Unable to check video processing status');
+        onProgress?.({ phase: job.status === 'failed' ? 'failed' : 'processing', percent: 70 + Math.round((Number(job.progress) || 0) * 0.3) });
+        if (job.status === 'completed' && job.url) return job.url;
+        if (job.status === 'failed') throw new Error(job.message || 'Video processing failed');
+    }
+    throw new Error('Video processing timed out. Please try again.');
+}
+
 const AeroAPI = {
     // Auth API
     async signin(username, password) {
@@ -2249,17 +2569,15 @@ const AeroAPI = {
         }
     },
 
-    async uploadMedia(file) {
-        const formData = new FormData();
-        formData.append('file', file);
-        const res = await fetch(`${API_BASE}/uploads`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` },
-            body: formData
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Media upload failed');
-        return String(data.url || '').startsWith('http') ? data.url : `${API_ORIGIN}${data.url}`;
+    async uploadMedia(file, onProgress) {
+        onProgress?.({ phase: 'compressing', percent: 0 });
+        const uploadFile = await optimizePostImage(file);
+        const { status, payload } = await uploadPostMediaRequest(uploadFile, onProgress);
+        let mediaUrl = payload.url;
+        if (status === 202 && payload.job_id) mediaUrl = await waitForPostMediaJob(payload.job_id, onProgress);
+        if (!mediaUrl) throw new Error('Media upload completed without a URL');
+        onProgress?.({ phase: 'complete', percent: 100 });
+        return String(mediaUrl).startsWith('http') ? mediaUrl : `${API_ORIGIN}${mediaUrl}`;
     },
 
     async deletePost(postId) {
@@ -2559,6 +2877,7 @@ const AeroAPI = {
     async renderFeed(feedType = 'for_you', append = false) {
         const feedContainer = document.getElementById('posts-feed');
         if (!feedContainer) return;
+        await window.AeroMentionDirectoryReady;
 
         if (feedLoading) return;
         feedLoading = true;
@@ -3681,10 +4000,11 @@ function updateStaticPollLanguage(overlay) {
 function mentionAtCaret(input) {
     if (input.selectionStart !== input.selectionEnd) return null;
     const prefix = input.value.slice(0, input.selectionStart);
-    const match = prefix.match(/(^|[\s([{])([@#])([\p{L}\p{N}_.-]*)$/u);
+    const match = prefix.match(/(^|[\s([{])([@#])([\p{L}\p{N}_ .-]*)$/u);
     if (!match) return null;
     const kind = match[2] === '@' ? 'mention' : 'hashtag';
-    if (kind === 'mention' && !/^[A-Za-z0-9_.-]*$/.test(match[3])) return null;
+    if (kind === 'mention' && !/^[A-Za-z0-9_ ]*$/.test(match[3])) return null;
+    if (kind === 'hashtag' && match[3].includes(' ')) return null;
     return { start: input.selectionStart - match[0].length + match[1].length, end: input.selectionStart, query: match[3], kind };
 }
 
@@ -3939,6 +4259,7 @@ function closeThreadsCompose(saveDraft = true) {
     document.getElementById('threads-options-menu')?.classList.add('hidden');
     document.getElementById('threads-schedule-field')?.classList.add('hidden');
     document.getElementById('static-composer-poll-builder')?.remove();
+    releaseAllThreadPreviews();
     document.getElementById('threads-gif-picker')?.classList.add('hidden');
     document.getElementById('threads-emoji-picker')?.classList.add('hidden');
     closeThreadsPanels();
@@ -3958,6 +4279,7 @@ function closeThreadsCompose(saveDraft = true) {
     const submitButton = document.getElementById('threads-submit-btn');
     if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Post'; }
     document.getElementById('threads-compose-error')?.classList.add('hidden');
+    document.getElementById('threads-upload-progress')?.classList.add('hidden');
     const pollButton = overlay.querySelector('[data-threads-action="poll"]');
     pollButton?.classList.remove('is-active');
     if (pollButton) pollButton.disabled = false;
@@ -4001,6 +4323,7 @@ function renderThreadChildren() {
         const counter = item.querySelector('.threads-post-counter');
         if (counter) counter.textContent = `${index + 1}/${threadsPostState.length}`;
     });
+    threadsPostState.forEach((_, index) => renderThreadMediaList(index));
 }
 
 function renderThreadMediaList(index) {
@@ -4010,22 +4333,63 @@ function renderThreadMediaList(index) {
     list.replaceChildren();
     const media = [...threadsPostState[index].files, ...(threadsPostState[index].gif ? [{ name: 'GIF', isGif: true }] : [])];
     media.forEach((file, fileIndex) => {
-        const chip = document.createElement('span');
-        chip.className = 'threads-media-chip';
-        chip.append(document.createTextNode(file.name));
+        const chip = document.createElement('div');
+        chip.className = 'threads-media-preview-item';
+        if (file.isGif) {
+            const image = document.createElement('img');
+            image.src = threadsPostState[index].gif;
+            image.alt = 'Selected GIF preview';
+            chip.appendChild(image);
+        } else if (file.type?.startsWith('video/')) {
+            const video = document.createElement('video');
+            video.src = threadPreviewUrl(file);
+            video.muted = true;
+            video.playsInline = true;
+            video.preload = 'metadata';
+            chip.appendChild(video);
+        } else if (file.type?.startsWith('image/')) {
+            const image = document.createElement('img');
+            image.src = threadPreviewUrl(file);
+            image.alt = `${file.name} preview`;
+            chip.appendChild(image);
+        }
+        const name = document.createElement('span');
+        name.className = 'threads-media-preview-name';
+        name.textContent = file.name;
+        chip.appendChild(name);
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.textContent = '×';
         remove.setAttribute('aria-label', `Remove ${file.name}`);
         remove.addEventListener('click', () => {
             if (file.isGif) threadsPostState[index].gif = '';
-            else threadsPostState[index].files.splice(fileIndex, 1);
+            else {
+                releaseThreadPreview(file);
+                threadsPostState[index].files.splice(fileIndex, 1);
+            }
             renderThreadMediaList(index);
             updateThreadsComposerState();
         });
         chip.appendChild(remove);
         list.appendChild(chip);
     });
+}
+
+function updateStaticUploadProgress(progress = {}) {
+    const container = document.getElementById('threads-upload-progress');
+    if (!container) return;
+    container.classList.remove('hidden');
+    const isChinese = window.AeroI18n?.getLanguage?.() === 'zh';
+    const labels = isChinese
+        ? { compressing: '正在压缩媒体', uploading: '正在上传', processing: '正在转码视频', publishing: '正在发布' }
+        : { compressing: 'Compressing media', uploading: 'Uploading media', processing: 'Processing video', publishing: 'Publishing post' };
+    const label = document.getElementById('threads-upload-progress-stage');
+    const value = document.getElementById('threads-upload-progress-value');
+    const bar = document.getElementById('threads-upload-progress-bar');
+    const percent = Math.max(0, Math.min(100, Number(progress.percent) || 0));
+    if (label) label.textContent = labels[progress.phase] || labels.uploading;
+    if (value) value.textContent = `${percent}%`;
+    if (bar) bar.value = percent;
 }
 
 function renderThreadsDrafts() {
@@ -4066,6 +4430,10 @@ async function publishThreadsPosts() {
     const error = document.getElementById('threads-compose-error');
     button.disabled = true;
     error.classList.add('hidden');
+    const totalMedia = entries.reduce((total, post) => total + post.files.length, 0);
+    const mediaProgress = new Map();
+    let mediaIndex = 0;
+    if (totalMedia) updateStaticUploadProgress({ phase: 'compressing', percent: 0 });
     try {
         if (staticPollState.active) {
             if (threadsPostState.length !== 1) throw new Error('投票仅支持单条帖子。');
@@ -4073,10 +4441,19 @@ async function publishThreadsPosts() {
             if (options.some((option) => !option)) throw new Error(staticPollText('poll_option_required'));
             if (new Set(options.map((option) => option.toLocaleLowerCase())).size !== options.length) throw new Error(staticPollText('poll_option_duplicate'));
         }
-        const posts = await Promise.all(entries.map(async (post) => ({
-            content: post.content.trim(),
-            images: [...await Promise.all(post.files.map((file) => AeroAPI.uploadMedia(file))), ...(post.gif ? [post.gif] : [])],
-        })));
+        const posts = await Promise.all(entries.map(async (post) => {
+            const images = await Promise.all(post.files.map((file) => {
+                const index = mediaIndex++;
+                mediaProgress.set(index, 0);
+                return AeroAPI.uploadMedia(file, (status) => {
+                    mediaProgress.set(index, status.percent);
+                    const percent = [...mediaProgress.values()].reduce((sum, value) => sum + value, 0) / Math.max(1, totalMedia);
+                    updateStaticUploadProgress({ phase: status.phase, percent });
+                });
+            }));
+            return { content: post.content.trim(), images: [...images, ...(post.gif ? [post.gif] : [])] };
+        }));
+        if (totalMedia) updateStaticUploadProgress({ phase: 'publishing', percent: 100 });
         const poll = staticPollState.active ? {
             options: staticPollState.options.map((option) => option.trim()),
             expires_at: new Date(Date.now() + staticPollState.duration * 60 * 60 * 1000).toISOString(),
@@ -4103,6 +4480,7 @@ async function publishThreadsPosts() {
         error.classList.remove('hidden');
     } finally {
         button.disabled = false;
+        document.getElementById('threads-upload-progress')?.classList.add('hidden');
     }
 }
 
@@ -4151,7 +4529,10 @@ function setupCreatePostExperience() {
     });
     document.getElementById('threads-media-input')?.addEventListener('change', (event) => {
         const files = Array.from(event.target.files || []);
-        threadsPostState[threadsActivePostIndex].files.push(...files);
+        const post = threadsPostState[threadsActivePostIndex];
+        const remaining = Math.max(0, 10 - post.files.length);
+        post.files.push(...files.slice(0, remaining));
+        if (files.length > remaining) window.showNotice?.('A post can include at most 10 media files.', 'info');
         event.target.value = '';
         renderThreadMediaList(threadsActivePostIndex);
         updateThreadsComposerState();
@@ -4167,6 +4548,7 @@ function setupCreatePostExperience() {
         const removeIndex = event.target.closest('[data-remove-thread]')?.dataset.removeThread;
         if (removeIndex !== undefined) {
             updateThreadsComposerState();
+            threadsPostState[Number(removeIndex)]?.files.forEach(releaseThreadPreview);
             threadsPostState.splice(Number(removeIndex), 1);
             renderThreadChildren();
             updateThreadsComposerState();
