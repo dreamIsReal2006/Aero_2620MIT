@@ -170,13 +170,20 @@ def create_app():
                 "Skipping poll_json column migration during app startup: %s",
                 error,
             )
-        db.metadata.create_all(
-            bind=db.engine,
-            tables=[db.metadata.tables["post_votes"]],
-        )
-        existing_tables = set(inspect(db.engine).get_table_names())
-        if not {table.name for table in hashtag_tables}.issubset(existing_tables):
-            db.metadata.create_all(bind=db.engine, tables=hashtag_tables)
+        try:
+            db.metadata.create_all(
+                bind=db.engine,
+                tables=[db.metadata.tables["post_votes"]],
+            )
+            existing_tables = set(inspect(db.engine).get_table_names())
+            if not {table.name for table in hashtag_tables}.issubset(existing_tables):
+                db.metadata.create_all(bind=db.engine, tables=hashtag_tables)
+        except Exception as error:
+            db.session.rollback()
+            logger.warning(
+                "Skipping optional table creation during app startup: %s",
+                error,
+            )
 
     from backend.auth import auth_bp
     from backend.auth import routes
