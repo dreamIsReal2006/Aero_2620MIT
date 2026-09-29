@@ -405,7 +405,7 @@
                 <div class="profile-header-main">
                     <div class="profile-header-copy">
                         <div class="profile-display-row">
-                            <h2>${user.display_name || user.username || 'User'}${profileRoleBadge(user.role)}</h2>
+                            <h2><span class="profile-display-name"></span>${profileRoleBadge(user.role)}</h2>
                             ${isOwnProfile ? '<button type="button" class="profile-share-btn" id="profile-share-btn" aria-label="Share profile" title="Share profile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5"></path></svg></button>' : ''}
                         </div>
                         <div class="profile-handle">@${user.username || 'user'}</div>
@@ -422,6 +422,7 @@
                 </div>
             `;
 
+            header.querySelector('.profile-display-name').textContent = user.display_name || user.username || 'User';
             header.querySelector('#profile-share-btn')?.addEventListener('click', () => {
                 if (isOwnProfile) openProfileShareModal(user, profileUserId);
             });

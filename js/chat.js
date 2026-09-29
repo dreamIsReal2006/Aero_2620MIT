@@ -79,9 +79,19 @@
         const avatarValue = String(contact.avatar_url || contact.avatarUrl || contact.avatar || '');
         const avatarText = avatarValue.startsWith('letter:') ? avatarValue.slice(7, 8).toUpperCase() : String(contact.username || contact.name || 'U').charAt(0).toUpperCase();
         button.innerHTML = `
-            <span class="chat-contact-avatar ${contact.is_online ? 'is-online' : ''}">${avatarUrl ? `<img src="${avatarUrl}" alt="" loading="lazy">` : avatarText}</span>
+            <span class="chat-contact-avatar ${contact.is_online ? 'is-online' : ''}"></span>
             <span><strong>@${escapeText(contact.username || contact.name || 'User')}</strong><small>${escapeText(contact.latest_message || 'Start a conversation')}</small></span>
         `;
+        const avatarElement = button.querySelector('.chat-contact-avatar');
+        if (avatarUrl) {
+            const image = document.createElement('img');
+            image.src = avatarUrl;
+            image.alt = '';
+            image.loading = 'lazy';
+            avatarElement.appendChild(image);
+        } else {
+            avatarElement.textContent = avatarText;
+        }
         button.addEventListener('click', () => {
             if (typeof window.selectChatContact === 'function') {
                 window.selectChatContact(contact);

@@ -49,13 +49,14 @@ def create_app():
     base_dir = Path(__file__).resolve().parent.parent
     app = Flask(
         __name__,
-        static_folder=str(base_dir),
-        static_url_path="",
+        static_folder=str(base_dir / "assets"),
+        static_url_path="/assets",
     )
 
-    app.config["SECRET_KEY"] = os.environ.get(
-        "AERO_SECRET_KEY", "development-only-change-this-secret"
-    )
+    secret_key = os.environ.get("AERO_SECRET_KEY", "").strip()
+    if len(secret_key) < 32:
+        raise RuntimeError("AERO_SECRET_KEY must be configured and at least 32 characters long")
+    app.config["SECRET_KEY"] = secret_key
     app.config["SESSION_COOKIE_SAMESITE"] = "None"
     app.config["SESSION_COOKIE_SECURE"] = True
     app.config["SESSION_COOKIE_HTTPONLY"] = True
@@ -106,6 +107,21 @@ def create_app():
         if not request.path.startswith("/api/"):
             response.headers.setdefault("Cache-Control", "public, max-age=3600")
         return response
+
+    @app.get("/css/<path:filename>")
+    def serve_css(filename):
+        return send_from_directory(base_dir / "css", filename)
+
+    @app.get("/js/<path:filename>")
+    def serve_js(filename):
+        return send_from_directory(base_dir / "js", filename)
+
+    @app.get("/index.html")
+    @app.get("/otp.html")
+    @app.get("/settings.html")
+    @app.get("/suspended.html")
+    def serve_public_document():
+        return send_from_directory(base_dir, request.path.lstrip("/"))
 
     @app.get("/api/ping")
     def ping():
