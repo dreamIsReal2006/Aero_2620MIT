@@ -6,6 +6,10 @@ const NOTIFICATION_POLL_MS = 30000;
 const PRESENCE_POLL_MS = 60000;
 const UNREAD_CHAT_POLL_MS = 30000;
 
+function isThreadDebugEnabled() {
+    return new URLSearchParams(window.location.search).get('debugThreads') === '1';
+}
+
 function getAuthToken() {
     const token = localStorage.getItem('aero_token');
     return token && token !== 'null' && token !== 'undefined' ? token : '';
@@ -2895,6 +2899,7 @@ const AeroAPI = {
         feedLoading = false;
         if (requestId !== feedRenderRequestId) return;
         const posts = Array.isArray(payload.posts) ? payload.posts : [];
+        if (isThreadDebugEnabled()) console.debug('[thread-feed] received posts:', posts);
         feedCursor = payload.next_cursor || '';
         feedHasMore = Boolean(payload.has_more && feedCursor);
         const uniquePosts = [];
@@ -2976,6 +2981,14 @@ const AeroAPI = {
             postTime.dateTime = post.created_at || '';
             postTime.textContent = formatRelativeTime(post.created_at);
             authorIdentity.appendChild(postTime);
+            const threadPosts = Array.isArray(post.thread_posts) ? post.thread_posts : [];
+            if (threadPosts.length) {
+                const threadBadge = document.createElement('span');
+                threadBadge.className = 'post-thread-count';
+                threadBadge.textContent = `1 / ${threadPosts.length + 1}`;
+                threadBadge.setAttribute('aria-label', `Thread post 1 of ${threadPosts.length + 1}`);
+                authorIdentity.appendChild(threadBadge);
+            }
             header.appendChild(authorIdentity);
             const moreButton = document.createElement('button');
             moreButton.className = 'icon-btn post-more-btn menu-trigger-btn';
@@ -3138,6 +3151,49 @@ const AeroAPI = {
                     }
                 });
                 postEl.appendChild(media);
+            }
+            if (threadPosts.length) {
+                const threadList = document.createElement('section');
+                threadList.className = 'post-thread-list';
+                threadList.setAttribute('aria-label', 'Thread posts');
+                threadPosts.forEach((threadPost, index) => {
+                    const threadItem = document.createElement('article');
+                    threadItem.className = 'post-thread-item';
+                    const threadHeader = document.createElement('div');
+                    threadHeader.className = 'post-thread-item-header';
+                    const threadAuthor = document.createElement('strong');
+                    threadAuthor.textContent = `@${threadPost.username || post.username || 'User'}`;
+                    const threadPosition = document.createElement('span');
+                    threadPosition.textContent = `${index + 2} / ${threadPosts.length + 1}`;
+                    threadHeader.append(threadAuthor, threadPosition);
+                    threadItem.appendChild(threadHeader);
+                    if (threadPost.content) {
+                        const threadContent = document.createElement('div');
+                        threadContent.className = 'post-thread-item-content';
+                        threadContent.innerHTML = renderMentionText(threadPost.content);
+                        threadItem.appendChild(threadContent);
+                    }
+                    (Array.isArray(threadPost.images) ? threadPost.images : []).filter(Boolean).forEach((mediaUrl) => {
+                        if (/\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(mediaUrl)) {
+                            const video = document.createElement('video');
+                            video.className = 'post-thread-item-media';
+                            video.src = mediaUrl;
+                            video.controls = true;
+                            video.playsInline = true;
+                            video.preload = 'metadata';
+                            threadItem.appendChild(video);
+                        } else {
+                            const image = document.createElement('img');
+                            image.className = 'post-thread-item-media';
+                            image.src = mediaUrl;
+                            image.alt = 'Thread post media';
+                            image.loading = 'lazy';
+                            threadItem.appendChild(image);
+                        }
+                    });
+                    threadList.appendChild(threadItem);
+                });
+                postEl.appendChild(threadList);
             }
             const actions = document.createElement('div');
             actions.className = 'post-actions';
@@ -4466,12 +4522,15 @@ async function publishThreadsPosts() {
             topic: document.querySelector('.selected-topic')?.textContent || '',
         };
         const isSinglePost = posts.length === 1;
+        const requestBody = isSinglePost ? { ...posts[0], ...metadata, poll } : { ...metadata, posts };
+        if (isThreadDebugEnabled()) console.debug('[thread-publish] request payload:', requestBody);
         const response = await fetch(`${API_BASE}/posts${isSinglePost ? '' : '/chain'}`, {
             method: 'POST',
             headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-            body: JSON.stringify(isSinglePost ? { ...posts[0], ...metadata, poll } : { ...metadata, posts }),
+            body: JSON.stringify(requestBody),
         });
         const payload = await response.json().catch(() => ({}));
+        if (isThreadDebugEnabled()) console.debug('[thread-publish] response:', payload);
         if (!response.ok) throw new Error(payload.message || 'Unable to publish thread');
         closeThreadsCompose(false);
         await AeroAPI.renderFeed();

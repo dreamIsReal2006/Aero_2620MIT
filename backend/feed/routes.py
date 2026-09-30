@@ -188,6 +188,7 @@ def post_payload(post, current_user_id=None):
         "is_bookmarked": bookmarked,
         "is_following": is_following,
         "parent_id": post.parent_id,
+        "thread_posts": [],
         "type": post.type,
         "likes": likes_count,
         "comments": comments_count,
@@ -224,6 +225,7 @@ def optimized_post_payload(
         "is_bookmarked": post.id in bookmarked_ids,
         "is_following": post.user_id in followed_ids,
         "parent_id": post.parent_id,
+        "thread_posts": [],
         "type": post.type,
         "likes": likes_count,
         "comments": comments_count,
@@ -777,6 +779,8 @@ def create_post(current_user):
         logger.exception("Unable to index hashtags for post %s", post.id)
     mentioned_users = add_mention_notifications(content, current_user, post.id, "post")
     db.session.commit()
+    with _post_cache_lock:
+        _post_response_cache.clear()
     for mentioned_user in mentioned_users:
         if mentioned_user.email:
             threading.Thread(
@@ -841,6 +845,8 @@ def create_post_chain(current_user):
                 for mentioned_user in add_mention_notifications(content, current_user, post.id, "post")
             )
         db.session.commit()
+        with _post_cache_lock:
+            _post_response_cache.clear()
     except Exception:
         db.session.rollback()
         logger.exception("Unable to create post chain for user %s", current_user.id)
