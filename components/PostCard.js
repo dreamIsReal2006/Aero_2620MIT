@@ -71,9 +71,11 @@ export default function PostCard({ post, onAction }) {
   const [votingOption, setVotingOption] = useState(null);
   const [pollNow, setPollNow] = useState(Date.now());
   const [viewerIndex, setViewerIndex] = useState(null);
+  const [threadExpanded, setThreadExpanded] = useState(false);
   const touchStartX = useRef(null);
   const author = post.author || post.user || { username: post.username, avatar_url: post.avatar_url };
   const media = post.images || post.media || [];
+  const threadPosts = Array.isArray(post.thread_posts) ? post.thread_posts : [];
   const mediaUrl = (item) => String(item).startsWith('http') ? item : `${process.env.NEXT_PUBLIC_API_ORIGIN || ''}${item}`;
   const isVideo = (item) => /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(String(item));
 
@@ -161,6 +163,18 @@ export default function PostCard({ post, onAction }) {
     <div className="mb-3 flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-2.5"><Avatar user={author} /><div className="min-w-0"><strong className="block truncate text-sm">@{author.username || 'User'}</strong><span className="text-xs text-[#65676b]">{post.created_at ? new Date(post.created_at).toLocaleDateString() : 'Just now'}</span></div></div><button onClick={() => onAction?.('menu', post)} className="rounded-full px-2 text-lg text-[#65676b] hover:bg-black/5" aria-label="Post options">•••</button></div>
     <p className="mb-4 whitespace-pre-wrap text-[.96rem] leading-6">{renderTaggedContent(post.content || 'Shared a thought with Aero.', mentionUsers)}</p>
     {media.length > 0 && <div className={`post-media-container mb-3 ${media.length > 1 ? 'post-media-carousel' : ''}`}>{media.map((item, index) => { const url = mediaUrl(item); const video = isVideo(item); return video ? <button key={`${item}-${index}`} type="button" className="post-media-item post-video-placeholder" aria-label={`Play video ${index + 1} of ${media.length}`} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setViewerIndex(index); }}><span className="post-video-placeholder-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg></span><span className="post-video-placeholder-label">Play video</span></button> : <img key={`${item}-${index}`} src={url} alt="Post media" className="post-media-item" loading="lazy" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setViewerIndex(index); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setViewerIndex(index); } }} tabIndex={0} role="button" aria-label={`Open media ${index + 1} of ${media.length}`} />; })}</div>}
+    {threadPosts.length > 0 && <section className="mb-4 border-l-2 border-[#0A84FF]/30 pl-4">
+      <button type="button" className="mb-2 text-sm font-semibold text-[#0A84FF]" aria-expanded={threadExpanded} onClick={() => setThreadExpanded((expanded) => !expanded)}>
+        {threadExpanded ? (window.AeroI18n?.getLanguage?.() === 'zh' ? '收起串文' : 'Hide thread') : (window.AeroI18n?.getLanguage?.() === 'zh' ? `查看串文 · ${threadPosts.length + 1}` : `View thread · ${threadPosts.length + 1}`)}
+      </button>
+      {threadExpanded && <div className="space-y-3">{threadPosts.map((entry) => <article key={entry.id} className="border-t border-black/10 pt-3">
+        <strong className="mb-1 block text-xs text-[#65676b]">@{entry.username || author.username || 'User'}</strong>
+        {entry.content && <p className="whitespace-pre-wrap text-[.94rem] leading-6">{renderTaggedContent(entry.content, mentionUsers)}</p>}
+        {Array.isArray(entry.images) && entry.images.length > 0 && <div className="mt-2 grid grid-cols-2 gap-2">{entry.images.map((item, index) => isVideo(item)
+          ? <video key={`${entry.id}-${index}`} src={mediaUrl(item)} controls playsInline preload="metadata" className="max-h-64 w-full rounded-lg object-cover" />
+          : <img key={`${entry.id}-${index}`} src={mediaUrl(item)} alt="Thread post media" className="max-h-64 w-full rounded-lg object-cover" loading="lazy" />)}</div>}
+      </article>)}</div>}
+    </section>}
     {poll && pollOptions.length > 0 && <section className="thread-poll-container" aria-label="Post poll">
       {pollOptions.map((option, index) => {
         const votes = Number(option.votes || 0);

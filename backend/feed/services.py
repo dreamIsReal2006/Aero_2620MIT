@@ -65,6 +65,7 @@ def get_for_you_candidate_ids(user_id, limit):
             " JOIN user_hashtag_interests interest ON interest.hashtag_id = post_tag.hashtag_id "
             " WHERE post_tag.post_id = p.id AND interest.user_id = u.id"
             ") tag_score ON TRUE "
+            "WHERE p.parent_id IS NULL "
             "ORDER BY ("
             " 0.5 * CASE WHEN p.embedding IS NULL OR u.interest_embedding IS NULL THEN 0.0 "
             " ELSE GREATEST(1.0 - (p.embedding <=> u.interest_embedding), 0.0) END "

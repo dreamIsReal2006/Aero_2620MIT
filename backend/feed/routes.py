@@ -16,7 +16,7 @@ from flask import current_app, jsonify, request
 from PIL import Image, ImageOps
 from sqlalchemy import false, func, or_, text
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import contains_eager, load_only
+from sqlalchemy.orm import contains_eager, joinedload, load_only
 from werkzeug.utils import secure_filename
 
 from backend import db
@@ -242,6 +242,46 @@ def visible_posts_query(current_user):
     )
 
 
+def _thread_post_payload(post):
+    return {
+        "id": post.id,
+        "user_id": post.user_id,
+        "username": post.author.username,
+        "avatar_url": post.author.avatar_url or "",
+        "content": post.content,
+        "images": json.loads(post.images_json or "[]"),
+        "parent_id": post.parent_id,
+        "created_at": f"{post.created_at.isoformat()}Z",
+    }
+
+
+def _attach_thread_posts(posts, current_user):
+    if not posts:
+        return
+    root_payloads = {post["id"]: post for post in posts}
+    root_ids_by_post_id = {post_id: post_id for post_id in root_payloads}
+    descendants_by_root = {post_id: [] for post_id in root_payloads}
+    parent_ids = list(root_payloads)
+
+    while parent_ids:
+        children = visible_posts_query(current_user).options(
+            joinedload(Post.author)
+        ).filter(
+            Post.parent_id.in_(parent_ids)
+        ).order_by(Post.created_at.asc(), Post.id.asc()).all()
+        parent_ids = []
+        for child in children:
+            root_id = root_ids_by_post_id.get(child.parent_id)
+            if root_id is None:
+                continue
+            descendants_by_root[root_id].append(_thread_post_payload(child))
+            root_ids_by_post_id[child.id] = root_id
+            parent_ids.append(child.id)
+
+    for root_id, root_payload in root_payloads.items():
+        root_payload["thread_posts"] = descendants_by_root[root_id]
+
+
 def _pagination():
     page = max(request.args.get("page", 1, type=int) or 1, 1)
     limit = min(max(request.args.get("limit", 10, type=int) or 10, 1), 10)
@@ -425,7 +465,7 @@ def get_posts(current_user):
             User.show_online_status,
             User.last_seen_at,
         ),
-    )
+    ).filter(Post.parent_id.is_(None))
     if excluded_ids:
         posts_query = posts_query.filter(~Post.id.in_(excluded_ids))
     if cursor:
@@ -489,6 +529,7 @@ def get_posts(current_user):
         )
         for post, likes_count, comments_count, share_count in rows
     ]
+    _attach_thread_posts(posts, current_user)
     next_cursor = _encode_post_cursor(rows[-1][0]) if has_more and rows else None
     response = {"posts": posts, "next_cursor": next_cursor, "has_more": has_more}
     _cache_posts(cache_key, response)
@@ -673,7 +714,9 @@ def get_post(current_user, post_id):
     post = db.session.get(Post, post_id)
     if not post or not can_view_user_content(current_user, post.author):
         return jsonify({"message": "Post not found"}), 404
-    return jsonify(post_payload(post, current_user.id if current_user else None)), 200
+    payload = post_payload(post, current_user.id if current_user else None)
+    _attach_thread_posts([payload], current_user)
+    return jsonify(payload), 200
 
 
 @feed_bp.post("/posts/<int:post_id>/vote")
@@ -774,18 +817,19 @@ def create_post_chain(current_user):
     created_posts = []
     mention_notifications = []
     try:
-        parent_id = None
+        main_post_id = None
         for content, images in normalized:
             post = Post(
                 content=content,
                 images_json=json.dumps(images),
                 user_id=current_user.id,
-                parent_id=parent_id,
+                parent_id=main_post_id,
                 type="original",
             )
             db.session.add(post)
             db.session.flush()
-            parent_id = post.id
+            if main_post_id is None:
+                main_post_id = post.id
             created_posts.append(post)
             try:
                 with db.session.begin_nested():
@@ -820,7 +864,9 @@ def create_post_chain(current_user):
                 name=f"post-embedding-{post.id}",
             ).start()
 
-    return jsonify({"posts": [post_payload(post, current_user.id) for post in created_posts]}), 201
+    response_posts = [post_payload(post, current_user.id) for post in created_posts]
+    _attach_thread_posts(response_posts[:1], current_user)
+    return jsonify({"posts": response_posts}), 201
 
 
 @feed_bp.delete("/posts/<post_id>")

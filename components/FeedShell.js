@@ -558,7 +558,8 @@ export default function FeedShell() {
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message || 'Unable to publish post');
       const createdPosts = result.posts || [result.post || result];
-      setPosts((current) => [...createdPosts, ...current]);
+      const [mainPost, ...threadReplies] = createdPosts;
+      setPosts((current) => [{ ...mainPost, thread_posts: threadReplies }, ...current]);
       threadPosts.forEach((post) => post.files.forEach(releasePostPreviewUrl));
       setThreadPosts([{ id: Date.now(), content: '', files: [] }]);
       setSelectedGif('');

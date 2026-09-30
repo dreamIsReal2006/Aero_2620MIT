@@ -576,11 +576,22 @@
             const mediaMarkup = media.length ? `<div class="post-media-container post-detail-media">${media.map((url, index) => /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(url)
                 ? `<button type="button" class="post-media-item post-video-placeholder" data-detail-media-index="${index}" aria-label="Play video ${index + 1} of ${media.length}"><span class="post-video-placeholder-icon" aria-hidden="true">▶</span><span class="post-video-placeholder-label">Play video</span></button>`
                 : `<img class="post-media-item" src="${escapePostDetail(url)}" alt="Post media" loading="lazy" data-detail-media-index="${index}" tabindex="0" role="button" aria-label="Open media ${index + 1} of ${media.length}">`).join('')}</div>` : '';
+            const threadMarkup = (Array.isArray(post.thread_posts) ? post.thread_posts : []).map((entry) => {
+                const entryUsername = escapePostDetail(entry.username || post.username || 'User');
+                const entryContent = window.AeroMentionText?.(entry.content || '') || escapePostDetail(entry.content);
+                const entryMedia = (Array.isArray(entry.images) ? entry.images : []).map((item) => {
+                    const url = postDetailMediaUrl(item);
+                    return /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(url)
+                        ? `<video class="post-media-item" src="${escapePostDetail(url)}" controls playsinline preload="metadata"></video>`
+                        : `<img class="post-media-item" src="${escapePostDetail(url)}" alt="Thread post media" loading="lazy">`;
+                }).join('');
+                return `<article class="post-thread-item"><strong>@${entryUsername}</strong><div class="post-content">${entryContent}</div>${entryMedia ? `<div class="post-media-container">${entryMedia}</div>` : ''}</article>`;
+            }).join('');
             const relativeTime = window.AeroFormatRelativeTime?.(post.created_at) || new Date(post.created_at || Date.now()).toLocaleDateString();
 
             container.innerHTML = `<article class="post-card glass-card liquid-glass liquid-glass-interactive g2-card" data-post-id="${Number(post.id)}">
                 <header class="post-header"><div class="post-author-info post-author-identity"><a class="post-author-link" href="#profile/${Number(post.user_id)}" aria-label="Open @${username} profile"><span class="post-avatar ${post.is_online ? 'is-online' : ''}"><img src="${escapePostDetail(authorAvatar.url)}" alt=""></span><span class="post-author">@${username}${profileRoleBadge(post.role)}</span></a><time class="post-relative-time">${escapePostDetail(relativeTime)}</time></div></header>
-                <div class="post-content">${content}</div>${mediaMarkup}
+                <div class="post-content">${content}</div>${mediaMarkup}${threadMarkup ? `<section class="post-thread-list" aria-label="Thread posts">${threadMarkup}</section>` : ''}
                 <div class="post-actions"><div class="action-capsule">
                     <button type="button" class="post-action-btn${post.is_liked ? ' is-liked' : ''}" data-detail-like aria-label="${post.is_liked ? 'Unlike' : 'Like'} post">${post.is_liked ? '♥' : '♡'} <span>${Number(post.likes_count) || 0}</span></button>
                     <button type="button" class="post-action-btn" data-detail-comment aria-label="Go to comments">♧ <span>${Number(post.comments_count) || 0}</span></button>
