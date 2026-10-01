@@ -5,6 +5,7 @@ const DEFAULT_ADMIN_STATS = { total_users: 0, total_posts: 0, pending_reports: 0
 const NOTIFICATION_POLL_MS = 30000;
 const PRESENCE_POLL_MS = 60000;
 const UNREAD_CHAT_POLL_MS = 30000;
+const chatInfoText = (key, values = {}) => window.AeroI18n?.t?.(`chat.info.${key}`, values) || key;
 
 function isThreadDebugEnabled() {
     return new URLSearchParams(window.location.search).get('debugThreads') === '1';
@@ -352,6 +353,49 @@ function renderAvatarMarkup(user = {}, className = 'avatar', sizeClass = '') {
 
 window.getUserAvatarUrl = getUserAvatarUrl;
 window.AeroAvatar = { getUrl: getUserAvatarUrl, markup: renderAvatarMarkup };
+
+function getChatAvatarFallback(user = {}, fallbackName = '') {
+    const avatarValue = String(user.avatar_url || user.avatarUrl || user.avatar || user.profile_picture || '');
+    if (avatarValue.startsWith('letter:')) return avatarValue.slice(7, 8).toUpperCase() || 'U';
+    return String(user.username || user.display_name || user.name || fallbackName || 'U').trim().charAt(0).toUpperCase() || 'U';
+}
+
+function chatAvatarMarkup(user, className) {
+    const url = getUserAvatarUrl(user);
+    const fallback = getChatAvatarFallback(user);
+    return `<span class="${escapeHtml(className)}" data-chat-avatar-fallback="${escapeHtml(fallback)}" aria-hidden="true">${url ? `<img src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async">` : escapeHtml(fallback)}</span>`;
+}
+
+function setChatAvatar(element, user, fallbackName = '', isOnline = user?.is_online) {
+    if (!element) return;
+    const avatarUser = { ...user, username: user?.username || fallbackName || user?.name || user?.display_name };
+    const url = getUserAvatarUrl(avatarUser);
+    const fallback = getChatAvatarFallback(avatarUser, fallbackName);
+    element.dataset.chatAvatarFallback = fallback;
+    element.setAttribute('aria-hidden', 'true');
+    element.classList.toggle('is-online', Boolean(isOnline));
+    element.replaceChildren();
+    if (!url) {
+        element.textContent = fallback;
+        return;
+    }
+    const image = document.createElement('img');
+    image.src = url;
+    image.alt = '';
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    element.appendChild(image);
+}
+
+document.addEventListener('error', (event) => {
+    const image = event.target;
+    if (!(image instanceof HTMLImageElement)) return;
+    const avatar = image.closest('[data-chat-avatar-fallback]');
+    if (!avatar) return;
+    avatar.replaceChildren();
+    avatar.textContent = avatar.dataset.chatAvatarFallback || 'U';
+}, true);
+window.AeroChatAvatar = { markup: chatAvatarMarkup, set: setChatAvatar };
 
 function getCurrentViewerRole(user = null) {
     const viewer = user || JSON.parse(localStorage.getItem('aero_user') || '{}');
@@ -1488,18 +1532,10 @@ async function loadChatContacts() {
     chatContactCache = contactsResponse.ok ? await contactsResponse.json() : [];
     chatGroupCache = groupsResponse.ok ? await groupsResponse.json() : [];
     const contactMarkup = (chatContactCache || []).map((contact) => {
-        const avatarUrl = contact.avatar_url && !String(contact.avatar_url).startsWith('letter:')
-            ? (String(contact.avatar_url).startsWith('http') ? contact.avatar_url : `${API_ORIGIN}${contact.avatar_url}`)
-            : '';
-        const avatarText = String(contact.avatar_url || '').startsWith('letter:')
-            ? String(contact.avatar_url).slice(7, 8).toUpperCase()
-            : (contact.username || 'U').charAt(0).toUpperCase();
-        const avatar = avatarUrl
-            ? `<img src="${escapeHtml(avatarUrl)}" alt="" loading="lazy" onerror="this.remove()">`
-            : escapeHtml(avatarText || 'U');
-        return `<button type="button" class="chat-contact ${contact.unread_count ? 'unread' : ''}" data-user-id="${contact.id}"><span class="chat-contact-avatar ${contact.is_online ? 'is-online' : ''}">${avatar}</span><span><strong>@${escapeHtml(contact.username)}</strong><small>${escapeHtml(contact.latest_message || 'Start a conversation')}</small><time>${escapeHtml(formatRelativeTime(contact.latest_message_at))}</time></span></button>`;
+        const avatar = chatAvatarMarkup(contact, `chat-contact-avatar${contact.is_online ? ' is-online' : ''}`);
+        return `<button type="button" class="chat-contact ${contact.unread_count ? 'unread' : ''}" data-user-id="${contact.id}">${avatar}<span><strong>@${escapeHtml(contact.username)}</strong><small>${escapeHtml(contact.latest_message || 'Start a conversation')}</small><time>${escapeHtml(formatRelativeTime(contact.latest_message_at))}</time></span></button>`;
     }).join('');
-    const groupMarkup = (chatGroupCache || []).map((group) => `<button type="button" class="chat-contact chat-group-contact" data-group-id="${group.group_id}"><span class="chat-contact-avatar">${escapeHtml((group.name || 'G').slice(0, 1).toUpperCase())}</span><span><strong>${escapeHtml(group.name)}</strong><small>${escapeHtml(group.latest_message || `${group.member_count} members`)}</small><time>${escapeHtml(formatRelativeTime(group.latest_message_at))}</time></span></button>`).join('');
+    const groupMarkup = (chatGroupCache || []).map((group) => `<button type="button" class="chat-contact chat-group-contact" data-group-id="${group.group_id}">${chatAvatarMarkup(group, 'chat-contact-avatar')}<span><strong>${escapeHtml(group.name)}</strong><small>${escapeHtml(group.latest_message || chatInfoText('member_count', { count: group.member_count || 0 }))}</small><time>${escapeHtml(formatRelativeTime(group.latest_message_at))}</time></span></button>`).join('');
     list.innerHTML = `${groupMarkup}${contactMarkup}` || '<div class="bookmarks-empty">No contacts yet.</div>';
     await Promise.all([...list.querySelectorAll('.chat-contact')].map(async (item) => {
         const isGroup = item.classList.contains('chat-group-contact');
@@ -1547,8 +1583,8 @@ async function markConversationRead(conversation) {
 function setMuteButtonState(button, muted, animate = true) {
     if (!button) return;
     button.classList.toggle('is-muted', muted);
-    button.setAttribute('aria-label', muted ? 'Unmute user' : 'Mute user');
-    button.title = muted ? 'Unmute user' : 'Mute user';
+    button.setAttribute('aria-label', chatInfoText(muted ? 'unmute_user' : 'mute_user'));
+    button.title = chatInfoText(muted ? 'unmute_user' : 'mute_user');
     button.innerHTML = muted
         ? '<svg class="chat-header-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"></path><path d="M10 21h4"></path><path d="m4 4 16 16"></path></svg>'
         : '<svg class="chat-header-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"></path><path d="M10 21h4"></path></svg>';
@@ -1576,18 +1612,18 @@ async function selectChatGroup(group) {
     const activeName = document.getElementById('chat-active-name');
     const groupInfo = document.getElementById('chat-group-info-btn');
     if (activeName) {
-        activeName.textContent = `${group.name} · ${group.member_count} members`;
+        activeName.textContent = `${group.name} · ${chatInfoText('member_count', { count: group.member_count || 0 })}`;
+        activeName.setAttribute('data-i18n-aria-label', 'chat.info.open');
+        activeName.setAttribute('aria-label', chatInfoText('open'));
         activeName.href = '#';
-        activeName.setAttribute('aria-disabled', 'true');
+        activeName.removeAttribute('aria-disabled');
     }
     const avatarLink = document.getElementById('chat-active-avatar-link');
-    avatarLink?.setAttribute('aria-disabled', 'true');
+    avatarLink?.setAttribute('data-i18n-aria-label', 'chat.info.open');
+    avatarLink?.setAttribute('aria-label', chatInfoText('open'));
+    avatarLink?.removeAttribute('aria-disabled');
     if (avatarLink) avatarLink.href = '#';
-    if (activeAvatar) {
-        activeAvatar.classList.remove('is-online');
-        activeAvatar.replaceChildren();
-        activeAvatar.textContent = String(group.name || 'G').slice(0, 1).toUpperCase();
-    }
+    setChatAvatar(activeAvatar, group, group.name, false);
     groupInfo?.classList.remove('hidden');
     document.getElementById('chat-mute-btn')?.classList.add('hidden');
     const cacheKey = chatConversationKey(activeChatUser);
@@ -1607,32 +1643,19 @@ async function selectChatContact(contact) {
     const activeName = document.getElementById('chat-active-name');
     if (activeName) {
         activeName.textContent = `@${contact.username}`;
+        activeName.setAttribute('data-i18n-aria-label', 'chat.info.open');
+        activeName.setAttribute('aria-label', chatInfoText('open'));
         activeName.href = `#profile/${encodeURIComponent(contact.id)}`;
         activeName.removeAttribute('aria-disabled');
     }
     const avatarLink = document.getElementById('chat-active-avatar-link');
     if (avatarLink) {
+        avatarLink.setAttribute('data-i18n-aria-label', 'chat.info.open');
+        avatarLink.setAttribute('aria-label', chatInfoText('open'));
         avatarLink.href = `#profile/${encodeURIComponent(contact.id)}`;
         avatarLink.removeAttribute('aria-disabled');
     }
-    if (activeAvatar) {
-        activeAvatar.classList.toggle('is-online', Boolean(contact.is_online));
-        activeAvatar.replaceChildren();
-        const avatarUrl = contact.avatar_url && !String(contact.avatar_url).startsWith('letter:')
-            ? (String(contact.avatar_url).startsWith('http') ? contact.avatar_url : `${API_ORIGIN}${contact.avatar_url}`)
-            : '';
-        if (avatarUrl) {
-            const image = document.createElement('img');
-            image.src = avatarUrl;
-            image.alt = `@${contact.username}`;
-            image.onerror = () => { activeAvatar.textContent = (contact.username || 'U').charAt(0).toUpperCase(); };
-            activeAvatar.appendChild(image);
-        } else {
-            activeAvatar.textContent = String(contact.avatar_url || '').startsWith('letter:')
-                ? String(contact.avatar_url).slice(7, 8).toUpperCase()
-                : (contact.username || 'U').charAt(0).toUpperCase();
-        }
-    }
+    setChatAvatar(activeAvatar, contact, contact.username, contact.is_online);
     const cacheKey = chatConversationKey(contact);
     const cachedMessages = messagesCache.get(cacheKey);
     if (cachedMessages) {
@@ -1741,12 +1764,26 @@ async function renderChatMessages(messages, contact) {
         const image = Array.isArray(post.images) && post.images[0]
             ? `<img src="${escapeHtml(String(post.images[0]).startsWith('http') ? post.images[0] : `${API_ORIGIN}${post.images[0]}`)}" alt="Shared post image" loading="lazy">`
             : '';
-        return `<a class="chat-shared-post" href="/#post-${post.id}"><span class="chat-shared-post-author"><span class="chat-shared-post-avatar">${post.avatar_url ? `<img src="${escapeHtml(String(post.avatar_url).startsWith('http') ? post.avatar_url : `${API_ORIGIN}${post.avatar_url}`)}" alt="">` : escapeHtml((post.username || 'U').charAt(0).toUpperCase())}</span><strong>@${escapeHtml(post.username || 'User')}</strong></span>${image}<span class="chat-shared-post-text">${escapeHtml(post.content || 'Shared post')}</span></a>`;
+        return `<a class="chat-shared-post" href="/#post-${post.id}"><span class="chat-shared-post-author">${chatAvatarMarkup(post, 'chat-shared-post-avatar')}<strong>@${escapeHtml(post.username || 'User')}</strong></span>${image}<span class="chat-shared-post-text">${escapeHtml(post.content || 'Shared post')}</span></a>`;
     };
     const renderMessageText = (value) => escapeHtml(value).replace(/(https?:\/\/[^\s<]+|\/#post-\d+)/g, '<a class="chat-message-link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-    box.innerHTML = displayMessages.map((message) => `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}">${contact.is_group && message.sender_id !== currentUser.id ? `<small class="chat-group-sender">@${escapeHtml(message.sender_username || 'User')}</small>` : ''}<div class="chat-bubble-content">${message.shared_post ? sharedPostMarkup(message.shared_post) : mediaMarkup(message)}${message.type === 'post_share' ? '' : (message.content ? renderMessageText(message.content) : '')}</div><div class="chat-message-meta"><time>${escapeHtml(window.AeroI18n?.formatChatTimestamp?.(message.created_at) || '')}</time>${message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : ''}</div></div>`).join('');
+    const starredKey = `aero_starred_chat:${chatConversationKey(contact)}`;
+    const starredIds = new Set(JSON.parse(localStorage.getItem(starredKey) || '[]').map(String));
+    box.innerHTML = displayMessages.map((message) => `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}">${contact.is_group && message.sender_id !== currentUser.id ? `<small class="chat-group-sender">@${escapeHtml(message.sender_username || 'User')}</small>` : ''}<div class="chat-bubble-content">${message.shared_post ? sharedPostMarkup(message.shared_post) : mediaMarkup(message)}${message.type === 'post_share' ? '' : (message.content ? renderMessageText(message.content) : '')}</div><div class="chat-message-meta"><time>${escapeHtml(window.AeroI18n?.formatChatTimestamp?.(message.created_at) || '')}</time><button type="button" class="chat-star-message ${starredIds.has(String(message.id)) ? 'is-starred' : ''}" data-star-message="${message.id}" aria-label="${chatInfoText(starredIds.has(String(message.id)) ? 'unstar_message' : 'star_message')}" aria-pressed="${starredIds.has(String(message.id))}">${starredIds.has(String(message.id)) ? '★' : '☆'}</button>${message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : ''}</div></div>`).join('');
     box.querySelectorAll('[data-lightbox-src]').forEach((item) => item.addEventListener('click', () => { const lightbox = document.getElementById('chat-lightbox'); const image = document.getElementById('chat-lightbox-image'); image.src = item.dataset.lightboxSrc; lightbox.classList.remove('hidden'); }));
     box.querySelectorAll('[data-delete-message]').forEach((button) => button.addEventListener('click', async () => { const response = await fetch(`${API_BASE}/chat/messages/${button.dataset.deleteMessage}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }); if (response.ok) button.closest('.chat-message')?.remove(); }));
+    box.querySelectorAll('[data-star-message]').forEach((button) => button.addEventListener('click', () => {
+        const currentStars = new Set(JSON.parse(localStorage.getItem(starredKey) || '[]').map(String));
+        const messageId = String(button.dataset.starMessage);
+        if (currentStars.has(messageId)) currentStars.delete(messageId);
+        else currentStars.add(messageId);
+        localStorage.setItem(starredKey, JSON.stringify([...currentStars]));
+        const isStarred = currentStars.has(messageId);
+        button.textContent = isStarred ? '★' : '☆';
+        button.setAttribute('aria-label', chatInfoText(isStarred ? 'unstar_message' : 'star_message'));
+        button.setAttribute('aria-pressed', String(isStarred));
+        button.classList.toggle('is-starred', isStarred);
+    }));
     box.scrollTop = box.scrollHeight;
 }
 
@@ -1773,7 +1810,7 @@ function setupMediaAndChat() {
         const picker = document.getElementById('chat-group-contact-picker');
         if (!picker) return;
         picker.innerHTML = chatContactCache.length
-            ? chatContactCache.map((contact) => `<label class="chat-group-contact-option"><input type="checkbox" value="${contact.id}"><span class="chat-contact-avatar">${escapeHtml((contact.username || 'U').slice(0, 1).toUpperCase())}</span><span>@${escapeHtml(contact.username)}</span></label>`).join('')
+            ? chatContactCache.map((contact) => `<label class="chat-group-contact-option"><input type="checkbox" value="${contact.id}">${chatAvatarMarkup(contact, 'chat-contact-avatar')}<span>@${escapeHtml(contact.username)}</span></label>`).join('')
             : '<p class="bookmarks-empty">Follow or connect with people before creating a group.</p>';
     };
     document.getElementById('chat-new-group-btn')?.addEventListener('click', async () => {
@@ -1805,24 +1842,202 @@ function setupMediaAndChat() {
         if (!group?.is_group) return;
         const response = await fetch(`${API_BASE}/chat/groups/${group.group_id || group.id}/members`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
         const data = await response.json().catch(() => ({}));
-        if (!response.ok) return window.showNotice?.(data.message || 'Unable to load group members.', 'error');
+        if (!response.ok) return window.showNotice?.(data.message || chatInfoText('unable_load_group_members'), 'error');
         document.getElementById('chat-group-members-title').textContent = data.group.name;
-        document.getElementById('chat-group-member-count').textContent = `${data.members.length} members`;
-        document.getElementById('chat-group-members-list').innerHTML = data.members.map((member) => `<div class="chat-group-member"><span class="chat-contact-avatar">${escapeHtml((member.username || 'U').slice(0, 1).toUpperCase())}</span><span><strong>@${escapeHtml(member.username)}</strong>${member.is_admin ? '<small>Group admin</small>' : ''}</span></div>`).join('');
+        document.getElementById('chat-group-member-count').textContent = chatInfoText('member_count', { count: data.members.length });
+        document.getElementById('chat-group-members-list').innerHTML = data.members.map((member) => `<div class="chat-group-member">${chatAvatarMarkup(member, 'chat-contact-avatar')}<span><strong>@${escapeHtml(member.username)}</strong>${member.is_admin ? `<small>${chatInfoText('group_admin')}</small>` : ''}</span></div>`).join('');
         const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
         const isOwner = Number(data.group.owner_id) === Number(currentUser.id);
-        document.getElementById('chat-group-delete-btn')?.classList.toggle('hidden', !isOwner);
-        document.getElementById('chat-group-leave-btn')?.classList.toggle('hidden', isOwner);
+        const deleteButton = document.getElementById('chat-group-delete-btn');
+        const leaveButton = document.getElementById('chat-group-leave-btn');
+        deleteButton?.classList.toggle('hidden', !isOwner);
+        leaveButton?.classList.toggle('hidden', isOwner);
+        if (deleteButton) deleteButton.textContent = chatInfoText('delete_group');
+        if (leaveButton) leaveButton.textContent = chatInfoText('leave_group');
         membersModal?.classList.remove('hidden');
     };
-    const openActiveProfile = (event) => {
-        event.preventDefault();
-        const contact = activeChatUser || window.activeChatUser;
-        if (contact?.is_group) openGroupMembers();
-        else if (contact) window.AeroRouter?.navigate('profile', { userId: contact.id });
+    const chatPanel = document.querySelector('#view-chat .chat-panel');
+    const infoBackdrop = document.createElement('button');
+    infoBackdrop.type = 'button';
+    infoBackdrop.className = 'chat-info-backdrop';
+    infoBackdrop.setAttribute('aria-label', chatInfoText('close'));
+    infoBackdrop.setAttribute('aria-hidden', 'true');
+    const infoDrawer = document.createElement('aside');
+    infoDrawer.id = 'chat-info-drawer';
+    infoDrawer.className = 'chat-info-drawer';
+    infoDrawer.setAttribute('role', 'dialog');
+    infoDrawer.setAttribute('aria-modal', 'true');
+    infoDrawer.setAttribute('aria-label', chatInfoText('title'));
+    infoDrawer.setAttribute('aria-hidden', 'true');
+    infoDrawer.inert = true;
+    chatPanel?.append(infoBackdrop, infoDrawer);
+    const closeInfoDrawer = () => {
+        infoDrawer.classList.remove('is-open');
+        infoBackdrop.classList.remove('is-visible');
+        infoDrawer.setAttribute('aria-hidden', 'true');
+        infoBackdrop.setAttribute('aria-hidden', 'true');
+        infoDrawer.inert = true;
+        if (infoDrawer.dataset.showingStarred !== 'true') {
+            document.querySelectorAll('#chat-messages-list .chat-message').forEach((message) => message.classList.remove('hidden'));
+        }
     };
-    document.getElementById('chat-active-name')?.addEventListener('click', openActiveProfile);
-    document.getElementById('chat-active-avatar-link')?.addEventListener('click', openActiveProfile);
+    const getInfoMediaUrl = (message) => message.media_url
+        ? (String(message.media_url).startsWith('http') ? message.media_url : `${API_ORIGIN}${message.media_url}`)
+        : '';
+    const openInfoDrawer = async () => {
+        const contact = activeChatUser || window.activeChatUser;
+        if (!contact || !infoDrawer) return;
+        infoDrawer.setAttribute('aria-label', chatInfoText('title'));
+        infoBackdrop.setAttribute('aria-label', chatInfoText('close'));
+        const isGroup = Boolean(contact.is_group);
+        const name = isGroup ? (contact.name || 'Group') : (contact.display_name || contact.username || 'User');
+        const avatarMarkup = chatAvatarMarkup({ ...contact, username: contact.username || name, display_name: contact.display_name || name }, 'chat-info-avatar');
+        const cacheKey = chatConversationKey(contact);
+        const messages = messagesCache.get(cacheKey) || [];
+        const media = messages.filter((message) => ['image', 'gif', 'video'].includes(message.type) && getInfoMediaUrl(message));
+        const documents = messages.filter((message) => message.type === 'document' || message.file_name);
+        const about = !isGroup ? (contact.about || contact.bio || chatInfoText('about_default')) : '';
+        const membersMarkup = isGroup
+            ? `<div class="chat-info-members"><div class="chat-info-loading">${chatInfoText('loading_members')}</div></div>`
+            : '';
+        infoDrawer.innerHTML = `
+            <div class="chat-info-heading"><span>${chatInfoText('title')}</span><button type="button" class="chat-info-close" aria-label="${chatInfoText('close')}">&times;</button></div>
+            <div class="chat-info-scroll">
+                <section class="chat-info-profile">${avatarMarkup}<strong>${escapeHtml(name)}</strong><small>${isGroup ? chatInfoText('group_count', { count: Number(contact.member_count) || 0 }) : `@${escapeHtml(contact.username || 'user')}`}</small>${!isGroup ? `<p>${escapeHtml(about)}</p>` : ''}</section>
+                <div class="chat-info-actions">
+                    <button type="button" disabled title="${chatInfoText('call_unavailable')}"><span>☎</span>${chatInfoText('voice')}</button>
+                    <button type="button" disabled title="${chatInfoText('call_unavailable')}"><span>▣</span>${chatInfoText('video')}</button>
+                    ${isGroup ? `<button type="button" data-info-action="add-member" disabled title="${chatInfoText('member_management_unavailable')}"><span>＋</span>${chatInfoText('add_member')}</button>` : ''}
+                    <button type="button" data-info-action="search"><span>⌕</span>${chatInfoText('search')}</button>
+                </div>
+                <label class="chat-info-search hidden"><span class="sr-only">${chatInfoText('search_messages')}</span><input type="search" placeholder="${chatInfoText('search_messages')}"></label>
+                <section class="chat-info-section"><div class="chat-info-section-heading"><strong>${chatInfoText('media')}</strong><span>${media.length + documents.length}</span></div><div class="chat-info-media">${media.length ? media.slice(-9).reverse().map((message) => {
+                    const url = getInfoMediaUrl(message);
+                    const isVideo = message.type === 'video';
+                    return `<button type="button" data-info-message="${escapeHtml(message.id)}" data-info-media-type="${isVideo ? 'video' : 'image'}" data-info-media-src="${escapeHtml(url)}" aria-label="${chatInfoText(isVideo ? 'open_video' : 'open_image')}">${isVideo ? `<video src="${escapeHtml(url)}" muted preload="metadata" playsinline></video><span class="chat-info-video-mark">▶</span>` : `<img src="${escapeHtml(url)}" alt="" loading="lazy">`}</button>`;
+                }).join('') : `<p class="chat-info-empty">${chatInfoText('no_media')}</p>`}</div></section>
+                ${membersMarkup}
+                <section class="chat-info-section chat-info-options">
+                    <button type="button" data-info-action="starred">☆ <span>${chatInfoText('starred')}</span></button>
+                    ${!isGroup ? `<button type="button" data-info-action="mute">♧ <span>${chatInfoText(contact.is_muted ? 'unmute' : 'mute')}</span></button><button type="button" data-info-action="block" class="is-danger">⊘ <span>${chatInfoText('block')}</span></button>` : `<button type="button" disabled title="${chatInfoText('group_notifications_unavailable')}">♧ <span>${chatInfoText('notification_settings')}</span></button><button type="button" data-info-action="leave" class="is-danger">↪ <span>${chatInfoText('leave')}</span></button><button type="button" class="is-danger" disabled title="${chatInfoText('reporting_unavailable')}">⚑ <span>${chatInfoText('report')}</span></button>`}
+                    <button type="button" data-info-action="clear" class="is-danger" disabled title="${chatInfoText('clear_unavailable')}">⌫ <span>${chatInfoText('clear')}</span></button>
+                </section>
+            </div>`;
+        infoDrawer.classList.add('is-open');
+        infoBackdrop.classList.add('is-visible');
+        infoDrawer.setAttribute('aria-hidden', 'false');
+        infoBackdrop.setAttribute('aria-hidden', 'false');
+        infoDrawer.inert = false;
+        infoDrawer.querySelector('.chat-info-close')?.addEventListener('click', closeInfoDrawer);
+        if (isGroup) {
+            const groupId = contact.group_id || contact.id;
+            fetch(`${API_BASE}/chat/groups/${groupId}/members`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } })
+                .then((response) => response.ok ? response.json() : Promise.reject(new Error('Unable to load group members')))
+                .then((data) => {
+                    const list = infoDrawer.querySelector('.chat-info-members');
+                    if (!list) return;
+                    list.innerHTML = `<div class="chat-info-section-heading"><strong>${chatInfoText('members')}</strong><button type="button" data-info-action="all-members">${chatInfoText('view_all', { count: data.members.length })}</button></div><input class="chat-info-member-search" type="search" placeholder="${chatInfoText('search_members')}" aria-label="${chatInfoText('search_members')}">${data.members.map((member) => `<div class="chat-info-member">${chatAvatarMarkup(member, 'chat-contact-avatar')}<span><strong>@${escapeHtml(member.username || 'User')}</strong><small>${member.is_admin ? chatInfoText('group_admin') : chatInfoText('member')}</small></span></div>`).join('')}`;
+                    list.querySelector('.chat-info-member-search')?.addEventListener('input', (event) => {
+                        const query = event.target.value.toLowerCase();
+                        list.querySelectorAll('.chat-info-member').forEach((member) => member.classList.toggle('hidden', !member.textContent.toLowerCase().includes(query)));
+                    });
+                    list.querySelector('[data-info-action="all-members"]')?.addEventListener('click', () => { closeInfoDrawer(); openGroupMembers(); });
+                })
+                .catch(() => { const list = infoDrawer.querySelector('.chat-info-members'); if (list) list.innerHTML = `<p class="chat-info-empty">${chatInfoText('unable_load_members')}</p>`; });
+        }
+        infoDrawer.querySelector('[data-info-action="search"]')?.addEventListener('click', () => {
+            const search = infoDrawer.querySelector('.chat-info-search');
+            search?.classList.toggle('hidden');
+            search?.querySelector('input')?.focus();
+        });
+        infoDrawer.querySelector('.chat-info-search input')?.addEventListener('input', (event) => {
+            const query = event.target.value.toLowerCase();
+            document.querySelectorAll('#chat-messages-list .chat-message').forEach((message) => message.classList.toggle('hidden', !message.textContent.toLowerCase().includes(query)));
+        });
+        infoDrawer.querySelectorAll('[data-info-media-src]').forEach((item) => item.addEventListener('click', () => {
+            const message = document.querySelector(`#chat-messages-list [data-message-id="${CSS.escape(item.dataset.infoMessage)}"]`);
+            if (item.dataset.infoMediaType === 'image') {
+                const lightbox = document.getElementById('chat-lightbox');
+                const image = document.getElementById('chat-lightbox-image');
+                if (lightbox && image) { image.src = item.dataset.infoMediaSrc; lightbox.classList.remove('hidden'); }
+            } else if (message) {
+                message.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                message.querySelector('video')?.play().catch(() => {});
+            }
+        }));
+        infoDrawer.querySelector('[data-info-action="mute"]')?.addEventListener('click', async () => {
+            if (isGroup) return window.showNotice?.(chatInfoText('group_notifications_unavailable'), 'info');
+            const muted = Boolean(contact.is_muted);
+            const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/mute`, { method: muted ? 'DELETE' : 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+            if (!response.ok) return window.showNotice?.(chatInfoText('unable_update_notifications'), 'error');
+            contact.is_muted = !muted;
+            setMuteButtonState(document.getElementById('chat-mute-btn'), !muted, false);
+            infoDrawer.querySelector('[data-info-action="mute"] span').textContent = chatInfoText(muted ? 'mute' : 'unmute');
+            loadChatContacts();
+        });
+        infoDrawer.querySelector('[data-info-action="block"]')?.addEventListener('click', async () => {
+            if (!window.confirm(chatInfoText('confirm_block', { user: contact.username || 'this user' }))) return;
+            const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+            if (!response.ok) return window.showNotice?.(chatInfoText('unable_block'), 'error');
+            closeInfoDrawer();
+            window.showNotice?.(chatInfoText('user_blocked'), 'success');
+            loadChatContacts();
+        });
+        infoDrawer.querySelector('[data-info-action="leave"]')?.addEventListener('click', async () => {
+            if (!window.confirm(chatInfoText('confirm_leave', { group: name }))) return;
+            const response = await fetch(`${API_BASE}/chat/groups/${contact.group_id || contact.id}/leave`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+            if (!response.ok) return window.showNotice?.(chatInfoText('unable_leave'), 'error');
+            closeInfoDrawer();
+            activeChatUser = null;
+            window.activeChatUser = null;
+            document.getElementById('chat-messages-list')?.replaceChildren();
+            document.getElementById('chat-active-name').textContent = chatInfoText('select_contact');
+            await loadChatContacts();
+        });
+        infoDrawer.querySelector('[data-info-action="starred"]')?.addEventListener('click', () => {
+            const starred = new Set(JSON.parse(localStorage.getItem(`aero_starred_chat:${cacheKey}`) || '[]').map(String));
+            const messagesBox = document.getElementById('chat-messages-list');
+            const showingStarred = infoDrawer.dataset.showingStarred === 'true';
+            infoDrawer.dataset.showingStarred = String(!showingStarred);
+            messagesBox?.querySelectorAll('.chat-message').forEach((message) => {
+                message.classList.toggle('hidden', !showingStarred && !starred.has(String(message.dataset.messageId)));
+            });
+            if (!showingStarred && !starred.size) window.showNotice?.(chatInfoText('no_starred'), 'info');
+            closeInfoDrawer();
+        });
+        infoDrawer.querySelector('[data-info-action="clear"]')?.addEventListener('click', () => window.showNotice?.(chatInfoText('history_clear_unavailable'), 'info'));
+    };
+    window.addEventListener('aero:language-change', () => {
+        const group = activeChatUser || window.activeChatUser;
+        if (group) document.querySelectorAll('#chat-active-name, #chat-active-avatar-link').forEach((trigger) => {
+            trigger.setAttribute('data-i18n-aria-label', 'chat.info.open');
+            trigger.setAttribute('aria-label', chatInfoText('open'));
+        });
+        document.querySelectorAll('.chat-star-message').forEach((button) => button.setAttribute('aria-label', chatInfoText(button.getAttribute('aria-pressed') === 'true' ? 'unstar_message' : 'star_message')));
+        if (group?.is_group) {
+            const activeName = document.getElementById('chat-active-name');
+            if (activeName) activeName.textContent = `${group.name} · ${chatInfoText('member_count', { count: group.member_count || 0 })}`;
+            if (!membersModal?.classList.contains('hidden')) openGroupMembers();
+        } else if (group) {
+            setMuteButtonState(document.getElementById('chat-mute-btn'), Boolean(group.is_muted), false);
+        }
+        document.querySelectorAll('.chat-group-contact').forEach((item) => {
+            const cachedGroup = chatGroupCache.find((candidate) => String(candidate.group_id) === item.dataset.groupId);
+            const preview = item.querySelector('small');
+            if (cachedGroup && preview && !cachedGroup.latest_message) preview.textContent = chatInfoText('member_count', { count: cachedGroup.member_count || 0 });
+        });
+        if (infoDrawer.classList.contains('is-open')) openInfoDrawer();
+    });
+    document.getElementById('chat-active-name')?.addEventListener('click', (event) => { event.preventDefault(); openInfoDrawer(); });
+    document.getElementById('chat-active-avatar-link')?.addEventListener('click', (event) => { event.preventDefault(); openInfoDrawer(); });
+    document.querySelector('#view-chat .chat-sidebar')?.addEventListener('click', (event) => {
+        if (event.target.closest('.chat-contact')) {
+            infoDrawer.dataset.showingStarred = 'false';
+            closeInfoDrawer();
+        }
+    });
+    infoBackdrop.addEventListener('click', closeInfoDrawer);
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && infoDrawer.classList.contains('is-open')) closeInfoDrawer(); });
     document.getElementById('chat-group-info-btn')?.addEventListener('click', openGroupMembers);
     document.getElementById('chat-group-members-close')?.addEventListener('click', () => closeModal(membersModal));
     membersModal?.addEventListener('click', (event) => { if (event.target === membersModal) closeModal(membersModal); });

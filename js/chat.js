@@ -33,41 +33,26 @@
         return document.getElementById('chat-contacts-list') || document.getElementById('chat-contact-list');
     }
 
-    function contactAvatarUrl(contact) {
-        const value = contact?.avatar_url || contact?.avatarUrl || contact?.avatar || '';
-        return value && !String(value).startsWith('letter:')
-            ? (String(value).startsWith('http') ? String(value) : `${window.AeroConfig.API_ORIGIN}${value}`)
-            : '';
-    }
-
     function renderChatHeader(contact) {
         const name = contact?.username || contact?.name || 'User';
         const nameElement = document.getElementById('chat-active-name');
         const header = document.getElementById('chat-active-header');
         const avatarElement = document.getElementById('chat-active-avatar');
         if (!header || !avatarElement) return;
-        if (nameElement) nameElement.textContent = `@${name}`;
+        if (nameElement) {
+            nameElement.textContent = `@${name}`;
+            nameElement.setAttribute('data-i18n-aria-label', 'chat.info.open');
+            nameElement.setAttribute('aria-label', window.AeroI18n?.t?.('chat.info.open') || 'Open conversation info');
+        }
+        const avatarLink = document.getElementById('chat-active-avatar-link');
+        avatarLink?.setAttribute('data-i18n-aria-label', 'chat.info.open');
+        avatarLink?.setAttribute('aria-label', window.AeroI18n?.t?.('chat.info.open') || 'Open conversation info');
         const muteButton = document.getElementById('chat-mute-btn');
         muteButton?.classList.toggle('hidden', !contact?.id);
         if (muteButton) {
             setMuteButtonState(muteButton, Boolean(contact?.is_muted));
         }
-        avatarElement.replaceChildren();
-        avatarElement.classList.toggle('is-online', Boolean(contact?.is_online));
-        const avatarUrl = contactAvatarUrl(contact);
-        const letterAvatar = String(contact?.avatar_url || contact?.avatarUrl || contact?.avatar || '').startsWith('letter:')
-            ? String(contact.avatar_url || contact.avatarUrl || contact.avatar).slice(7, 8).toUpperCase()
-            : String(name).charAt(0).toUpperCase();
-        if (avatarUrl) {
-            const image = document.createElement('img');
-            image.src = avatarUrl;
-            image.alt = `@${name}`;
-            image.loading = 'lazy';
-            image.onerror = () => { avatarElement.replaceChildren(); avatarElement.textContent = letterAvatar || 'U'; };
-            avatarElement.appendChild(image);
-        } else {
-            avatarElement.textContent = letterAvatar || 'U';
-        }
+        window.AeroChatAvatar?.set(avatarElement, contact, name, contact?.is_online);
     }
 
     function createChatContactButton(contact) {
@@ -75,23 +60,12 @@
         button.type = 'button';
         button.className = 'chat-contact';
         button.dataset.userId = String(contact.id);
-        const avatarUrl = contactAvatarUrl(contact);
-        const avatarValue = String(contact.avatar_url || contact.avatarUrl || contact.avatar || '');
-        const avatarText = avatarValue.startsWith('letter:') ? avatarValue.slice(7, 8).toUpperCase() : String(contact.username || contact.name || 'U').charAt(0).toUpperCase();
+        const avatarMarkup = window.AeroChatAvatar?.markup(contact, `chat-contact-avatar${contact.is_online ? ' is-online' : ''}`)
+            || `<span class="chat-contact-avatar">${escapeText((contact.username || contact.name || 'U').charAt(0).toUpperCase())}</span>`;
         button.innerHTML = `
-            <span class="chat-contact-avatar ${contact.is_online ? 'is-online' : ''}"></span>
+            ${avatarMarkup}
             <span><strong>@${escapeText(contact.username || contact.name || 'User')}</strong><small>${escapeText(contact.latest_message || 'Start a conversation')}</small></span>
         `;
-        const avatarElement = button.querySelector('.chat-contact-avatar');
-        if (avatarUrl) {
-            const image = document.createElement('img');
-            image.src = avatarUrl;
-            image.alt = '';
-            image.loading = 'lazy';
-            avatarElement.appendChild(image);
-        } else {
-            avatarElement.textContent = avatarText;
-        }
         button.addEventListener('click', () => {
             if (typeof window.selectChatContact === 'function') {
                 window.selectChatContact(contact);

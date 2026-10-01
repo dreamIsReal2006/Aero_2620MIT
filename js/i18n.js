@@ -23,7 +23,36 @@
             'post.copy_link': 'Copy Link', 'post.not_interested': 'Not Interested',
             'post.follow': 'Follow', 'post.unfollow': 'Unfollow', 'post.report': 'Report Post',
             'common.new_post': 'New Post', 'common.new_video': 'Video',
-            'auth.or_continue_with': 'Or continue with', 'auth.google': 'Sign in with Google', 'auth.github': 'Sign in with GitHub'
+            'auth.or_continue_with': 'Or continue with', 'auth.google': 'Sign in with Google', 'auth.github': 'Sign in with GitHub',
+            'chat.info.title': 'Conversation info', 'chat.info.close': 'Close conversation information',
+            'chat.info.group_count': 'Group · {count} members', 'chat.info.member_count': '{count} members',
+            'chat.info.about_default': 'Hey there! I am using Aero.', 'chat.info.voice': 'Voice', 'chat.info.video': 'Video',
+            'chat.info.add_member': 'Add member', 'chat.info.search': 'Search', 'chat.info.search_messages': 'Search messages...',
+            'chat.info.search_members': 'Search members', 'chat.info.media': 'Media, links and docs',
+            'chat.info.no_media': 'No shared media yet', 'chat.info.open_image': 'Open shared image',
+            'chat.info.open_video': 'Open shared video', 'chat.info.starred': 'Starred messages',
+            'chat.info.mute': 'Mute notifications', 'chat.info.unmute': 'Unmute notifications',
+            'chat.info.block': 'Block user', 'chat.info.notification_settings': 'Notification settings',
+            'chat.info.leave': 'Exit group', 'chat.info.report': 'Report group', 'chat.info.clear': 'Clear chat',
+            'chat.info.call_unavailable': 'Calls are not available yet',
+            'chat.info.member_management_unavailable': 'Member management is not available yet',
+            'chat.info.reporting_unavailable': 'Group reporting is not available yet',
+            'chat.info.clear_unavailable': 'Server-side chat clearing is not available yet',
+            'chat.info.loading_members': 'Loading members...', 'chat.info.members': 'Members',
+            'chat.info.view_all': 'View all {count}', 'chat.info.group_admin': 'Group admin',
+            'chat.info.member': 'Member', 'chat.info.unable_load_members': 'Unable to load members',
+            'chat.info.unable_update_notifications': 'Unable to update notifications.',
+            'chat.info.group_notifications_unavailable': 'Group notification settings are not available yet.',
+            'chat.info.confirm_block': 'Block @{user}?', 'chat.info.unable_block': 'Unable to block this user.',
+            'chat.info.user_blocked': 'User blocked.', 'chat.info.confirm_leave': 'Leave {group}?',
+            'chat.info.unable_leave': 'Unable to leave this group.', 'chat.info.select_contact': 'Select a contact',
+            'chat.info.no_starred': 'No starred messages in this conversation.',
+            'chat.info.history_clear_unavailable': 'Chat history is stored on the server and cannot be cleared from this device.',
+            'chat.info.star_message': 'Star message', 'chat.info.unstar_message': 'Unstar message',
+            'chat.info.group_members': 'Group members', 'chat.info.leave_group': 'Leave Group',
+            'chat.info.delete_group': 'Delete Group', 'chat.info.unable_load_group_members': 'Unable to load group members.',
+            'chat.info.open': 'Open conversation info', 'chat.info.mute_user': 'Mute user',
+            'chat.info.unmute_user': 'Unmute user', 'chat.info.delete_message': 'Delete message'
         },
         zh: {
             screenTimeWeekdays: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
@@ -73,7 +102,42 @@
             'post.copy_link': '复制链接', 'post.not_interested': '不感兴趣',
             'post.follow': '关注', 'post.unfollow': '取消关注', 'post.report': '举报帖子',
             'common.new_post': '发布新帖', 'common.new_video': '视频',
-            'auth.or_continue_with': '或使用以下方式继续', 'auth.google': '使用 Google 登录', 'auth.github': '使用 GitHub 登录'
+            'auth.or_continue_with': '或使用以下方式继续', 'auth.google': '使用 Google 登录', 'auth.github': '使用 GitHub 登录',
+            'chat.info.title': '会话信息', 'chat.info.close': '关闭会话信息',
+            'chat.info.group_count': '群组 · {count} 位成员', 'chat.info.member_count': '{count} 位成员',
+            'chat.info.about_default': '嗨，我正在使用 Aero。', 'chat.info.voice': '语音', 'chat.info.video': '视频',
+            'chat.info.add_member': '添加成员', 'chat.info.search': '搜索', 'chat.info.search_messages': '搜索消息...',
+            'chat.info.search_members': '搜索成员', 'chat.info.media': '媒体、链接和文件',
+            'chat.info.no_media': '暂无共享媒体', 'chat.info.open_image': '打开共享图片',
+            'chat.info.open_video': '打开共享视频', 'chat.info.starred': '已加星标的消息',
+            'chat.info.mute': '静音通知', 'chat.info.unmute': '取消静音通知',
+            'chat.info.block': '拉黑用户', 'chat.info.notification_settings': '通知设置',
+            'chat.info.leave': '退出群组', 'chat.info.report': '举报群组', 'chat.info.clear': '清空聊天',
+            'chat.info.call_unavailable': '通话功能暂不可用',
+            'chat.info.member_management_unavailable': '成员管理功能暂不可用',
+            'chat.info.reporting_unavailable': '群组举报功能暂不可用',
+            'chat.info.clear_unavailable': '暂不支持从服务器清空聊天记录',
+            'chat.info.loading_members': '正在加载成员...', 'chat.info.members': '群组成员',
+            'chat.info.view_all': '查看全部 {count} 位成员', 'chat.info.group_admin': '群管理员',
+            'chat.info.member': '成员', 'chat.info.unable_load_members': '无法加载成员',
+            'chat.info.unable_update_notifications': '无法更新通知设置。',
+            'chat.info.group_notifications_unavailable': '群组通知设置暂不可用。',
+            'chat.info.confirm_block': '确定拉黑 @{user} 吗？', 'chat.info.unable_block': '无法拉黑该用户。',
+            'chat.info.user_blocked': '已拉黑该用户。', 'chat.info.confirm_leave': '确定退出 {group} 吗？',
+            'chat.info.unable_leave': '无法退出该群组。', 'chat.info.select_contact': '选择联系人',
+            'chat.info.no_starred': '此会话中没有星标消息。',
+            'chat.info.history_clear_unavailable': '聊天记录保存在服务器，目前无法从此设备清空。',
+            'chat.info.star_message': '为消息加星标', 'chat.info.unstar_message': '取消消息星标',
+            'chat.info.group_members': '群组成员', 'chat.info.leave_group': '退出群组',
+            'chat.info.delete_group': '删除群组', 'chat.info.unable_load_group_members': '无法加载群组成员。',
+            'chat.info.open': '打开会话信息', 'chat.info.mute_user': '静音用户',
+            'chat.info.unmute_user': '取消静音用户', 'chat.info.delete_message': '删除消息',
+            'Back to contacts': '返回联系人', 'Delete message': '删除消息',
+            'Create group': '创建群组', 'Add attachment': '添加附件', 'Add emoji': '添加表情',
+            'Add GIF': '添加 GIF', 'Send message': '发送消息', 'Close media preview': '关闭媒体预览',
+            'New Group': '新建群组', 'Group name': '群组名称', 'Create': '创建', 'Close': '关闭',
+            'Message': '消息', 'Shorts': '短视频', 'Create a new post': '发布新帖',
+            'Open navigation': '打开导航', 'Go to Aero home': '返回 Aero 主页', 'Open profile': '打开个人主页'
         }
     };
     const originalText = new WeakMap();
@@ -146,6 +210,11 @@
             else node.textContent = translateValue(translationKey);
         }
         ['placeholder', 'title', 'aria-label'].forEach((attribute) => {
+            const explicitKey = node.getAttribute(`data-i18n-${attribute}`);
+            if (explicitKey) {
+                node.setAttribute(attribute, translate(explicitKey));
+                return;
+            }
             const value = node.getAttribute(attribute);
             if (value && !originalAttributes.has(node)) originalAttributes.set(node, {});
             if (value && !originalAttributes.get(node)[attribute]) originalAttributes.get(node)[attribute] = value;
