@@ -504,7 +504,8 @@ def block_contact(current_user, user_id):
 @token_required
 def get_block_status(current_user, user_id):
     blocked = Block.query.filter_by(blocker_id=current_user.id, blocked_id=user_id).first() is not None
-    return jsonify({"blocked": blocked})
+    blocked_by = Block.query.filter_by(blocker_id=user_id, blocked_id=current_user.id).first() is not None
+    return jsonify({"blocked": blocked, "blocked_by": blocked_by})
 
 
 @chat_bp.delete("/chat/contacts/<int:user_id>/block")

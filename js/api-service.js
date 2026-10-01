@@ -1607,6 +1607,7 @@ async function selectChatGroup(group) {
     if (!group) return;
     activeChatUser = { ...group, id: group.group_id, is_group: true };
     window.activeChatUser = activeChatUser;
+    setChatBlockState(activeChatUser, false, false);
     setChatContactState(true);
     const activeAvatar = document.getElementById('chat-active-avatar');
     const activeName = document.getElementById('chat-active-name');
@@ -1637,6 +1638,7 @@ async function selectChatContact(contact) {
     if (!contact) return;
     activeChatUser = contact;
     window.activeChatUser = contact;
+    setChatBlockState(contact, Boolean(contact.is_blocked), Boolean(contact.is_blocked_by));
     document.getElementById('chat-group-info-btn')?.classList.add('hidden');
     setChatContactState(true);
     const activeAvatar = document.getElementById('chat-active-avatar');
@@ -1656,6 +1658,7 @@ async function selectChatContact(contact) {
         avatarLink.removeAttribute('aria-disabled');
     }
     setChatAvatar(activeAvatar, contact, contact.username, contact.is_online);
+    refreshChatBlockStatus(contact).catch(() => {});
     const cacheKey = chatConversationKey(contact);
     const cachedMessages = messagesCache.get(cacheKey);
     if (cachedMessages) {
@@ -1671,6 +1674,39 @@ async function selectChatContact(contact) {
     }
     loadChatContacts().catch(() => {});
     loadUnreadChatCount().catch(() => {});
+}
+
+function setChatBlockState(contact, blocked, blockedBy) {
+    if (contact) {
+        contact.is_blocked = Boolean(blocked);
+        contact.is_blocked_by = Boolean(blockedBy);
+    }
+    const form = document.getElementById('chat-form');
+    const notice = document.getElementById('chat-block-notice');
+    const unavailable = Boolean(contact && !contact.is_group && (contact.is_blocked || contact.is_blocked_by));
+    form?.classList.toggle('is-blocked', unavailable);
+    if (notice) {
+        notice.textContent = unavailable
+            ? chatInfoText(contact.is_blocked ? 'you_blocked_user' : 'user_blocked_you')
+            : '';
+        notice.classList.toggle('hidden', !unavailable);
+    }
+    form?.querySelectorAll('input, button').forEach((control) => { control.disabled = unavailable; });
+}
+
+async function refreshChatBlockStatus(contact) {
+    if (!contact || contact.is_group) return;
+    const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+    });
+    if (!response.ok) throw new Error('Unable to load block status');
+    const status = await response.json();
+    contact.is_blocked = Boolean(status.blocked);
+    contact.is_blocked_by = Boolean(status.blocked_by);
+    if ((activeChatUser || window.activeChatUser) === contact) {
+        setChatBlockState(contact, status.blocked, status.blocked_by);
+    }
+    return status;
 }
 
 window.selectChatContact = selectChatContact;
@@ -1805,6 +1841,30 @@ function setupMediaAndChat() {
     document.getElementById('chat-contact-search')?.addEventListener('input', (event) => document.querySelectorAll('.chat-contact').forEach((item) => item.classList.toggle('hidden', !item.textContent.toLowerCase().includes(event.target.value.toLowerCase()))));
     const newGroupModal = document.getElementById('chat-new-group-modal');
     const membersModal = document.getElementById('chat-group-members-modal');
+    if (newGroupModal && newGroupModal.parentElement !== document.body) document.body.appendChild(newGroupModal);
+    newGroupModal?.classList.add('new-group-modal-overlay');
+    const translateNewGroupModal = () => {
+        const translate = (value) => window.AeroI18n?.translateValue(value) || value;
+        const title = document.getElementById('chat-new-group-title');
+        const nameInput = document.getElementById('chat-group-name');
+        const cancelButton = document.getElementById('chat-new-group-cancel');
+        const createButton = document.querySelector('#chat-new-group-form button[type="submit"]');
+        if (title) title.textContent = translate('New Group');
+        if (nameInput) nameInput.placeholder = translate('Group name');
+        if (cancelButton) cancelButton.textContent = translate('Cancel');
+        if (createButton) createButton.textContent = translate('Create');
+    };
+    translateNewGroupModal();
+    window.addEventListener('aero:language-change', translateNewGroupModal);
+    const chatForm = document.getElementById('chat-form');
+    if (chatForm && !document.getElementById('chat-block-notice')) {
+        const notice = document.createElement('p');
+        notice.id = 'chat-block-notice';
+        notice.className = 'chat-block-notice hidden';
+        notice.setAttribute('role', 'status');
+        notice.setAttribute('aria-live', 'polite');
+        chatForm.parentElement.insertBefore(notice, chatForm);
+    }
     const closeModal = (modal) => modal?.classList.add('hidden');
     const renderGroupPicker = () => {
         const picker = document.getElementById('chat-group-contact-picker');
@@ -2001,6 +2061,7 @@ function setupMediaAndChat() {
     const openInfoDrawer = async () => {
         const contact = activeChatUser || window.activeChatUser;
         if (!contact || !infoDrawer) return;
+        if (!contact.is_group) await refreshChatBlockStatus(contact).catch(() => {});
         infoDrawer.setAttribute('aria-label', chatInfoText('title'));
         infoBackdrop.setAttribute('aria-label', chatInfoText('close'));
         const isGroup = Boolean(contact.is_group);
@@ -2030,7 +2091,7 @@ function setupMediaAndChat() {
                 ${membersMarkup}
                 <section class="chat-info-section chat-info-options">
                     <button type="button" data-info-action="starred">☆ <span>${chatInfoText('starred')}</span></button>
-                    ${!isGroup ? `<button type="button" data-info-action="mute">♧ <span>${chatInfoText(contact.is_muted ? 'unmute' : 'mute')}</span></button><button type="button" data-info-action="block" class="is-danger">⊘ <span>${chatInfoText('block')}</span></button>` : `<button type="button" disabled title="${chatInfoText('group_notifications_unavailable')}">♧ <span>${chatInfoText('notification_settings')}</span></button><button type="button" data-info-action="leave" class="is-danger">↪ <span>${chatInfoText('leave')}</span></button><button type="button" class="is-danger" disabled title="${chatInfoText('reporting_unavailable')}">⚑ <span>${chatInfoText('report')}</span></button>`}
+                    ${!isGroup ? `<button type="button" data-info-action="mute">♧ <span>${chatInfoText(contact.is_muted ? 'unmute' : 'mute')}</span></button><button type="button" data-info-action="block" class="is-danger">${contact.is_blocked ? '🔓' : '🚫'} <span>${chatInfoText(contact.is_blocked ? 'unblock' : 'block')}</span></button>` : `<button type="button" disabled title="${chatInfoText('group_notifications_unavailable')}">♧ <span>${chatInfoText('notification_settings')}</span></button><button type="button" data-info-action="leave" class="is-danger">↪ <span>${chatInfoText('leave')}</span></button><button type="button" class="is-danger" disabled title="${chatInfoText('reporting_unavailable')}">⚑ <span>${chatInfoText('report')}</span></button>`}
                     <button type="button" data-info-action="clear" class="is-danger" disabled title="${chatInfoText('clear_unavailable')}">⌫ <span>${chatInfoText('clear')}</span></button>
                 </section>
             </div>`;
@@ -2082,11 +2143,16 @@ function setupMediaAndChat() {
             loadChatContacts();
         });
         infoDrawer.querySelector('[data-info-action="block"]')?.addEventListener('click', async () => {
-            if (!window.confirm(chatInfoText('confirm_block', { user: contact.username || 'this user' }))) return;
-            const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
-            if (!response.ok) return window.showNotice?.(chatInfoText('unable_block'), 'error');
-            closeInfoDrawer();
-            window.showNotice?.(chatInfoText('user_blocked'), 'success');
+            const wasBlocked = Boolean(contact.is_blocked);
+            if (!window.confirm(chatInfoText(wasBlocked ? 'confirm_unblock' : 'confirm_block', { user: contact.username || 'this user' }))) return;
+            const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, {
+                method: wasBlocked ? 'DELETE' : 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+            });
+            if (!response.ok) return window.showNotice?.(chatInfoText(wasBlocked ? 'unable_unblock' : 'unable_block'), 'error');
+            setChatBlockState(contact, !wasBlocked, contact.is_blocked_by);
+            window.showNotice?.(chatInfoText(wasBlocked ? 'user_unblocked' : 'user_blocked'), 'success');
+            await openInfoDrawer();
             loadChatContacts();
         });
         infoDrawer.querySelector('[data-info-action="leave"]')?.addEventListener('click', async () => {
@@ -2393,7 +2459,7 @@ function setupMediaAndChat() {
         const content = input?.value.trim();
         const mediaUrl = input?.dataset.mediaUrl || '';
         const messageType = input?.dataset.messageType || 'text';
-        if (!contact || (!content && !mediaUrl)) return;
+        if (!contact || (!content && !mediaUrl) || (!contact.is_group && (contact.is_blocked || contact.is_blocked_by))) return;
         const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
         const temporaryId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const groupId = contact.is_group ? contact.group_id || contact.id : null;
@@ -2431,7 +2497,11 @@ function setupMediaAndChat() {
                 body: JSON.stringify(body)
             });
             const payload = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(payload.message || payload.error || 'Unable to send message');
+            if (!response.ok) {
+                const error = new Error(payload.message || payload.error || 'Unable to send message');
+                error.status = response.status;
+                throw error;
+            }
             return { ...payload, content: encryptedContent };
         };
         const sendAndSettle = async () => {
@@ -2457,6 +2527,13 @@ function setupMediaAndChat() {
                 await markConversationRead(contact).catch(() => {});
                 await loadUnreadChatCount().catch(() => {});
             } catch (error) {
+                if (error.status === 403 && !contact.is_group) {
+                    await refreshChatBlockStatus(contact).catch(() => {});
+                    if (contact.is_blocked || contact.is_blocked_by) {
+                        temporaryNode()?.remove();
+                        return;
+                    }
+                }
                 const node = temporaryNode();
                 if (!node) return;
                 node.classList.remove('is-sending');

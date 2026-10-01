@@ -15,6 +15,7 @@ from backend.models.chat_email_cooldown import ChatEmailCooldown
 from backend.models.user_custom_gif import UserCustomGif
 from backend.models.media_processing_job import MediaProcessingJob
 from backend.models.video_comment import VideoComment
+from backend.models.video_comment_like import VideoCommentLike
 from backend.models.video_like import VideoLike
 from backend.models.note import Note
 from backend.models.moderation_log import ModerationLog

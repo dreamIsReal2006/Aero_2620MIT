@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 
 from backend.auth.routes import token_required
 from backend.video import video_bp
-from backend.models import Follow, Video, VideoComment, VideoLike
+from backend.models import Follow, Video, VideoComment, VideoCommentLike, VideoLike
 from backend import db
 from backend.storage import upload_file_to_supabase
 
@@ -90,7 +90,18 @@ def create_video(current_user):
 @token_required
 def get_video_comments(current_user, video_id):
     comments = VideoComment.query.filter_by(video_id=video_id).order_by(VideoComment.created_at.asc()).all()
-    return jsonify([{"id": item.id, "username": item.author.username, "content": item.content, "media_url": item.media_url or "", "type": item.type or "text", "created_at": f"{item.created_at.isoformat()}Z"} for item in comments])
+    return jsonify([{
+        "id": item.id,
+        "user_id": item.user_id,
+        "username": item.author.username,
+        "avatar_url": item.author.avatar_url or "",
+        "content": item.content,
+        "media_url": item.media_url or "",
+        "type": item.type or "text",
+        "created_at": f"{item.created_at.isoformat()}Z",
+        "likes_count": VideoCommentLike.query.filter_by(video_comment_id=item.id).count(),
+        "is_liked": VideoCommentLike.query.filter_by(video_comment_id=item.id, user_id=current_user.id).first() is not None,
+    } for item in comments])
 
 
 @video_bp.post("/shorts/<int:video_id>/comments")
@@ -108,7 +119,28 @@ def create_video_comment(current_user, video_id):
     comment = VideoComment(video_id=video_id, user_id=current_user.id, content=content[:1000], media_url=media_url, type=message_type)
     db.session.add(comment)
     db.session.commit()
-    return jsonify({"id": comment.id, "username": current_user.username, "content": comment.content, "media_url": comment.media_url, "type": comment.type}), 201
+    return jsonify({"id": comment.id, "user_id": current_user.id, "username": current_user.username, "avatar_url": current_user.avatar_url or "", "content": comment.content, "media_url": comment.media_url, "type": comment.type, "created_at": f"{comment.created_at.isoformat()}Z", "likes_count": 0, "is_liked": False}), 201
+
+
+@video_bp.post("/shorts/comments/<int:comment_id>/like")
+@video_bp.post("/videos/comments/<int:comment_id>/like")
+@token_required
+def like_video_comment(current_user, comment_id):
+    if not db.session.get(VideoComment, comment_id):
+        return jsonify({"message": "Comment not found"}), 404
+    existing = VideoCommentLike.query.filter_by(user_id=current_user.id, video_comment_id=comment_id).first()
+    if existing:
+        db.session.delete(existing)
+        liked = False
+    else:
+        comment_like = VideoCommentLike()
+        comment_like.user_id = current_user.id
+        comment_like.video_comment_id = comment_id
+        db.session.add(comment_like)
+        liked = True
+    db.session.commit()
+    likes_count = VideoCommentLike.query.filter_by(video_comment_id=comment_id).count()
+    return jsonify({"liked": liked, "likes_count": likes_count})
 
 
 @video_bp.post("/shorts/<int:video_id>/like")

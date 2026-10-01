@@ -144,6 +144,7 @@ def create_app():
         UserCustomGif,
         MediaProcessingJob,
         VideoComment,
+        VideoCommentLike,
         Note,
         VideoLike,
         ModerationLog,
@@ -181,6 +182,7 @@ def create_app():
                     db.metadata.tables["chat_email_cooldowns"],
                     db.metadata.tables["user_custom_gifs"],
                     db.metadata.tables["media_processing_jobs"],
+                    db.metadata.tables["video_comment_likes"],
                 ],
             )
             existing_tables = set(inspect(db.engine).get_table_names())
