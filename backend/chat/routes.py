@@ -378,6 +378,16 @@ def get_notes(current_user):
 @token_required
 def get_messages(current_user):
     try:
+        page_size = int(request.args.get("limit", CHAT_MESSAGE_LIMIT))
+    except (TypeError, ValueError):
+        page_size = CHAT_MESSAGE_LIMIT
+    try:
+        page_offset = int(request.args.get("offset", "0"))
+    except (TypeError, ValueError):
+        page_offset = 0
+    page_size = max(1, min(page_size, 100))
+    page_offset = max(0, page_offset)
+    try:
         group_id = int(request.args.get("group_id", "0"))
     except ValueError:
         group_id = 0
@@ -392,7 +402,7 @@ def get_messages(current_user):
             ).joinedload(Post.author).load_only(
                 User.id, User.username, User.avatar_url
             ),
-        ).order_by(Message.created_at.desc()).limit(CHAT_MESSAGE_LIMIT).all()
+        ).order_by(Message.created_at.desc()).offset(page_offset).limit(page_size).all()
         recipient_id = None
     else:
         recipient_id = None
@@ -419,7 +429,7 @@ def get_messages(current_user):
             ).joinedload(Post.author).load_only(
                 User.id, User.username, User.avatar_url
             ),
-        ).order_by(Message.created_at.desc()).limit(CHAT_MESSAGE_LIMIT).all()
+        ).order_by(Message.created_at.desc()).offset(page_offset).limit(page_size).all()
         Message.query.filter_by(sender_id=user_id, recipient_id=current_user.id, is_read=False).update(
             {Message.is_read: True}, synchronize_session=False
         )

@@ -1881,9 +1881,123 @@ function setupMediaAndChat() {
             document.querySelectorAll('#chat-messages-list .chat-message').forEach((message) => message.classList.remove('hidden'));
         }
     };
-    const getInfoMediaUrl = (message) => message.media_url
-        ? (String(message.media_url).startsWith('http') ? message.media_url : `${API_ORIGIN}${message.media_url}`)
-        : '';
+    const getInfoAssetUrl = (message) => {
+        const value = message.image_url || message.video_url || message.file_url || message.attachment_url || message.media_url || '';
+        return value ? (String(value).startsWith('http') ? String(value) : `${API_ORIGIN}${value}`) : '';
+    };
+    const isInfoMedia = (message) => ['image', 'gif', 'video'].includes(String(message.type || '').toLowerCase()) || Boolean(message.image_url || message.video_url);
+    const isInfoDocument = (message) => {
+        if (isInfoMedia(message)) return false;
+        return ['file', 'document'].includes(String(message.type || '').toLowerCase()) || Boolean(message.file_url || message.attachment_url || message.file_name);
+    };
+    const extractInfoLinks = (messages) => messages.flatMap((message) => {
+        const urls = String(message.content || '').match(/https?:\/\/[^\s<>"']+/gi) || [];
+        return [...new Set(urls.map((url) => url.replace(/[),.!?;:]+$/g, '')))]
+            .filter(Boolean)
+            .map((url) => ({ url, messageId: message.id, created_at: message.created_at }));
+    });
+    const formatInfoFileSize = (value) => {
+        const size = Number(value) || 0;
+        if (!size) return '';
+        if (size < 1024) return `${size} B`;
+        if (size < 1048576) return `${Math.round(size / 1024)} KB`;
+        return `${(size / 1048576).toFixed(1)} MB`;
+    };
+    const getInfoFileName = (message, url) => {
+        if (message.file_name) return String(message.file_name);
+        try { return decodeURIComponent(new URL(url).pathname.split('/').pop() || 'File'); }
+        catch { return 'File'; }
+    };
+    const prepareInfoMessages = (messages, contact) => Promise.all(messages.map(async (message) => ({
+        ...message,
+        content: await decryptChatContent(message.content, contact)
+    })));
+    const renderInfoAssets = (messages, isLoading = false) => {
+        const root = infoDrawer.querySelector('[data-info-assets-root]');
+        if (!root) return;
+        if (!root.dataset.bound) {
+            root.addEventListener('click', (event) => {
+                const tabButton = event.target.closest('[data-info-tab]');
+                if (tabButton) {
+                    infoDrawer.dataset.activeInfoTab = tabButton.dataset.infoTab;
+                    root.querySelectorAll('[data-info-tab]').forEach((tab) => {
+                        const isActive = tab === tabButton;
+                        tab.classList.toggle('is-active', isActive);
+                        tab.setAttribute('aria-selected', String(isActive));
+                    });
+                    root.querySelectorAll('[data-info-pane]').forEach((pane) => pane.classList.toggle('hidden', pane.dataset.infoPane !== tabButton.dataset.infoTab));
+                    return;
+                }
+                const mediaButton = event.target.closest('[data-info-media-src]');
+                if (!mediaButton) return;
+                const message = document.querySelector(`#chat-messages-list [data-message-id="${CSS.escape(mediaButton.dataset.infoMessage)}"]`);
+                if (mediaButton.dataset.infoMediaType === 'image') {
+                    const lightbox = document.getElementById('chat-lightbox');
+                    const image = document.getElementById('chat-lightbox-image');
+                    if (lightbox && image) { image.src = mediaButton.dataset.infoMediaSrc; lightbox.classList.remove('hidden'); }
+                } else if (message) {
+                    message.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    message.querySelector('video')?.play().catch(() => {});
+                }
+            });
+            root.dataset.bound = 'true';
+        }
+        const media = messages.filter((message) => isInfoMedia(message) && getInfoAssetUrl(message));
+        const documents = messages.filter(isInfoDocument);
+        const links = extractInfoLinks(messages);
+        const totalElement = root.closest('.chat-info-assets-section')?.querySelector('[data-info-assets-count]');
+        if (totalElement) totalElement.textContent = String(media.length + documents.length + links.length);
+        const currentTab = infoDrawer.dataset.activeInfoTab;
+        const tabCounts = { media: media.length, docs: documents.length, links: links.length };
+        const activeTab = ['media', 'docs', 'links'].includes(currentTab) && tabCounts[currentTab] > 0
+            ? currentTab
+            : (media.length ? 'media' : documents.length ? 'docs' : links.length ? 'links' : 'media');
+        infoDrawer.dataset.activeInfoTab = activeTab;
+        const tabButton = (tab, label, count) => `<button type="button" class="chat-info-tab ${activeTab === tab ? 'is-active' : ''}" data-info-tab="${tab}" role="tab" aria-selected="${activeTab === tab}">${chatInfoText(label)}<span>${count}</span></button>`;
+        const mediaMarkup = media.length
+            ? media.slice(-12).reverse().map((message) => {
+                const url = getInfoAssetUrl(message);
+                const isVideo = String(message.type || '').toLowerCase() === 'video' || Boolean(message.video_url);
+                return `<button type="button" data-info-message="${escapeHtml(message.id)}" data-info-media-type="${isVideo ? 'video' : 'image'}" data-info-media-src="${escapeHtml(url)}" aria-label="${chatInfoText(isVideo ? 'open_video' : 'open_image')}">${isVideo ? `<video src="${escapeHtml(url)}" muted preload="metadata" playsinline></video><span class="chat-info-video-mark">▶</span>` : `<img src="${escapeHtml(url)}" alt="" loading="lazy">`}</button>`;
+            }).join('')
+            : `<p class="chat-info-empty">${isLoading ? chatInfoText('loading_history') : chatInfoText('no_media')}</p>`;
+        const docsMarkup = documents.length
+            ? documents.slice().reverse().map((message) => {
+                const url = getInfoAssetUrl(message);
+                const fileName = getInfoFileName(message, url);
+                const extension = (fileName.split('.').pop() || 'FILE').slice(0, 5).toUpperCase();
+                const metadata = [window.AeroI18n?.formatChatTimestamp?.(message.created_at), formatInfoFileSize(message.file_size)].filter(Boolean).join(' · ');
+                return `<div class="chat-info-doc"><a class="chat-info-doc-main" href="${escapeHtml(url || '#')}" ${url ? 'target="_blank" rel="noopener noreferrer"' : 'aria-disabled="true"'}><span class="chat-info-doc-ext">${escapeHtml(extension)}</span><span class="chat-info-doc-copy"><strong>${escapeHtml(fileName)}</strong><small>${escapeHtml(metadata || extension)}</small></span></a>${url ? `<a class="chat-info-doc-download" href="${escapeHtml(url)}" download="${escapeHtml(fileName)}" aria-label="${chatInfoText('download_file')}">↓</a>` : ''}</div>`;
+            }).join('')
+            : `<p class="chat-info-empty">${isLoading ? chatInfoText('loading_history') : chatInfoText('no_docs')}</p>`;
+        const linksMarkup = links.length
+            ? links.slice().reverse().map((link) => {
+                let host = link.url;
+                try { host = new URL(link.url).hostname; } catch {}
+                const timestamp = window.AeroI18n?.formatChatTimestamp?.(link.created_at) || '';
+                return `<a class="chat-info-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"><span class="chat-info-link-mark" aria-hidden="true">↗</span><span class="chat-info-link-copy"><strong>${escapeHtml(host)}</strong><small>${escapeHtml(link.url)}</small>${timestamp ? `<time>${escapeHtml(timestamp)}</time>` : ''}</span></a>`;
+            }).join('')
+            : `<p class="chat-info-empty">${isLoading ? chatInfoText('loading_history') : chatInfoText('no_links')}</p>`;
+        root.innerHTML = `<div class="chat-info-tabs" role="tablist" aria-label="${chatInfoText('media')}">${tabButton('media', 'media_tab', media.length)}${tabButton('docs', 'docs_tab', documents.length)}${tabButton('links', 'links_tab', links.length)}</div><div class="chat-info-tab-panel ${activeTab === 'media' ? '' : 'hidden'}" data-info-pane="media" role="tabpanel"><div class="chat-info-media">${mediaMarkup}</div></div><div class="chat-info-tab-panel ${activeTab === 'docs' ? '' : 'hidden'}" data-info-pane="docs" role="tabpanel"><div class="chat-info-docs">${docsMarkup}</div></div><div class="chat-info-tab-panel ${activeTab === 'links' ? '' : 'hidden'}" data-info-pane="links" role="tabpanel"><div class="chat-info-links">${linksMarkup}</div></div>`;
+    };
+    const loadAllInfoMessages = async (contact) => {
+        const query = contact.is_group
+            ? `group_id=${contact.group_id || contact.id}`
+            : `contact_id=${contact.id}`;
+        const pageSize = 100;
+        const allMessages = [];
+        for (let offset = 0; ; offset += pageSize) {
+            const response = await fetch(`${API_BASE}/chat/messages?${query}&limit=${pageSize}&offset=${offset}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+            if (!response.ok) throw new Error('Unable to load conversation attachments');
+            const page = await response.json();
+            if (!Array.isArray(page)) throw new Error('Invalid conversation history response');
+            allMessages.push(...page);
+            if (page.length < pageSize) break;
+        }
+        const uniqueMessages = [...new Map(allMessages.map((message) => [String(message.id), message])).values()];
+        uniqueMessages.sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime());
+        return prepareInfoMessages(uniqueMessages, contact);
+    };
     const openInfoDrawer = async () => {
         const contact = activeChatUser || window.activeChatUser;
         if (!contact || !infoDrawer) return;
@@ -1893,13 +2007,14 @@ function setupMediaAndChat() {
         const name = isGroup ? (contact.name || 'Group') : (contact.display_name || contact.username || 'User');
         const avatarMarkup = chatAvatarMarkup({ ...contact, username: contact.username || name, display_name: contact.display_name || name }, 'chat-info-avatar');
         const cacheKey = chatConversationKey(contact);
-        const messages = messagesCache.get(cacheKey) || [];
-        const media = messages.filter((message) => ['image', 'gif', 'video'].includes(message.type) && getInfoMediaUrl(message));
-        const documents = messages.filter((message) => message.type === 'document' || message.file_name);
+        const cachedMessages = await prepareInfoMessages(messagesCache.get(cacheKey) || [], contact);
         const about = !isGroup ? (contact.about || contact.bio || chatInfoText('about_default')) : '';
         const membersMarkup = isGroup
             ? `<div class="chat-info-members"><div class="chat-info-loading">${chatInfoText('loading_members')}</div></div>`
             : '';
+        const refreshId = String((Number(infoDrawer.dataset.historyRefreshId) || 0) + 1);
+        infoDrawer.dataset.historyRefreshId = refreshId;
+        infoDrawer.dataset.conversationKey = cacheKey;
         infoDrawer.innerHTML = `
             <div class="chat-info-heading"><span>${chatInfoText('title')}</span><button type="button" class="chat-info-close" aria-label="${chatInfoText('close')}">&times;</button></div>
             <div class="chat-info-scroll">
@@ -1911,11 +2026,7 @@ function setupMediaAndChat() {
                     <button type="button" data-info-action="search"><span>⌕</span>${chatInfoText('search')}</button>
                 </div>
                 <label class="chat-info-search hidden"><span class="sr-only">${chatInfoText('search_messages')}</span><input type="search" placeholder="${chatInfoText('search_messages')}"></label>
-                <section class="chat-info-section"><div class="chat-info-section-heading"><strong>${chatInfoText('media')}</strong><span>${media.length + documents.length}</span></div><div class="chat-info-media">${media.length ? media.slice(-9).reverse().map((message) => {
-                    const url = getInfoMediaUrl(message);
-                    const isVideo = message.type === 'video';
-                    return `<button type="button" data-info-message="${escapeHtml(message.id)}" data-info-media-type="${isVideo ? 'video' : 'image'}" data-info-media-src="${escapeHtml(url)}" aria-label="${chatInfoText(isVideo ? 'open_video' : 'open_image')}">${isVideo ? `<video src="${escapeHtml(url)}" muted preload="metadata" playsinline></video><span class="chat-info-video-mark">▶</span>` : `<img src="${escapeHtml(url)}" alt="" loading="lazy">`}</button>`;
-                }).join('') : `<p class="chat-info-empty">${chatInfoText('no_media')}</p>`}</div></section>
+                <section class="chat-info-section chat-info-assets-section"><div class="chat-info-section-heading"><strong>${chatInfoText('media')}</strong><span data-info-assets-count>0</span></div><div data-info-assets-root></div></section>
                 ${membersMarkup}
                 <section class="chat-info-section chat-info-options">
                     <button type="button" data-info-action="starred">☆ <span>${chatInfoText('starred')}</span></button>
@@ -1923,12 +2034,18 @@ function setupMediaAndChat() {
                     <button type="button" data-info-action="clear" class="is-danger" disabled title="${chatInfoText('clear_unavailable')}">⌫ <span>${chatInfoText('clear')}</span></button>
                 </section>
             </div>`;
+        renderInfoAssets(cachedMessages, true);
         infoDrawer.classList.add('is-open');
         infoBackdrop.classList.add('is-visible');
         infoDrawer.setAttribute('aria-hidden', 'false');
         infoBackdrop.setAttribute('aria-hidden', 'false');
         infoDrawer.inert = false;
         infoDrawer.querySelector('.chat-info-close')?.addEventListener('click', closeInfoDrawer);
+        loadAllInfoMessages(contact).then((allMessages) => {
+            if (infoDrawer.dataset.conversationKey === cacheKey && infoDrawer.dataset.historyRefreshId === refreshId && infoDrawer.classList.contains('is-open')) renderInfoAssets(allMessages);
+        }).catch(() => {
+            if (infoDrawer.dataset.conversationKey === cacheKey && infoDrawer.dataset.historyRefreshId === refreshId && infoDrawer.classList.contains('is-open')) renderInfoAssets(cachedMessages);
+        });
         if (isGroup) {
             const groupId = contact.group_id || contact.id;
             fetch(`${API_BASE}/chat/groups/${groupId}/members`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } })
@@ -1954,17 +2071,6 @@ function setupMediaAndChat() {
             const query = event.target.value.toLowerCase();
             document.querySelectorAll('#chat-messages-list .chat-message').forEach((message) => message.classList.toggle('hidden', !message.textContent.toLowerCase().includes(query)));
         });
-        infoDrawer.querySelectorAll('[data-info-media-src]').forEach((item) => item.addEventListener('click', () => {
-            const message = document.querySelector(`#chat-messages-list [data-message-id="${CSS.escape(item.dataset.infoMessage)}"]`);
-            if (item.dataset.infoMediaType === 'image') {
-                const lightbox = document.getElementById('chat-lightbox');
-                const image = document.getElementById('chat-lightbox-image');
-                if (lightbox && image) { image.src = item.dataset.infoMediaSrc; lightbox.classList.remove('hidden'); }
-            } else if (message) {
-                message.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                message.querySelector('video')?.play().catch(() => {});
-            }
-        }));
         infoDrawer.querySelector('[data-info-action="mute"]')?.addEventListener('click', async () => {
             if (isGroup) return window.showNotice?.(chatInfoText('group_notifications_unavailable'), 'info');
             const muted = Boolean(contact.is_muted);
