@@ -14,6 +14,7 @@
     let isAuthenticated = Boolean(localStorage.getItem('aero_token'));
     let profileEditorUser = null;
     let profileEditorFile = null;
+    let followsModalState = null;
 
     const profileApiBase = () => window.AeroConfig.API_BASE_URL;
 
@@ -38,6 +39,170 @@
             : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Z"></path><path d="M8 12h8M12 8v8"></path></svg>';
         const label = window.AeroI18n?.t(`role_${normalized}`) || normalized;
         return `<span class="role-badge ${normalized}">${icon}<span>${label}</span></span>`;
+    }
+
+    function profileEscape(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));
+    }
+
+    function followsText(value) {
+        return window.AeroI18n?.translateValue(value) || value;
+    }
+
+    function ensureFollowsModal() {
+        let overlay = document.getElementById('profile-follows-modal');
+        if (overlay) return overlay;
+        overlay = document.createElement('div');
+        overlay.id = 'profile-follows-modal';
+        overlay.className = 'profile-follows-modal-overlay hidden';
+        overlay.setAttribute('role', 'presentation');
+        overlay.innerHTML = `<section class="profile-follows-modal" role="dialog" aria-modal="true" aria-label="Followers and Following"><header class="profile-follows-header"><div class="profile-follows-tabs" role="tablist"><button type="button" data-follows-tab="followers" role="tab"></button><button type="button" data-follows-tab="following" role="tab"></button><span class="profile-follows-indicator"></span></div><button type="button" class="profile-follows-close" aria-label="Close">&times;</button></header><div class="profile-follows-list" role="tabpanel" aria-live="polite"></div></section>`;
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', (event) => { if (event.target === overlay) closeFollowsModal(); });
+        overlay.querySelector('.profile-follows-close').addEventListener('click', closeFollowsModal);
+        overlay.querySelectorAll('[data-follows-tab]').forEach((button) => button.addEventListener('click', () => {
+            if (!followsModalState || button.dataset.followsTab === followsModalState.tab) return;
+            followsModalState.tab = button.dataset.followsTab;
+            renderFollowsTabs();
+            loadFollowsModalUsers();
+        }));
+        window.addEventListener('aero:language-change', () => {
+            if (!followsModalState) return;
+            renderFollowsTabs();
+            renderFollowsModalUsers();
+        });
+        return overlay;
+    }
+
+    function renderFollowsTabs() {
+        const overlay = document.getElementById('profile-follows-modal');
+        if (!overlay || !followsModalState) return;
+        const { tab, counts } = followsModalState;
+        overlay.querySelector('[data-follows-tab="followers"]').innerHTML = `${followsText('Followers')} <span>${counts.followers}</span>`;
+        overlay.querySelector('[data-follows-tab="following"]').innerHTML = `${followsText('Following')} <span>${counts.following}</span>`;
+        overlay.querySelectorAll('[data-follows-tab]').forEach((button) => {
+            const active = button.dataset.followsTab === tab;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-selected', String(active));
+        });
+        overlay.querySelector('.profile-follows-indicator').dataset.tab = tab;
+        overlay.querySelector('.profile-follows-modal').setAttribute('aria-label', `${followsText('Followers')} / ${followsText('Following')}`);
+        overlay.querySelector('.profile-follows-close').setAttribute('aria-label', followsText('Close'));
+    }
+
+    function renderFollowsModalUsers() {
+        const overlay = document.getElementById('profile-follows-modal');
+        const list = overlay?.querySelector('.profile-follows-list');
+        if (!list || !followsModalState) return;
+        const { users, loading, error, tab, viewerId } = followsModalState;
+        if (loading) {
+            list.innerHTML = `<p class="profile-follows-state">${followsText('Loading people...')}</p>`;
+            return;
+        }
+        if (error) {
+            list.innerHTML = `<p class="profile-follows-state is-error">${profileEscape(error)}</p>`;
+            return;
+        }
+        if (!users.length) {
+            list.innerHTML = `<p class="profile-follows-state">${followsText('No people to show yet.')}</p>`;
+            return;
+        }
+        list.innerHTML = users.map((person) => {
+            const avatar = profileAvatarValue(person);
+            const following = Boolean(person.is_following);
+            const label = following ? followsText('Following') : tab === 'followers' && person.is_followed_by ? followsText('Follow back') : followsText('Follow');
+            const action = Number(person.id) === viewerId ? '' : `<button type="button" class="profile-follows-action ${following ? 'is-following' : ''}" data-follows-action="${person.id}" title="${followsText(following ? 'Unfollow' : 'Follow')}">${label}</button>`;
+            return `<div class="profile-follows-user"><button type="button" class="profile-follows-user-main" data-open-follow-profile="${person.id}"><img class="profile-follows-avatar" src="${profileEscape(avatar.url)}" data-avatar-fallback="${profileEscape(avatar.fallbackUrl)}" alt=""/><span class="profile-follows-user-copy"><strong>@${profileEscape(person.username)}</strong><small>${profileEscape(person.display_name || person.username)}</small></span></button>${action}</div>`;
+        }).join('');
+        list.querySelectorAll('[data-avatar-fallback]').forEach((image) => image.addEventListener('error', () => { image.src = image.dataset.avatarFallback; }, { once: true }));
+        list.querySelectorAll('[data-open-follow-profile]').forEach((button) => button.addEventListener('click', () => {
+            const userId = Number(button.dataset.openFollowProfile);
+            closeFollowsModal();
+            window.switchView?.('profile', { userId });
+        }));
+        list.querySelectorAll('[data-follows-action]').forEach((button) => button.addEventListener('click', async () => {
+            const person = followsModalState?.users.find((item) => String(item.id) === button.dataset.followsAction);
+            if (!person || !followsModalState) return;
+            if (!localStorage.getItem('aero_token')) {
+                window.showLoginModal?.('Please sign in before following people.');
+                return;
+            }
+            const wasFollowing = Boolean(person.is_following);
+            button.disabled = true;
+            try {
+                const result = await window.toggleFollowUser(person.id, { username: person.username, name: person.display_name, avatar: person.avatar_url });
+                person.is_following = Boolean(result.is_following);
+                if (followsModalState.isOwnProfile) {
+                    followsModalState.counts.following = Math.max(0, followsModalState.counts.following + (person.is_following ? 1 : -1));
+                    followsModalState.onFollowingCountChange?.(followsModalState.counts.following);
+                }
+                if (followsModalState.isOwnProfile && followsModalState.tab === 'following' && wasFollowing && !person.is_following) {
+                    followsModalState.users = followsModalState.users.filter((item) => Number(item.id) !== Number(person.id));
+                }
+                renderFollowsTabs();
+                renderFollowsModalUsers();
+            } catch (error) {
+                window.showNotice?.(error.message || followsText('Unable to update follow status.'), 'error');
+                button.disabled = false;
+            }
+        }));
+    }
+
+    async function loadFollowsModalUsers() {
+        if (!followsModalState) return;
+        const state = followsModalState;
+        const tab = state.tab;
+        const requestId = state.requestId = (state.requestId || 0) + 1;
+        state.loading = true;
+        state.error = '';
+        renderFollowsModalUsers();
+        try {
+            const response = await fetch(`${profileApiBase()}/users/${state.userId}/follows?type=${tab}`, {
+                headers: window.AeroAuthHeaders?.() || {}
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(payload.message || followsText('Unable to load this list.'));
+            if (followsModalState !== state || state.requestId !== requestId || state.tab !== tab) return;
+            state.users = Array.isArray(payload.users) ? payload.users : [];
+            state.counts = { followers: Number(payload.followers_count) || 0, following: Number(payload.following_count) || 0 };
+        } catch (error) {
+            if (followsModalState === state && state.requestId === requestId && state.tab === tab) state.error = error.message || followsText('Unable to load this list.');
+        } finally {
+            if (followsModalState === state && state.requestId === requestId && state.tab === tab) {
+                state.loading = false;
+                renderFollowsTabs();
+                renderFollowsModalUsers();
+            }
+        }
+    }
+
+    function openFollowsModal({ userId, initialTab, followersCount, followingCount, isOwnProfile, onFollowingCountChange }) {
+        const overlay = ensureFollowsModal();
+        followsModalState = {
+            userId: Number(userId),
+            initialTab: initialTab === 'following' ? 'following' : 'followers',
+            tab: initialTab === 'following' ? 'following' : 'followers',
+            counts: { followers: Number(followersCount) || 0, following: Number(followingCount) || 0 },
+            isOwnProfile,
+            viewerId: Number(JSON.parse(localStorage.getItem('aero_user') || '{}').id || 0),
+            users: [],
+            requestId: 0,
+            loading: false,
+            error: '',
+            onFollowingCountChange
+        };
+        overlay.classList.remove('hidden');
+        document.body.classList.add('has-profile-follows-modal');
+        renderFollowsTabs();
+        loadFollowsModalUsers();
+        overlay.querySelector('.profile-follows-close').focus();
+    }
+
+    function closeFollowsModal() {
+        const overlay = document.getElementById('profile-follows-modal');
+        overlay?.classList.add('hidden');
+        document.body.classList.remove('has-profile-follows-modal');
+        followsModalState = null;
     }
 
     function updateSharedUserState(user) {
@@ -108,42 +273,51 @@
     }
 
     function checkNFCSupport() {
-        const isMobile = window.innerWidth <= 768 || /Android|iPhone/i.test(navigator.userAgent);
-        return isMobile && 'NDEFReader' in window;
+        return Boolean(window.isSecureContext && 'NDEFReader' in window);
     }
 
     function profileShareUrl(userId) {
         const username = typeof userId === 'object' ? userId.username : userId;
-        return `${window.location.origin}${window.location.pathname}?user=${encodeURIComponent(username)}`;
+        const profileUrl = new URL(window.location.href);
+        profileUrl.searchParams.set('user', username);
+        profileUrl.searchParams.delete('profile');
+        profileUrl.hash = '';
+        return profileUrl.toString();
+    }
+
+    function nfcText(key) {
+        return window.AeroI18n?.t?.(`share.nfc.${key}`) || key;
     }
 
     function setNfcStatus(message, active = false) {
         const status = document.getElementById('nfc-share-status');
         if (status) status.textContent = message;
-        document.getElementById('nfc-share-panel')?.classList.toggle('is-active', active);
+        const panel = document.getElementById('nfc-share-panel');
+        panel?.classList.toggle('is-active', active);
+        panel?.classList.toggle('is-unavailable', !checkNFCSupport());
     }
 
     async function startNFCShare(profileUrl) {
         const fallbackToClipboard = async () => {
             try {
                 await navigator.clipboard.writeText(profileUrl);
-                setNfcStatus('NFC is unavailable. Profile link copied to clipboard.');
+                setNfcStatus(nfcText('copied'));
                 window.showNotice?.('NFC 写入不可用，已自动复制 Profile 链接至剪贴板', 'info');
             } catch (clipboardError) {
-                setNfcStatus('NFC is unavailable. Use the QR code or copy the link.');
+                setNfcStatus(nfcText('write_failed'));
                 window.showNotice?.('NFC writing is unavailable. Please copy the Profile link manually.', 'info');
             }
         };
         if (!checkNFCSupport()) {
-            await fallbackToClipboard();
-            return;
+            setNfcStatus(nfcText('unsupported'));
+            return false;
         }
-        setNfcStatus('Ready. Hold another phone close to this one.', true);
+        setNfcStatus(nfcText('instructions'), true);
         try {
             const ndef = new NDEFReader();
             await ndef.write({ records: [{ recordType: 'url', data: profileUrl }] });
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-            setNfcStatus('NFC link written successfully.');
+            setNfcStatus(nfcText('success'));
             window.showNotice?.('NFC sharing is ready. Bring the phones together.', 'success');
         } catch (error) {
             console.error('NFC Write Error:', error);
@@ -161,8 +335,12 @@
         document.getElementById('share-profile-handle').textContent = `@${user.username || 'user'}`;
         document.getElementById('share-profile-qr').src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(profileUrl)}`;
         document.getElementById('copy-profile-link').dataset.profileUrl = profileUrl;
-        document.getElementById('start-nfc-share').dataset.profileUrl = profileUrl;
-        setNfcStatus(checkNFCSupport() ? 'Ready to share with a nearby phone.' : 'Use the QR code or copy the link on this device.');
+        const nfcButton = document.getElementById('start-nfc-share');
+        nfcButton.dataset.profileUrl = profileUrl;
+        nfcButton.disabled = !checkNFCSupport();
+        nfcButton.setAttribute('aria-describedby', 'nfc-share-status');
+        nfcButton.title = checkNFCSupport() ? nfcText('instructions') : nfcText('unsupported');
+        setNfcStatus(checkNFCSupport() ? nfcText('instructions') : nfcText('unsupported'));
         modal.classList.remove('hidden');
     }
 
@@ -413,8 +591,8 @@
                         <p class="profile-bio">${(user.bio || 'No bio yet.').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]))}</p>
                         ${isOwnProfile ? '<button type="button" class="profile-edit-btn">Edit Profile</button>' : `<div class="profile-action-group"><button id="profile-follow-btn" type="button" class="profile-follow-btn ${payload.is_following ? 'is-following' : ''}" data-user-id="${profileUserId}" data-following="${Boolean(payload.is_following)}">${payload.is_following ? 'Following' : 'Follow'}</button><button type="button" class="profile-message-btn" data-user-id="${profileUserId}">Message</button></div>`}
                         <div class="profile-stats">
-                            <span><strong id="profile-followers-count">${followText(payload.followers_count)}</strong> Followers</span>
-                            <span><strong>${followText(payload.following_count)}</strong> Following</span>
+                            <button type="button" class="profile-stat-trigger" data-follows-tab="followers" aria-label="View followers"><strong id="profile-followers-count">${followText(payload.followers_count)}</strong><span data-i18n="Followers" data-i18n-text>Followers</span></button>
+                            <button type="button" class="profile-stat-trigger" data-follows-tab="following" aria-label="View following"><strong id="profile-following-count">${followText(payload.following_count)}</strong><span data-i18n="Following" data-i18n-text>Following</span></button>
                         </div>
                     </div>
                     <div class="profile-avatar-wrap ${user.is_online ? 'is-online' : ''}">
@@ -427,6 +605,18 @@
             header.querySelector('#profile-share-btn')?.addEventListener('click', () => {
                 if (isOwnProfile) openProfileShareModal(user, profileUserId);
             });
+            header.querySelectorAll('[data-follows-tab]').forEach((button) => button.addEventListener('click', () => {
+                const followersCount = header.querySelector('#profile-followers-count');
+                const followingCount = header.querySelector('#profile-following-count');
+                openFollowsModal({
+                    userId: profileUserId,
+                    initialTab: button.dataset.followsTab,
+                    followersCount: followersCount?.textContent,
+                    followingCount: followingCount?.textContent,
+                    isOwnProfile,
+                    onFollowingCountChange: (count) => { if (followingCount) followingCount.textContent = String(count); }
+                });
+            }));
             header.querySelector('.profile-edit-btn')?.addEventListener('click', () => openProfileEditor(user));
 
             if (!isOwnProfile) {

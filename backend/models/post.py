@@ -24,6 +24,10 @@ class Post(db.Model):
     )
 
     poll_json = db.Column(db.Text, nullable=True)
+    scheduled_at = db.Column(db.DateTime, nullable=True, index=True)
+    reply_permission = db.Column(db.String(20), nullable=False, default="anyone")
+    review_replies = db.Column(db.Boolean, nullable=False, default=False)
+    crosspost_targets_json = db.Column(db.Text, nullable=False, default="[]")
 
     created_at = db.Column(
         db.DateTime,

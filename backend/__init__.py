@@ -167,6 +167,15 @@ def create_app():
             db.session.execute(text(
                 "ALTER TABLE posts ADD COLUMN IF NOT EXISTS poll_json TEXT"
             ))
+            db.session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS meta_access_token TEXT"))
+            db.session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS meta_token_expires_at TIMESTAMP NULL"))
+            db.session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS meta_page_id VARCHAR(100) NULL"))
+            db.session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS meta_page_access_token TEXT NULL"))
+            db.session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS instagram_account_id VARCHAR(100) NULL"))
+            db.session.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP NULL"))
+            db.session.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS reply_permission VARCHAR(20) NOT NULL DEFAULT 'anyone'"))
+            db.session.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS review_replies BOOLEAN NOT NULL DEFAULT FALSE"))
+            db.session.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS crosspost_targets_json TEXT NOT NULL DEFAULT '[]'"))
             db.session.commit()
         except Exception as error:
             db.session.rollback()

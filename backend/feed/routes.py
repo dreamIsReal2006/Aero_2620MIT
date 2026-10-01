@@ -11,6 +11,9 @@ import time
 import uuid
 from io import BytesIO
 from pathlib import Path
+from urllib import error as urllib_error
+from urllib import parse as urllib_parse
+from urllib import request as urllib_request
 
 from flask import current_app, jsonify, request
 from PIL import Image, ImageOps
@@ -190,6 +193,10 @@ def post_payload(post, current_user_id=None):
         "parent_id": post.parent_id,
         "thread_posts": [],
         "type": post.type,
+        "scheduled_at": f"{post.scheduled_at.isoformat()}Z" if post.scheduled_at else None,
+        "reply_permission": post.reply_permission or "anyone",
+        "review_replies": bool(post.review_replies),
+        "crosspost_target": json.loads(post.crosspost_targets_json or "[]"),
         "likes": likes_count,
         "comments": comments_count,
         "ranking_score": score,
@@ -289,6 +296,59 @@ def _pagination():
     limit = min(max(request.args.get("limit", 10, type=int) or 10, 1), 10)
     return page, limit, (page - 1) * limit
 
+def _parse_scheduled_at(value):
+    if not value:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo:
+        parsed = parsed.astimezone(dt.timezone.utc).replace(tzinfo=None)
+    if parsed <= dt.datetime.utcnow():
+        return None
+    return parsed
+
+
+def _meta_graph_request(path, params, method="GET"):
+    url = f"https://graph.facebook.com/v19.0/{path.lstrip('/')}"
+    encoded = urllib_parse.urlencode(params).encode("utf-8")
+    request = urllib_request.Request(url, data=encoded if method != "GET" else None, method=method)
+    if method == "GET": url = f"{url}?{encoded.decode('utf-8')}"; request = urllib_request.Request(url, method="GET")
+    with urllib_request.urlopen(request, timeout=15) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def publish_meta_crossposts(user, content, images, targets):
+    if not targets:
+        return {"requested": [], "status": "none", "results": {}}
+    if not user.meta_access_token:
+        return {"requested": targets, "status": "needs_meta_auth", "results": {}}
+    results = {}
+    try:
+        page = None
+        if user.meta_page_id:
+            page = {"id": user.meta_page_id, "access_token": user.meta_page_access_token, "instagram_business_account": {"id": user.instagram_account_id} if user.instagram_account_id else None}
+        if not page:
+            pages = _meta_graph_request("me/accounts", {"access_token": user.meta_access_token, "fields": "id,name,access_token,instagram_business_account"}).get("data", [])
+            page = pages[0] if pages else None
+        if "facebook" in targets:
+            if not page: raise ValueError("No Facebook Page is available for this Meta account")
+            response = _meta_graph_request(f"{page['id']}/feed", {"message": content, "access_token": page.get("access_token") or user.meta_access_token}, method="POST")
+            results["facebook"] = {"status": "published", "id": response.get("id")}
+        if "instagram" in targets:
+            if not page or not page.get("instagram_business_account"):
+                raise ValueError("No Instagram Business account is linked to a Facebook Page")
+            if not images:
+                raise ValueError("Instagram crossposting requires an image")
+            ig_id = page["instagram_business_account"]["id"]
+            media = _meta_graph_request(f"{ig_id}/media", {"image_url": images[0], "caption": content, "access_token": page.get("access_token") or user.meta_access_token}, method="POST")
+            published = _meta_graph_request(f"{ig_id}/media_publish", {"creation_id": media["id"], "access_token": page.get("access_token") or user.meta_access_token}, method="POST")
+            results["instagram"] = {"status": "published", "id": published.get("id")}
+        return {"requested": targets, "status": "published", "results": results}
+    except (KeyError, ValueError, urllib_error.URLError, json.JSONDecodeError) as error:
+        logger.exception("Meta crosspost failed for user %s", user.id)
+        return {"requested": targets, "status": "failed", "message": str(error), "results": results}
 
 def _decode_post_cursor(value):
     if not value:
@@ -753,6 +813,18 @@ def create_post(current_user):
     data = request.get_json(silent=True) or {}
     content = str(data.get("content", "")).strip()
     images = data.get("images", [])
+    reply_permission = str(data.get("reply_permission", "anyone")).strip().lower()
+    review_replies = bool(data.get("review_replies", False))
+    crosspost_targets = data.get("crosspost_target", data.get("crosspost_targets", []))
+    if reply_permission not in {"anyone", "followed", "mentioned"}:
+        return jsonify({"message": "Invalid reply permission"}), 400
+    if not isinstance(crosspost_targets, list) or any(target not in {"facebook", "instagram"} for target in crosspost_targets):
+        return jsonify({"message": "Invalid crosspost target"}), 400
+    if crosspost_targets and not current_user.meta_access_token:
+        return jsonify({"status": "needs_meta_auth", "auth_url": "/api/auth/facebook", "message": "Connect Meta before crossposting"}), 401
+    scheduled_at = _parse_scheduled_at(data.get("scheduled_at"))
+    if data.get("scheduled_at") and scheduled_at is None:
+        return jsonify({"message": "scheduled_at must be a valid future ISO timestamp"}), 400
     try:
         poll = normalize_poll(data.get("poll"))
     except ValueError as error:
@@ -769,6 +841,10 @@ def create_post(current_user):
         user_id=current_user.id,
         parent_id=data.get("parentId"),
         type=post_type,
+        scheduled_at=scheduled_at,
+        reply_permission=reply_permission,
+        review_replies=review_replies,
+        crosspost_targets_json=json.dumps(crosspost_targets),
     )
     db.session.add(post)
     db.session.flush()
@@ -797,7 +873,10 @@ def create_post(current_user):
             daemon=True,
             name=f"post-embedding-{post.id}",
         ).start()
-    return jsonify(post_payload(post, current_user.id)), 201
+    response = post_payload(post, current_user.id)
+    response["scheduled"] = bool(scheduled_at)
+    response["crosspost"] = publish_meta_crossposts(current_user, content, images, crosspost_targets)
+    return jsonify(response), 201
 
 
 @feed_bp.post("/posts/chain")
@@ -807,6 +886,18 @@ def create_post_chain(current_user):
     entries = data.get("posts")
     if not isinstance(entries, list) or not 1 <= len(entries) <= 10:
         return jsonify({"message": "A thread must contain between 1 and 10 posts"}), 400
+    reply_permission = str(data.get("reply_permission", "anyone")).strip().lower()
+    review_replies = bool(data.get("review_replies", False))
+    crosspost_targets = data.get("crosspost_target", data.get("crosspost_targets", []))
+    scheduled_at = _parse_scheduled_at(data.get("scheduled_at"))
+    if reply_permission not in {"anyone", "followed", "mentioned"}:
+        return jsonify({"message": "Invalid reply permission"}), 400
+    if not isinstance(crosspost_targets, list) or any(target not in {"facebook", "instagram"} for target in crosspost_targets):
+        return jsonify({"message": "Invalid crosspost target"}), 400
+    if crosspost_targets and not current_user.meta_access_token:
+        return jsonify({"status": "needs_meta_auth", "auth_url": "/api/auth/facebook", "message": "Connect Meta before crossposting"}), 401
+    if data.get("scheduled_at") and scheduled_at is None:
+        return jsonify({"message": "scheduled_at must be a valid future ISO timestamp"}), 400
 
     normalized = []
     for entry in entries:
@@ -829,6 +920,10 @@ def create_post_chain(current_user):
                 user_id=current_user.id,
                 parent_id=main_post_id,
                 type="original",
+                scheduled_at=scheduled_at,
+                reply_permission=reply_permission,
+                review_replies=review_replies,
+                crosspost_targets_json=json.dumps(crosspost_targets),
             )
             db.session.add(post)
             db.session.flush()
@@ -872,7 +967,8 @@ def create_post_chain(current_user):
 
     response_posts = [post_payload(post, current_user.id) for post in created_posts]
     _attach_thread_posts(response_posts[:1], current_user)
-    return jsonify({"posts": response_posts}), 201
+    root_content, root_images = normalized[0]
+    return jsonify({"posts": response_posts, "crosspost": publish_meta_crossposts(current_user, root_content, root_images, crosspost_targets)}), 201
 
 
 @feed_bp.delete("/posts/<post_id>")

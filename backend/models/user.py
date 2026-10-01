@@ -33,6 +33,11 @@ class User(db.Model):
     bio = db.Column(db.String(150), default="", nullable=False)
     avatar_url = db.Column(db.String(500), default="", nullable=False)
     language_preference = db.Column(db.String(2), default=None, nullable=True)
+    meta_access_token = db.Column(db.Text, nullable=True)
+    meta_token_expires_at = db.Column(db.DateTime, nullable=True)
+    meta_page_id = db.Column(db.String(100), nullable=True)
+    meta_page_access_token = db.Column(db.Text, nullable=True)
+    instagram_account_id = db.Column(db.String(100), nullable=True)
     interest_embedding = db.Column(Vector(384), nullable=True)
 
     is_private = db.Column(db.Boolean, default=False, nullable=False)

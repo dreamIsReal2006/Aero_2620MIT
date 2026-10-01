@@ -22,10 +22,31 @@
             'post.bookmark': 'Bookmark Post', 'post.remove_bookmark': 'Remove Bookmark',
             'post.copy_link': 'Copy Link', 'post.not_interested': 'Not Interested',
             'post.follow': 'Follow', 'post.unfollow': 'Unfollow', 'post.report': 'Report Post',
+            'share.nfc.instructions': 'Turn on NFC, then bring the backs of the phones close together.',
+            'share.nfc.unsupported': 'This browser does not support NFC. Scan the QR code or copy the profile link.',
+            'share.nfc.success': 'NFC link written. Bring the phones together to open the profile.',
+            'share.nfc.copied': 'NFC could not write. The profile link was copied to the clipboard.',
+            'share.nfc.write_failed': 'NFC writing failed. Scan the QR code or copy the profile link.',
+            'Tap to share': 'Tap to share',
             'common.new_post': 'New Post', 'common.new_video': 'Video',
             'auth.or_continue_with': 'Or continue with', 'auth.google': 'Sign in with Google', 'auth.github': 'Sign in with GitHub',
             'chat.info.title': 'Conversation info', 'chat.info.close': 'Close conversation information',
             'chat.info.group_count': 'Group · {count} members', 'chat.info.member_count': '{count} members',
+            'Followers': 'Followers', 'Follow back': 'Follow back', 'Follow user': 'Follow user', 'Unfollow': 'Unfollow',
+            'View followers': 'View followers', 'View following': 'View following', 'Loading people...': 'Loading people...',
+            'No people to show yet.': 'No people to show yet.', 'Unable to load this list.': 'Unable to load this list.',
+            'Unable to update follow status.': 'Unable to update follow status.',
+            'chat.date.today': 'Today', 'chat.date.yesterday': 'Yesterday',
+            'chat.system.you_added_members': 'You invited {members} to the group',
+            'chat.system.actor_added_members': '{actor} invited {members} to the group',
+            'chat.system.you_removed_member': 'You removed {member} from the group',
+            'chat.system.actor_removed_member': '{actor} removed {member} from the group',
+            'chat.system.you_updated_group': 'You changed the group name to {name}',
+            'chat.system.actor_updated_group': '{actor} changed the group name to {name}',
+            'chat.info.edit_group': 'Edit group info', 'chat.info.edit_group_name_title': 'Edit group name',
+            'chat.info.edit_group_name_prompt': 'Choose a new name for {group}.',
+            'chat.info.group_name_placeholder': 'Group name', 'chat.info.save_group_name': 'Save name',
+            'chat.info.enter_group_name': 'Enter a group name.', 'chat.info.unable_update_group': 'Unable to update group info.',
             'chat.info.view_members': 'View Members', 'chat.info.add_members_title': 'Add Members',
             'chat.info.search_contacts': 'Search contacts', 'chat.info.confirm_add_members': 'Confirm Add',
             'chat.info.no_available_members': 'All your contacts are already in this group.',
@@ -116,10 +137,31 @@
             'post.bookmark': '收藏帖子', 'post.remove_bookmark': '取消收藏',
             'post.copy_link': '复制链接', 'post.not_interested': '不感兴趣',
             'post.follow': '关注', 'post.unfollow': '取消关注', 'post.report': '举报帖子',
+            'share.nfc.instructions': '请开启 NFC，并将两台手机背部靠近。',
+            'share.nfc.unsupported': '当前浏览器不支持 NFC，请扫描二维码或复制个人主页链接。',
+            'share.nfc.success': 'NFC 链接已写入，请将两台手机靠近以打开个人主页。',
+            'share.nfc.copied': 'NFC 写入失败，个人主页链接已复制到剪贴板。',
+            'share.nfc.write_failed': 'NFC 写入失败，请扫描二维码或复制个人主页链接。',
+            'Tap to share': '轻触开始分享',
             'common.new_post': '发布新帖', 'common.new_video': '视频',
             'auth.or_continue_with': '或使用以下方式继续', 'auth.google': '使用 Google 登录', 'auth.github': '使用 GitHub 登录',
             'chat.info.title': '会话信息', 'chat.info.close': '关闭会话信息',
             'chat.info.group_count': '群组 · {count} 位成员', 'chat.info.member_count': '{count} 位成员',
+            'Followers': '粉丝', 'Follow back': '回关', 'Follow user': '关注用户', 'Unfollow': '取消关注',
+            'View followers': '查看粉丝', 'View following': '查看已关注', 'Loading people...': '正在加载用户…',
+            'No people to show yet.': '暂无用户。', 'Unable to load this list.': '无法加载此列表。',
+            'Unable to update follow status.': '无法更新关注状态。',
+            'chat.date.today': '今天', 'chat.date.yesterday': '昨天',
+            'chat.system.you_added_members': '你邀请了 {members} 加入群组',
+            'chat.system.actor_added_members': '{actor} 邀请 {members} 加入群组',
+            'chat.system.you_removed_member': '你将 {member} 移出了群组',
+            'chat.system.actor_removed_member': '{actor} 将 {member} 移出了群组',
+            'chat.system.you_updated_group': '你将群组名称修改为 {name}',
+            'chat.system.actor_updated_group': '{actor} 将群组名称修改为 {name}',
+            'chat.info.edit_group': '编辑群组信息', 'chat.info.edit_group_name_title': '修改群组名称',
+            'chat.info.edit_group_name_prompt': '为“{group}”设置新名称。',
+            'chat.info.group_name_placeholder': '群组名称', 'chat.info.save_group_name': '保存名称',
+            'chat.info.enter_group_name': '请输入群组名称。', 'chat.info.unable_update_group': '无法更新群组信息。',
             'chat.info.view_members': '查看成员', 'chat.info.add_members_title': '添加成员',
             'chat.info.search_contacts': '搜索联系人', 'chat.info.confirm_add_members': '确认添加',
             'chat.info.no_available_members': '所有联系人都已在此群组中。',
@@ -224,6 +266,27 @@
         }).format(date);
     }
 
+    function formatChatDateDivider(timestamp) {
+        if (!timestamp) return '';
+        const rawTimestamp = String(timestamp).trim();
+        const normalizedTimestamp = /[zZ]|[+-]\d{2}:?\d{2}$/.test(rawTimestamp)
+            ? rawTimestamp
+            : `${rawTimestamp}Z`;
+        const date = new Date(normalizedTimestamp);
+        if (Number.isNaN(date.getTime())) return '';
+        const dateKey = (value) => `${value.getFullYear()}-${value.getMonth()}-${value.getDate()}`;
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (dateKey(date) === dateKey(today)) return translate('chat.date.today');
+        if (dateKey(date) === dateKey(yesterday)) return translate('chat.date.yesterday');
+        return new Intl.DateTimeFormat(getLanguage() === 'zh' ? 'zh-CN' : 'en-US', {
+            year: 'numeric',
+            month: getLanguage() === 'zh' ? 'long' : 'short',
+            day: 'numeric'
+        }).format(date);
+    }
+
     function translateNode(node) {
         if (node.nodeType === Node.TEXT_NODE) {
             if (!originalText.has(node)) originalText.set(node, node.nodeValue);
@@ -296,7 +359,7 @@
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    window.AeroI18n = { getLanguage, applyLanguage, setLanguage, restoreUserLanguage, translateValue, t: translate, formatChatTimestamp, getScreenTimeWeekdays };
+    window.AeroI18n = { getLanguage, applyLanguage, setLanguage, restoreUserLanguage, translateValue, t: translate, formatChatTimestamp, formatChatDateDivider, getScreenTimeWeekdays };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup);
     else setup();
 })();

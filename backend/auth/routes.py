@@ -9,9 +9,10 @@ from urllib import error as urllib_error
 from urllib import request as urllib_request
 
 import jwt
-from flask import current_app, jsonify, request, session
+from flask import current_app, jsonify, redirect, request, session
 from supabase import create_client
 from werkzeug.security import check_password_hash, generate_password_hash
+from urllib.parse import urlencode
 
 from backend import db
 from backend.auth import auth_bp
@@ -19,6 +20,8 @@ from backend.models import AppealTicket, Comment, Follow, Like, OTPCode, Post, R
 
 
 logger = logging.getLogger(__name__)
+
+META_SCOPE = "pages_show_list,pages_manage_posts,instagram_basic,instagram_content_publish"
 
 
 def effective_user_role(user):
@@ -54,6 +57,80 @@ def token_required(function):
             return jsonify({"message": "Token is invalid or expired"}), 401
         return function(user, *args, **kwargs)
     return decorated
+
+
+def _meta_json_request(url, params):
+    query = urlencode(params)
+    with urllib_request.urlopen(f"{url}?{query}", timeout=12) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+@auth_bp.get("/facebook")
+def start_meta_authorization():
+    authorization = request.headers.get("Authorization", "")
+    raw_token = authorization[7:].strip() if authorization.startswith("Bearer ") else request.args.get("access_token", "").strip()
+    try:
+        claims = jwt.decode(raw_token, current_app.config["SECRET_KEY"], algorithms=["HS256"])
+        current_user = db.session.get(User, claims["user_id"])
+        if not current_user or not current_user.active: raise jwt.InvalidTokenError
+    except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
+        return jsonify({"message": "Token is missing or invalid"}), 401
+    app_id = os.getenv("META_APP_ID", "").strip()
+    redirect_uri = os.getenv("META_REDIRECT_URI", "").strip()
+    if not app_id or not redirect_uri:
+        return jsonify({"message": "Meta OAuth is not configured"}), 503
+    state = jwt.encode(
+        {"user_id": current_user.id, "purpose": "meta_oauth", "exp": dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=10)},
+        current_app.config["SECRET_KEY"], algorithm="HS256"
+    )
+    params = {"client_id": app_id, "redirect_uri": redirect_uri, "scope": META_SCOPE, "response_type": "code", "state": state}
+    return redirect(f"https://www.facebook.com/v19.0/dialog/oauth?{urlencode(params)}")
+
+
+@auth_bp.get("/facebook/callback")
+def meta_authorization_callback():
+    error_description = request.args.get("error_description") or request.args.get("error")
+    if error_description:
+        return redirect(f"/?meta_auth=error&message={urlencode({'value': error_description})[6:]}")
+    code = request.args.get("code", "").strip()
+    state = request.args.get("state", "").strip()
+    if not code or not state:
+        return jsonify({"message": "Meta authorization code and state are required"}), 400
+    try:
+        claims = jwt.decode(state, current_app.config["SECRET_KEY"], algorithms=["HS256"])
+        if claims.get("purpose") != "meta_oauth": raise ValueError("Invalid OAuth state")
+        user_id = int(claims["user_id"])
+    except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
+        return jsonify({"message": "Invalid or expired Meta OAuth state"}), 400
+    try:
+        short_lived = _meta_json_request("https://graph.facebook.com/v19.0/oauth/access_token", {
+            "client_id": os.getenv("META_APP_ID", ""), "client_secret": os.getenv("META_APP_SECRET", ""),
+            "redirect_uri": os.getenv("META_REDIRECT_URI", ""), "code": code,
+        })
+        long_lived = _meta_json_request("https://graph.facebook.com/v19.0/oauth/access_token", {
+            "grant_type": "fb_exchange_token", "client_id": os.getenv("META_APP_ID", ""),
+            "client_secret": os.getenv("META_APP_SECRET", ""), "fb_exchange_token": short_lived["access_token"],
+        })
+        user = db.session.get(User, user_id)
+        if not user: return jsonify({"message": "User not found"}), 404
+        user.meta_access_token = long_lived.get("access_token") or short_lived["access_token"]
+        expires_in = int(long_lived.get("expires_in") or short_lived.get("expires_in") or 0)
+        user.meta_token_expires_at = dt.datetime.utcnow() + dt.timedelta(seconds=expires_in) if expires_in else None
+        pages = _meta_json_request("https://graph.facebook.com/v19.0/me/accounts", {
+            "access_token": user.meta_access_token,
+            "fields": "id,access_token,instagram_business_account",
+        }).get("data", [])
+        page = pages[0] if pages else {}
+        instagram_account = page.get("instagram_business_account") or {}
+        user.meta_page_id = page.get("id") or None
+        user.meta_page_access_token = page.get("access_token") or None
+        user.instagram_account_id = instagram_account.get("id") or None
+        db.session.commit()
+    except (KeyError, ValueError, urllib_error.URLError, json.JSONDecodeError) as error:
+        db.session.rollback()
+        logger.exception("Meta OAuth token exchange failed")
+        return redirect(f"/?meta_auth=error&message={urlencode({'value': str(error)})[6:]}")
+    return redirect("/?meta_auth=connected")
 
 
 def optional_token(function):

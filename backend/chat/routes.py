@@ -88,6 +88,7 @@ def _group_payload(group, current_user_id):
         "owner_id": group.owner_id,
         "member_count": ChatGroupMember.query.filter_by(group_id=group.id).count(),
         "latest_message": latest.content if latest else "",
+        "latest_message_type": latest.type if latest else "",
         "latest_message_at": f"{latest.created_at.isoformat()}Z" if latest else "",
         "unread_count": unread_count,
         "is_owner": group.owner_id == current_user_id,
@@ -97,6 +98,22 @@ def _group_payload(group, current_user_id):
 
 def _group_member(group_id, user_id):
     return ChatGroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
+
+
+def _add_group_system_message(group_id, actor, event, **details):
+    content = json.dumps({
+        "event": event,
+        "actor_id": actor.id,
+        "actor_username": actor.username,
+        **details,
+    }, ensure_ascii=False)
+    db.session.add(Message(
+        sender_id=actor.id,
+        recipient_id=actor.id,
+        group_id=group_id,
+        content=content,
+        type="system",
+    ))
 
 
 @chat_bp.get("/chat/my-gifs")
@@ -266,6 +283,33 @@ def get_group_members(current_user, group_id):
     })
 
 
+@chat_bp.patch("/chat/groups/<int:group_id>")
+@token_required
+def update_group(current_user, group_id):
+    group = db.session.get(ChatGroup, group_id)
+    membership = _group_member(group_id, current_user.id)
+    if not group or not membership:
+        return jsonify({"message": "Group not found"}), 404
+    if group.owner_id != current_user.id and not membership.is_admin:
+        return jsonify({"message": "Only group admins can update group information"}), 403
+    name = str((request.get_json(silent=True) or {}).get("name", "")).strip()
+    if not name or len(name) > 80:
+        return jsonify({"message": "Group name must be between 1 and 80 characters"}), 400
+    previous_name = group.name
+    if name == previous_name:
+        return jsonify(_group_payload(group, current_user.id))
+    group.name = name
+    _add_group_system_message(
+        group_id,
+        current_user,
+        "group_updated",
+        old_name=previous_name,
+        name=name,
+    )
+    db.session.commit()
+    return jsonify(_group_payload(group, current_user.id))
+
+
 @chat_bp.post("/chat/groups/<int:group_id>/members")
 @token_required
 def add_group_members(current_user, group_id):
@@ -299,6 +343,12 @@ def add_group_members(current_user, group_id):
     db.session.add_all(
         ChatGroupMember(group_id=group_id, user_id=user.id) for user in users
     )
+    _add_group_system_message(
+        group_id,
+        current_user,
+        "members_added",
+        members=[{"id": user.id, "username": user.username} for user in users],
+    )
     db.session.commit()
     return jsonify({
         "added": [{**_user_payload(user, current_user.id), "is_admin": False} for user in users],
@@ -320,7 +370,14 @@ def remove_group_member(current_user, group_id, user_id):
         return jsonify({"message": "Member not found"}), 404
     if target.user_id == group.owner_id or target.is_admin:
         return jsonify({"message": "Group admins cannot be removed"}), 403
+    removed_user = target.user
     db.session.delete(target)
+    _add_group_system_message(
+        group_id,
+        current_user,
+        "member_removed",
+        member={"id": removed_user.id, "username": removed_user.username},
+    )
     db.session.commit()
     return jsonify({
         "removed": True,

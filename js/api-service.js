@@ -1391,11 +1391,85 @@ function isActiveChatMessage(message, contact) {
         && Number(message.recipient_id) === Number(JSON.parse(localStorage.getItem('aero_user') || '{}').id);
 }
 
+function chatMessageDateKey(timestamp) {
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return '';
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function formatChatSystemEvent(message, currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}')) {
+    let event;
+    try {
+        event = JSON.parse(message.content || '{}');
+    } catch {
+        return '';
+    }
+    const actor = `@${event.actor_username || 'User'}`;
+    const isActor = Number(event.actor_id) === Number(currentUser.id);
+    if (event.event === 'members_added') {
+        const members = (event.members || []).map((member) => `@${member.username || 'User'}`).join(', ');
+        const key = isActor ? 'chat.system.you_added_members' : 'chat.system.actor_added_members';
+        return window.AeroI18n?.t?.(key, { actor, members }) || `${actor} added ${members} to the group`;
+    }
+    if (event.event === 'member_removed') {
+        const member = `@${event.member?.username || 'User'}`;
+        const key = isActor ? 'chat.system.you_removed_member' : 'chat.system.actor_removed_member';
+        return window.AeroI18n?.t?.(key, { actor, member }) || `${actor} removed ${member} from the group`;
+    }
+    if (event.event === 'group_updated') {
+        const key = isActor ? 'chat.system.you_updated_group' : 'chat.system.actor_updated_group';
+        return window.AeroI18n?.t?.(key, { actor, name: event.name || '' }) || `${actor} changed the group name to ${event.name || ''}`;
+    }
+    return '';
+}
+
+function applyGroupSystemEvent(message, group) {
+    if (!group?.is_group || message.type !== 'system') return false;
+    let event;
+    try {
+        event = JSON.parse(message.content || '{}');
+    } catch {
+        return false;
+    }
+    if (event.event !== 'group_updated' || !event.name) return false;
+    group.name = event.name;
+    group.username = event.name;
+    const activeGroup = activeChatUser || window.activeChatUser;
+    if (activeGroup?.is_group && String(activeGroup.group_id || activeGroup.id) === String(group.group_id || group.id)) {
+        const activeName = document.getElementById('chat-active-name');
+        if (activeName) activeName.textContent = `${event.name} · ${chatInfoText('member_count', { count: activeGroup.member_count || 0 })}`;
+        const infoName = document.querySelector('#chat-info-drawer .chat-info-profile > strong');
+        if (infoName) infoName.textContent = event.name;
+    }
+    return true;
+}
+
 async function appendSingleMessageToUI(message, conversation = activeChatUser || window.activeChatUser) {
     const contact = conversation;
     const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
     const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
     if (!box || !contact || box.querySelector(`[data-message-id="${message.id}"]`)) return false;
+    const dateKey = chatMessageDateKey(message.created_at);
+    if (dateKey && box.lastElementChild?.dataset.chatDateKey !== dateKey) {
+        const divider = document.createElement('div');
+        divider.className = 'chat-date-divider';
+        divider.dataset.dateKey = dateKey;
+        divider.setAttribute('role', 'separator');
+        divider.innerHTML = `<span>${escapeHtml(window.AeroI18n?.formatChatDateDivider?.(message.created_at) || '')}</span>`;
+        box.appendChild(divider);
+    }
+    if (message.type === 'system') {
+        const eventText = formatChatSystemEvent(message, currentUser);
+        if (!eventText) return false;
+        const node = document.createElement('div');
+        node.className = 'chat-system-message chat-timeline-message';
+        node.dataset.messageId = message.id;
+        node.dataset.chatDateKey = dateKey;
+        node.textContent = eventText;
+        box.appendChild(node);
+        box.scrollTop = box.scrollHeight;
+        return true;
+    }
     const content = escapeHtml(await decryptChatContent(message.content, contact));
     const mediaUrl = message.media_url ? (String(message.media_url).startsWith('http') ? message.media_url : `${API_ORIGIN}${message.media_url}`) : '';
     const videoType = /\.mov(?:$|\?)/i.test(mediaUrl) ? 'video/quicktime' : /\.webm(?:$|\?)/i.test(mediaUrl) ? 'video/webm' : /\.m4v(?:$|\?)/i.test(mediaUrl) ? 'video/x-m4v' : 'video/mp4';
@@ -1411,6 +1485,7 @@ async function appendSingleMessageToUI(message, conversation = activeChatUser ||
     const node = document.createElement('div');
     node.className = `chat-message ${Number(message.sender_id) === Number(currentUser.id) ? 'mine' : ''}`;
     node.dataset.messageId = message.id;
+    node.dataset.chatDateKey = dateKey;
     const timestamp = window.AeroI18n?.formatChatTimestamp?.(message.created_at) || formatRelativeTime(message.created_at);
     const deliveryStatus = message.status === 'sending'
         ? '<span class="chat-delivery-status sending">Sending...</span>'
@@ -1481,7 +1556,12 @@ function setupChatRealtime() {
                     && String(message.recipient_id) === String(currentUser.id));
             if (isCurrentChat) {
                 appendSingleMessageToUI(message, contact).then(async () => {
-                    updateChatContactPreview(message, await decryptChatContent(message.content, contact), contact);
+                    const groupUpdated = applyGroupSystemEvent(message, contact);
+                    const preview = message.type === 'system'
+                        ? formatChatSystemEvent(message, currentUser)
+                        : await decryptChatContent(message.content, contact);
+                    updateChatContactPreview(message, preview, contact);
+                    if (groupUpdated) loadChatContacts().catch(() => {});
                     markConversationRead(contact).catch(() => {});
                 }).catch(() => {});
             } else {
@@ -1492,7 +1572,10 @@ function setupChatRealtime() {
                     chatGroupUnreadCounts.set(groupId, (chatGroupUnreadCounts.get(groupId) || 0) + 1);
                     updateDockBadge('chat-dock-btn', (chatUnreadCount || 0) + getLocalGroupUnreadCount());
                 }
-                decryptChatPreview(message.content, message.group_id ? { id: message.group_id, group_id: message.group_id, is_group: true } : { id: message.sender_id }).then((preview) => updateChatContactPreview(message, preview, contact)).catch(() => {});
+                const preview = message.type === 'system'
+                    ? Promise.resolve(formatChatSystemEvent(message, currentUser))
+                    : decryptChatPreview(message.content, message.group_id ? { id: message.group_id, group_id: message.group_id, is_group: true } : { id: message.sender_id });
+                preview.then((text) => updateChatContactPreview(message, text, contact)).catch(() => {});
                 loadUnreadChatCount().catch(() => {});
                 loadChatContacts().catch(() => {});
             }
@@ -1567,7 +1650,9 @@ async function loadChatContacts() {
         const isGroup = item.classList.contains('chat-group-contact');
         const conversationId = isGroup ? item.dataset.groupId : item.dataset.userId;
         const source = (isGroup ? groupsSnapshot : contactsSnapshot).find((entry) => String(isGroup ? entry.group_id : entry.id) === String(conversationId));
-        const preview = await decryptChatPreview(source?.latest_message, isGroup ? { id: conversationId, group_id: conversationId, is_group: true } : { id: conversationId });
+        const preview = source?.latest_message_type === 'system'
+            ? formatChatSystemEvent({ type: 'system', content: source.latest_message })
+            : await decryptChatPreview(source?.latest_message, isGroup ? { id: conversationId, group_id: conversationId, is_group: true } : { id: conversationId });
         const summary = item.querySelector('small');
         if (summary && preview) summary.textContent = preview;
     }));
@@ -1801,14 +1886,14 @@ async function renderChatMessages(messages, contact) {
     const previousIds = chatMessageSnapshots.get(snapshotKey);
     const messageIds = new Set((messages || []).map((message) => String(message.id)));
     if (previousIds) {
-        const hasNewIncomingMessage = (messages || []).some((message) => message.sender_id !== currentUser.id && !previousIds.has(String(message.id)));
+        const hasNewIncomingMessage = (messages || []).some((message) => message.type !== 'system' && message.sender_id !== currentUser.id && !previousIds.has(String(message.id)));
         if (hasNewIncomingMessage) playNotificationSound();
     }
     chatMessageSnapshots.set(snapshotKey, messageIds);
     const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
     const displayMessages = await Promise.all((messages || []).map(async (message) => ({
         ...message,
-        content: await decryptChatContent(message.content, contact)
+        content: message.type === 'system' ? message.content : await decryptChatContent(message.content, contact)
     })));
     const formatBytes = (value) => { const size = Number(value) || 0; if (size < 1024) return `${size} B`; if (size < 1048576) return `${Math.round(size / 1024)} KB`; return `${(size / 1048576).toFixed(1)} MB`; };
     const mediaMarkup = (message) => {
@@ -1829,7 +1914,23 @@ async function renderChatMessages(messages, contact) {
     const renderMessageText = (value) => escapeHtml(value).replace(/(https?:\/\/[^\s<]+|\/#post-\d+)/g, '<a class="chat-message-link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
     const starredKey = `aero_starred_chat:${chatConversationKey(contact)}`;
     const starredIds = new Set(JSON.parse(localStorage.getItem(starredKey) || '[]').map(String));
-    box.innerHTML = displayMessages.map((message) => `<div class="chat-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}">${contact.is_group && message.sender_id !== currentUser.id ? `<small class="chat-group-sender">@${escapeHtml(message.sender_username || 'User')}</small>` : ''}<div class="chat-bubble-content">${message.shared_post ? sharedPostMarkup(message.shared_post) : mediaMarkup(message)}${message.type === 'post_share' ? '' : (message.content ? renderMessageText(message.content) : '')}</div><div class="chat-message-meta"><time>${escapeHtml(window.AeroI18n?.formatChatTimestamp?.(message.created_at) || '')}</time><button type="button" class="chat-star-message ${starredIds.has(String(message.id)) ? 'is-starred' : ''}" data-star-message="${message.id}" aria-label="${chatInfoText(starredIds.has(String(message.id)) ? 'unstar_message' : 'star_message')}" aria-pressed="${starredIds.has(String(message.id))}">${starredIds.has(String(message.id)) ? '★' : '☆'}</button>${message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : ''}</div></div>`).join('');
+    const timelineMarkup = [];
+    let previousDateKey = '';
+    displayMessages.forEach((message) => {
+        const dateKey = chatMessageDateKey(message.created_at);
+        if (dateKey && dateKey !== previousDateKey) {
+            const dateLabel = window.AeroI18n?.formatChatDateDivider?.(message.created_at) || '';
+            timelineMarkup.push(`<div class="chat-date-divider" data-date-key="${dateKey}" role="separator"><span>${escapeHtml(dateLabel)}</span></div>`);
+        }
+        previousDateKey = dateKey;
+        if (message.type === 'system') {
+            const eventText = formatChatSystemEvent(message, currentUser);
+            if (eventText) timelineMarkup.push(`<div class="chat-system-message chat-timeline-message" data-message-id="${message.id}" data-chat-date-key="${dateKey}">${escapeHtml(eventText)}</div>`);
+            return;
+        }
+        timelineMarkup.push(`<div class="chat-message chat-timeline-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}" data-chat-date-key="${dateKey}">${contact.is_group && message.sender_id !== currentUser.id ? `<small class="chat-group-sender">@${escapeHtml(message.sender_username || 'User')}</small>` : ''}<div class="chat-bubble-content">${message.shared_post ? sharedPostMarkup(message.shared_post) : mediaMarkup(message)}${message.type === 'post_share' ? '' : (message.content ? renderMessageText(message.content) : '')}</div><div class="chat-message-meta"><time>${escapeHtml(window.AeroI18n?.formatChatTimestamp?.(message.created_at) || '')}</time><button type="button" class="chat-star-message ${starredIds.has(String(message.id)) ? 'is-starred' : ''}" data-star-message="${message.id}" aria-label="${chatInfoText(starredIds.has(String(message.id)) ? 'unstar_message' : 'star_message')}" aria-pressed="${starredIds.has(String(message.id))}">${starredIds.has(String(message.id)) ? '★' : '☆'}</button>${message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : ''}</div></div>`);
+    });
+    box.innerHTML = timelineMarkup.join('');
     box.querySelectorAll('[data-lightbox-src]').forEach((item) => item.addEventListener('click', () => { const lightbox = document.getElementById('chat-lightbox'); const image = document.getElementById('chat-lightbox-image'); image.src = item.dataset.lightboxSrc; lightbox.classList.remove('hidden'); }));
     box.querySelectorAll('[data-delete-message]').forEach((button) => button.addEventListener('click', async () => { const response = await fetch(`${API_BASE}/chat/messages/${button.dataset.deleteMessage}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }); if (response.ok) button.closest('.chat-message')?.remove(); }));
     box.querySelectorAll('[data-star-message]').forEach((button) => button.addEventListener('click', () => {
@@ -1881,7 +1982,7 @@ function setupMediaAndChat() {
     confirmModal.id = 'chat-custom-confirm-modal';
     confirmModal.className = 'modal-overlay custom-confirm-overlay hidden';
     confirmModal.setAttribute('role', 'presentation');
-    confirmModal.innerHTML = `<section class="custom-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="chat-confirm-title" aria-describedby="chat-confirm-description"><header><h2 id="chat-confirm-title"></h2><button type="button" class="drawer-close-btn" data-confirm-cancel aria-label="Close">&times;</button></header><p id="chat-confirm-description"></p><div class="chat-group-actions"><button type="button" class="btn modal-cancel-btn" data-confirm-cancel></button><button type="button" class="btn btn-primary" data-confirm-accept></button></div></section>`;
+    confirmModal.innerHTML = `<section class="custom-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="chat-confirm-title" aria-describedby="chat-confirm-description"><header><h2 id="chat-confirm-title"></h2><button type="button" class="drawer-close-btn" data-confirm-cancel aria-label="Close">&times;</button></header><p id="chat-confirm-description"></p><input id="chat-confirm-input" class="custom-confirm-input hidden" type="text" maxlength="80"><div class="chat-group-actions"><button type="button" class="btn modal-cancel-btn" data-confirm-cancel></button><button type="button" class="btn btn-primary" data-confirm-accept></button></div></section>`;
     document.body.appendChild(confirmModal);
     let confirmResolver = null;
     let confirmReturnFocus = null;
@@ -1891,7 +1992,7 @@ function setupMediaAndChat() {
         confirmResolver = null;
         confirmReturnFocus?.focus?.();
     };
-    const showConfirmModal = ({ title, description, confirmLabel, cancelLabel, danger = true }) => new Promise((resolve) => {
+    const showConfirmModal = ({ title, description, confirmLabel, cancelLabel, danger = true, inputPlaceholder = '', inputValue = '' }) => new Promise((resolve) => {
         confirmResolver = resolve;
         confirmReturnFocus = document.activeElement;
         document.getElementById('chat-confirm-title').textContent = title;
@@ -1899,8 +2000,13 @@ function setupMediaAndChat() {
         confirmModal.querySelector('[data-confirm-accept]').textContent = confirmLabel;
         confirmModal.querySelectorAll('[data-confirm-cancel]').forEach((button) => { button.textContent = cancelLabel; });
         confirmModal.querySelector('[data-confirm-accept]').classList.toggle('delete-confirm-btn', danger);
+        const input = confirmModal.querySelector('#chat-confirm-input');
+        input.classList.toggle('hidden', !inputPlaceholder);
+        input.placeholder = inputPlaceholder;
+        input.setAttribute('aria-label', inputPlaceholder);
+        input.value = inputValue;
         confirmModal.classList.remove('hidden');
-        confirmModal.querySelector('[data-confirm-accept]').focus();
+        (inputPlaceholder ? input : confirmModal.querySelector('[data-confirm-accept]')).focus();
     });
     confirmModal.querySelector('[data-confirm-accept]').addEventListener('click', () => settleConfirm(true));
     confirmModal.querySelectorAll('[data-confirm-cancel]').forEach((button) => button.addEventListener('click', () => settleConfirm(false)));
@@ -1997,6 +2103,10 @@ function setupMediaAndChat() {
         const result = await response.json().catch(() => ({}));
         if (!response.ok) return window.showNotice?.(result.message || chatInfoText('unable_remove_member'), 'error');
         await syncGroupMemberCount(groupId, result.member_count);
+        const activeGroup = activeChatUser || window.activeChatUser;
+        if (activeGroup?.is_group && String(activeGroup.group_id || activeGroup.id) === String(groupId)) {
+            await loadChatMessages({ contact: activeGroup });
+        }
         if (refreshView === 'drawer' && infoDrawer.classList.contains('is-open')) await openInfoDrawer();
         else await openGroupMembers();
         window.showNotice?.(chatInfoText('member_removed'), 'success');
@@ -2016,7 +2126,7 @@ function setupMediaAndChat() {
         if (countLabel) countLabel.textContent = chatInfoText('member_count', { count: data.members.length });
         document.getElementById('chat-group-members-list').innerHTML = data.members.map((member) => {
             const canRemove = canManage && !member.is_admin && Number(member.id) !== Number(data.group.owner_id);
-            return `<div class="chat-group-member">${chatAvatarMarkup(member, 'chat-contact-avatar')}<span><strong>@${escapeHtml(member.username)}</strong>${member.is_admin ? `<small>${chatInfoText('group_admin')}</small>` : `<small>${chatInfoText('member')}</small>`}</span>${canRemove ? `<button type="button" class="group-remove-member-btn" data-remove-member="${member.id}" aria-label="${chatInfoText('remove_member')} @${escapeHtml(member.username)}">${chatInfoText('remove_member')}</button>` : ''}</div>`;
+            return `<div class="chat-group-member">${chatAvatarMarkup(member, 'chat-contact-avatar member-avatar-container')}<span><strong>@${escapeHtml(member.username)}</strong>${member.is_admin ? `<small>${chatInfoText('group_admin')}</small>` : `<small>${chatInfoText('member')}</small>`}</span>${canRemove ? `<button type="button" class="group-remove-member-btn" data-remove-member="${member.id}" aria-label="${chatInfoText('remove_member')} @${escapeHtml(member.username)}">${chatInfoText('remove_member')}</button>` : ''}</div>`;
         }).join('');
         document.getElementById('chat-group-members-list').querySelectorAll('[data-remove-member]').forEach((button) => {
             button.addEventListener('click', () => {
@@ -2098,6 +2208,10 @@ function setupMediaAndChat() {
             if (!response.ok) throw new Error(data.message || chatInfoText('unable_add_members'));
             addMembersModal.classList.add('hidden');
             await syncGroupMemberCount(groupId, data.member_count);
+            const activeGroup = activeChatUser || window.activeChatUser;
+            if (activeGroup?.is_group && String(activeGroup.group_id || activeGroup.id) === String(groupId)) {
+                await loadChatMessages({ contact: activeGroup });
+            }
             await openGroupMembers();
             window.showNotice?.(chatInfoText('members_added'), 'success');
         } catch (error) {
@@ -2273,6 +2387,7 @@ function setupMediaAndChat() {
                     <button type="button" disabled title="${chatInfoText('call_unavailable')}"><span>☎</span>${chatInfoText('voice')}</button>
                     <button type="button" disabled title="${chatInfoText('call_unavailable')}"><span>▣</span>${chatInfoText('video')}</button>
                     ${isGroup ? `<button type="button" data-info-action="add-member" ${canManageGroup(contact) ? '' : `disabled title="${chatInfoText('member_management_unavailable')}"`}><span>＋</span>${chatInfoText('add_member')}</button>` : ''}
+                    ${isGroup && canManageGroup(contact) ? `<button type="button" data-info-action="edit-group"><span>✎</span>${chatInfoText('edit_group')}</button>` : ''}
                     <button type="button" data-info-action="search"><span>⌕</span>${chatInfoText('search')}</button>
                 </div>
                 <label class="chat-info-search hidden"><span class="sr-only">${chatInfoText('search_messages')}</span><input type="search" placeholder="${chatInfoText('search_messages')}"></label>
@@ -2280,7 +2395,7 @@ function setupMediaAndChat() {
                 ${membersMarkup}
                 <section class="chat-info-section chat-info-options">
                     <button type="button" data-info-action="starred">☆ <span>${chatInfoText('starred')}</span></button>
-                    ${!isGroup ? `<button type="button" data-info-action="mute">♧ <span>${chatInfoText(contact.is_muted ? 'unmute' : 'mute')}</span></button><button type="button" data-info-action="block" class="is-danger">${contact.is_blocked ? '<svg class="chat-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="m17 11 2 2 4-4"/></svg>' : '<svg class="chat-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="m17 8 5 5m0-5-5 5"/></svg>'} <span>${chatInfoText(contact.is_blocked ? 'unblock' : 'block')}</span></button>` : `<button type="button" disabled title="${chatInfoText('group_notifications_unavailable')}">♧ <span>${chatInfoText('notification_settings')}</span></button><button type="button" data-info-action="leave" class="is-danger">↪ <span>${chatInfoText('leave')}</span></button><button type="button" class="is-danger" disabled title="${chatInfoText('reporting_unavailable')}">⚑ <span>${chatInfoText('report')}</span></button>`}
+                    ${!isGroup ? `<button type="button" data-info-action="mute">♧ <span>${chatInfoText(contact.is_muted ? 'unmute' : 'mute')}</span></button><button type="button" data-info-action="block" class="is-danger">${contact.is_blocked ? '<svg class="chat-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="m17 11 2 2 4-4"/></svg>' : '<svg class="chat-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="m17 8 5 5m0-5-5 5"/></svg>'} <span>${chatInfoText(contact.is_blocked ? 'unblock' : 'block')}</span></button>` : `<button type="button" disabled title="${chatInfoText('group_notifications_unavailable')}"><svg class="chat-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg><span>${chatInfoText('notification_settings')}</span></button><button type="button" data-info-action="leave" class="is-danger">↪ <span>${chatInfoText('leave')}</span></button><button type="button" class="is-danger" disabled title="${chatInfoText('reporting_unavailable')}">⚑ <span>${chatInfoText('report')}</span></button>`}
                     <button type="button" data-info-action="clear" class="is-danger" disabled title="${chatInfoText('clear_unavailable')}">⌫ <span>${chatInfoText('clear')}</span></button>
                 </section>
             </div>`;
@@ -2305,7 +2420,7 @@ function setupMediaAndChat() {
                     if (!list) return;
                     list.innerHTML = `<div class="chat-info-section-heading"><strong>${chatInfoText('members')}</strong><button type="button" data-info-action="all-members">${chatInfoText('view_all', { count: data.members.length })}</button></div><input class="chat-info-member-search" type="search" placeholder="${chatInfoText('search_members')}" aria-label="${chatInfoText('search_members')}">${data.members.map((member) => {
                         const canRemove = canManageGroup(contact) && !member.is_admin && Number(member.id) !== Number(contact.owner_id);
-                        return `<div class="chat-info-member">${chatAvatarMarkup(member, 'chat-contact-avatar')}<span><strong>@${escapeHtml(member.username || 'User')}</strong><small>${member.is_admin ? chatInfoText('group_admin') : chatInfoText('member')}</small></span>${canRemove ? `<button type="button" class="group-remove-member-btn" data-remove-info-member="${member.id}" aria-label="${chatInfoText('remove_member')} @${escapeHtml(member.username)}">${chatInfoText('remove_member')}</button>` : ''}</div>`;
+                        return `<div class="chat-info-member">${chatAvatarMarkup(member, 'chat-contact-avatar member-avatar-container')}<span><strong>@${escapeHtml(member.username || 'User')}</strong><small>${member.is_admin ? chatInfoText('group_admin') : chatInfoText('member')}</small></span>${canRemove ? `<button type="button" class="group-remove-member-btn" data-remove-info-member="${member.id}" aria-label="${chatInfoText('remove_member')} @${escapeHtml(member.username)}">${chatInfoText('remove_member')}</button>` : ''}</div>`;
                     }).join('')}`;
                     list.querySelector('.chat-info-member-search')?.addEventListener('input', (event) => {
                         const query = event.target.value.toLowerCase();
@@ -2328,6 +2443,36 @@ function setupMediaAndChat() {
             if (!canManageGroup(contact)) return;
             closeInfoDrawer();
             await openAddGroupMembers(contact);
+        });
+        infoDrawer.querySelector('[data-info-action="edit-group"]')?.addEventListener('click', async () => {
+            if (!canManageGroup(contact)) return;
+            const accepted = await showConfirmModal({
+                title: chatInfoText('edit_group_name_title'),
+                description: chatInfoText('edit_group_name_prompt', { group: name }),
+                confirmLabel: chatInfoText('save_group_name'),
+                cancelLabel: window.AeroI18n?.translateValue('Cancel') || 'Cancel',
+                danger: false,
+                inputPlaceholder: chatInfoText('group_name_placeholder'),
+                inputValue: contact.name || ''
+            });
+            if (!accepted) return;
+            const nextName = confirmModal.querySelector('#chat-confirm-input').value.trim();
+            if (!nextName) return window.showNotice?.(chatInfoText('enter_group_name'), 'error');
+            const response = await fetch(`${API_BASE}/chat/groups/${contact.group_id || contact.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` },
+                body: JSON.stringify({ name: nextName })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) return window.showNotice?.(data.message || chatInfoText('unable_update_group'), 'error');
+            contact.name = data.name;
+            contact.username = data.name;
+            contact.member_count = data.member_count;
+            const activeName = document.getElementById('chat-active-name');
+            if (activeName) activeName.textContent = `${contact.name} · ${chatInfoText('member_count', { count: contact.member_count || 0 })}`;
+            await loadChatContacts();
+            await loadChatMessages({ contact });
+            await openInfoDrawer();
         });
         infoDrawer.querySelector('.chat-info-search input')?.addEventListener('input', (event) => {
             const query = event.target.value.toLowerCase();
@@ -2407,6 +2552,10 @@ function setupMediaAndChat() {
             if (!addMembersModal.classList.contains('hidden')) openAddGroupMembers(group);
         } else if (group) {
             setMuteButtonState(document.getElementById('chat-mute-btn'), Boolean(group.is_muted), false);
+        }
+        if (group) {
+            const cachedMessages = messagesCache.get(chatConversationKey(group));
+            if (cachedMessages) renderChatMessages(cachedMessages, group);
         }
         document.querySelectorAll('.chat-group-contact').forEach((item) => {
             const cachedGroup = chatGroupCache.find((candidate) => String(candidate.group_id) === item.dataset.groupId);
@@ -4567,6 +4716,7 @@ function exportPostCard(postId, content, username, details = {}) {
 const threadsPostState = [{ content: '', files: [], gif: '' }];
 let threadsActivePostIndex = 0;
 const staticPollState = { active: false, options: ['', ''], duration: 24 };
+let scheduledPostAt = '';
 const mentionPickerState = { menu: null, timer: null, requestId: 0, items: [], activeIndex: -1, match: null };
 
 function staticPollText(key, values = {}) {
@@ -4875,6 +5025,30 @@ function updateThreadsComposerState() {
     });
     const validPoll = staticPollState.active && staticPollState.options.every((option) => option.trim()) && new Set(staticPollState.options.map((option) => option.trim().toLocaleLowerCase())).size === staticPollState.options.length;
     submitButton.disabled = !threadsPostState.some((post) => post.content.trim() || post.files.length || post.gif) && !validPoll;
+    const addThreadButton = document.getElementById('threads-add-chain-btn');
+    if (addThreadButton) addThreadButton.disabled = !threadsPostState[0]?.content.trim() || staticPollState.active || threadsPostState.length >= 10;
+}
+
+function formatScheduledPostTime(value) {
+    const date = new Date(value);
+    if (!value || Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat(window.AeroI18n?.getLanguage?.() === 'zh' ? 'zh-CN' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+function renderScheduledPostCapsule() {
+    const capsule = document.getElementById('threads-scheduled-capsule');
+    const text = capsule?.querySelector('span');
+    if (!capsule || !text) return;
+    text.textContent = scheduledPostAt ? `⏰ Scheduled for ${formatScheduledPostTime(scheduledPostAt)}` : '';
+    capsule.classList.toggle('hidden', !scheduledPostAt);
+}
+
+function setDefaultScheduleTime() {
+    const input = document.getElementById('threads-scheduled-at');
+    if (!input || input.value) return;
+    const date = new Date(Date.now() + 60 * 60 * 1000);
+    date.setSeconds(0, 0);
+    input.value = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
 function updateThreadsUser() {
@@ -4901,6 +5075,7 @@ function openThreadsCompose(event) {
     const overlay = document.getElementById('threads-compose-overlay');
     if (!overlay) return;
     updateThreadsUser();
+    updateThreadsComposerState();
     overlay.classList.remove('hidden');
     overlay.setAttribute('aria-hidden', 'false');
     document.body.classList.add('threads-compose-open');
@@ -4926,7 +5101,12 @@ function closeThreadsCompose(saveDraft = true) {
     document.getElementById('threads-more-menu')?.classList.add('hidden');
     document.getElementById('threads-topic-menu')?.classList.add('hidden');
     document.getElementById('threads-options-menu')?.classList.add('hidden');
-    document.getElementById('threads-schedule-field')?.classList.add('hidden');
+    document.getElementById('threads-schedule-popover')?.classList.add('hidden');
+    document.getElementById('threads-schedule-btn')?.setAttribute('aria-expanded', 'false');
+    scheduledPostAt = '';
+    const scheduleInput = document.getElementById('threads-scheduled-at');
+    if (scheduleInput) scheduleInput.value = '';
+    renderScheduledPostCapsule();
     document.getElementById('static-composer-poll-builder')?.remove();
     releaseAllThreadPreviews();
     document.getElementById('threads-gif-picker')?.classList.add('hidden');
@@ -4952,11 +5132,11 @@ function closeThreadsCompose(saveDraft = true) {
     const pollButton = overlay.querySelector('[data-threads-action="poll"]');
     pollButton?.classList.remove('is-active');
     if (pollButton) pollButton.disabled = false;
-    document.getElementById('threads-add-chain-btn').disabled = false;
+    document.getElementById('threads-add-chain-btn').disabled = true;
 }
 
 function closeThreadsPanels(exceptId = '') {
-    ['threads-more-menu', 'threads-topic-menu', 'threads-emoji-picker', 'threads-options-menu', 'threads-schedule-field', 'threads-gif-picker'].forEach((id) => {
+    ['threads-more-menu', 'threads-topic-menu', 'threads-emoji-picker', 'threads-options-menu', 'threads-schedule-popover', 'threads-gif-picker'].forEach((id) => {
         if (id !== exceptId) document.getElementById(id)?.classList.add('hidden');
     });
     if (exceptId !== 'threads-more-menu') document.getElementById('threads-more-btn')?.setAttribute('aria-expanded', 'false');
@@ -5130,8 +5310,8 @@ async function publishThreadsPosts() {
         const metadata = {
             reply_permission: document.getElementById('threads-reply-permission').value,
             review_replies: document.getElementById('threads-review-replies').checked,
-            share_to: document.getElementById('threads-share-to').value,
-            scheduled_at: document.getElementById('threads-scheduled-at').value || null,
+            crosspost_target: document.getElementById('threads-share-to').value === 'none' ? [] : [document.getElementById('threads-share-to').value],
+            scheduled_at: scheduledPostAt ? new Date(scheduledPostAt).toISOString() : null,
             topic: document.querySelector('.selected-topic')?.textContent || '',
         };
         const isSinglePost = posts.length === 1;
@@ -5146,6 +5326,7 @@ async function publishThreadsPosts() {
         if (isThreadDebugEnabled()) console.debug('[thread-publish] response:', payload);
         if (!response.ok) throw new Error(payload.message || 'Unable to publish thread');
         closeThreadsCompose(false);
+        window.showNotice?.(metadata.scheduled_at ? 'Post scheduled successfully' : 'Post published successfully', 'success');
         await AeroAPI.renderFeed();
     } catch (publishError) {
         error.textContent = publishError.message || 'Unable to publish thread';
@@ -5163,6 +5344,28 @@ function openCreatePostModal(event) {
 function setupCreatePostExperience() {
     const overlay = document.getElementById('threads-compose-overlay');
     if (!overlay) return;
+    const shareTarget = document.getElementById('threads-share-to');
+    shareTarget?.addEventListener('change', async () => {
+        const provider = shareTarget.value;
+        if (provider === 'none') return;
+        const previous = shareTarget.dataset.previousValue || 'none';
+        shareTarget.dataset.previousValue = provider;
+        try {
+            const response = await fetch(`${API_BASE}/auth/meta/status?provider=${encodeURIComponent(provider)}`, { headers: authHeaders({ Accept: 'application/json' }) });
+            const status = await response.json().catch(() => ({}));
+            if (!response.ok || !status.connected) {
+                const authUrl = status.auth_url || `${API_BASE}/auth/${provider}`;
+                const token = localStorage.getItem('aero_token') || '';
+                const separator = authUrl.includes('?') ? '&' : '?';
+                window.open(`${authUrl}${separator}access_token=${encodeURIComponent(token)}`, 'aero-meta-auth', 'popup,width=520,height=680');
+                window.showNotice?.(`Connect ${provider} before crossposting.`, 'info');
+            }
+        } catch (error) {
+            shareTarget.value = previous;
+            window.showNotice?.(`Unable to check ${provider} connection.`, 'error');
+        }
+    });
+    shareTarget?.addEventListener('focus', () => { shareTarget.dataset.previousValue = shareTarget.value; });
     updateStaticPollLanguage(overlay);
     window.addEventListener('aero:language-change', () => updateStaticPollLanguage(overlay));
     if (!mentionPickerState.menu) {
@@ -5193,7 +5396,7 @@ function setupCreatePostExperience() {
     document.getElementById('threads-add-chain-btn')?.addEventListener('click', () => {
         closeThreadsPanels();
         updateThreadsComposerState();
-        if (threadsPostState.length >= 10) return;
+        if (threadsPostState.length >= 10 || !threadsPostState[0]?.content.trim()) return;
         threadsPostState.push({ content: '', files: [], gif: '' });
         renderThreadChildren();
         overlay.querySelector('.threads-post-item:last-child .threads-textarea')?.focus();
@@ -5291,10 +5494,13 @@ function setupCreatePostExperience() {
             if (textarea) { textarea.value += `${textarea.value ? ' ' : ''}#Aero`; updateThreadsComposerState(); }
         }
         if (action === 'schedule') {
-            const field = document.getElementById('threads-schedule-field');
-            const opening = field.classList.contains('hidden');
-            closeThreadsPanels(opening ? 'threads-schedule-field' : '');
-            field.classList.toggle('hidden', !opening);
+            const popover = document.getElementById('threads-schedule-popover');
+            const button = document.getElementById('threads-schedule-btn');
+            const opening = popover.classList.contains('hidden');
+            closeThreadsPanels(opening ? 'threads-schedule-popover' : '');
+            if (opening) setDefaultScheduleTime();
+            popover.classList.toggle('hidden', !opening);
+            button?.setAttribute('aria-expanded', String(opening));
         }
         if (event.target.closest('#threads-more-btn')) {
             const panel = document.getElementById('threads-more-menu');
@@ -5321,6 +5527,25 @@ function setupCreatePostExperience() {
             closeThreadsPanels(opening ? 'threads-options-menu' : '');
             panel.classList.toggle('hidden', !opening);
             event.target.closest('#threads-options-btn').setAttribute('aria-expanded', String(opening));
+        }
+        if (event.target.closest('#threads-schedule-save')) {
+            const value = document.getElementById('threads-scheduled-at').value;
+            const date = new Date(value);
+            if (!value || Number.isNaN(date.getTime()) || date <= new Date()) {
+                const error = document.getElementById('threads-compose-error');
+                error.textContent = 'Choose a future date and time.';
+                error.classList.remove('hidden');
+                return;
+            }
+            scheduledPostAt = value;
+            renderScheduledPostCapsule();
+            closeThreadsPanels();
+        }
+        if (event.target.closest('#threads-schedule-cancel')) closeThreadsPanels();
+        if (event.target.closest('#threads-scheduled-clear')) {
+            scheduledPostAt = '';
+            document.getElementById('threads-scheduled-at').value = '';
+            renderScheduledPostCapsule();
         }
         if (event.target.closest('#threads-drafts-btn')) {
             closeThreadsPanels();

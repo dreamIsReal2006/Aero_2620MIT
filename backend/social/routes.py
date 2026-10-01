@@ -177,6 +177,69 @@ def toggle_follow(current_user, user_id):
     }), 200
 
 
+@social_bp.get("/users/<int:user_id>/follows")
+@optional_token
+def get_user_follows(current_user, user_id):
+    profile_user = db.session.get(User, user_id)
+    if not profile_user:
+        return jsonify({"message": "User not found"}), 404
+    if profile_user.is_private and not can_view_user_content(current_user, profile_user):
+        return jsonify({"message": "This profile is private"}), 403
+
+    relationship_type = str(request.args.get("type", "followers")).strip().lower()
+    if relationship_type not in {"followers", "following"}:
+        return jsonify({"message": "Type must be followers or following"}), 400
+    relation_column = Follow.following_id if relationship_type == "followers" else Follow.follower_id
+    rows = Follow.query.filter(
+        relation_column == user_id,
+        Follow.status == "approved",
+    ).order_by(Follow.created_at.desc()).all()
+    related_ids = [row.follower_id if relationship_type == "followers" else row.following_id for row in rows]
+    users = User.query.filter(
+        User.id.in_(related_ids), User.active.is_(True), User.is_banned.is_(False)
+    ).all() if related_ids else []
+    users_by_id = {user.id: user for user in users}
+
+    viewer_following_ids = set()
+    viewer_follower_ids = set()
+    if current_user and related_ids:
+        viewer_following_ids = {
+            row.following_id for row in Follow.query.filter(
+                Follow.follower_id == current_user.id,
+                Follow.following_id.in_(related_ids),
+                Follow.status == "approved",
+            ).all()
+        }
+        viewer_follower_ids = {
+            row.follower_id for row in Follow.query.filter(
+                Follow.follower_id.in_(related_ids),
+                Follow.following_id == current_user.id,
+                Follow.status == "approved",
+            ).all()
+        }
+
+    result = []
+    for related_id in related_ids:
+        user = users_by_id.get(related_id)
+        if not user:
+            continue
+        result.append({
+            "id": user.id,
+            "username": user.username,
+            "display_name": user.display_name or user.username,
+            "avatar_url": user.avatar_url or "",
+            "is_following": user.id in viewer_following_ids,
+            "is_followed_by": user.id in viewer_follower_ids,
+        })
+    return jsonify({
+        "type": relationship_type,
+        "users": result,
+        "total": len(result),
+        "followers_count": Follow.query.filter_by(following_id=user_id, status="approved").count(),
+        "following_count": Follow.query.filter_by(follower_id=user_id, status="approved").count(),
+    }), 200
+
+
 @social_bp.get("/users/<int:user_id>/profile")
 @token_required
 def get_profile(current_user, user_id):
