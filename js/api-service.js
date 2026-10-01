@@ -1322,6 +1322,7 @@ function setupNotificationDrawer() {
 let activeChatUser = null;
 let chatContactCache = [];
 let chatGroupCache = [];
+let chatContactsLoadVersion = 0;
 let chatRealtimeChannel = null;
 let feedRenderRequestId = 0;
 let appStateInitialized = false;
@@ -1524,29 +1525,52 @@ async function loadShortVideos() {
 async function loadChatContacts() {
     const list = document.getElementById('chat-contacts-list');
     if (!list) return;
+    const loadVersion = ++chatContactsLoadVersion;
+    if (!list.dataset.contactClickListener) {
+        list.dataset.contactClickListener = 'true';
+        list.addEventListener('click', (event) => {
+            const item = event.target.closest('.chat-contact');
+            if (!item || !list.contains(item)) return;
+            if (item.classList.contains('chat-group-contact')) {
+                selectChatGroup(chatGroupCache.find((group) => String(group.group_id) === item.dataset.groupId));
+            } else {
+                selectChatContact(chatContactCache.find((contact) => String(contact.id) === item.dataset.userId));
+            }
+        });
+    }
     const headers = { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` };
     const [contactsResponse, groupsResponse] = await Promise.all([
         fetch(`${API_BASE}/chat/contacts`, { headers }),
         fetch(`${API_BASE}/chat/groups`, { headers })
     ]);
-    chatContactCache = contactsResponse.ok ? await contactsResponse.json() : [];
-    chatGroupCache = groupsResponse.ok ? await groupsResponse.json() : [];
-    const contactMarkup = (chatContactCache || []).map((contact) => {
+    const [contacts, groups] = await Promise.all([
+        contactsResponse.ok ? contactsResponse.json().catch(() => null) : Promise.resolve(null),
+        groupsResponse.ok ? groupsResponse.json().catch(() => null) : Promise.resolve(null)
+    ]);
+    if (loadVersion !== chatContactsLoadVersion) return;
+    const hasContacts = Array.isArray(contacts);
+    const hasGroups = Array.isArray(groups);
+    if (hasContacts) chatContactCache = contacts;
+    if (hasGroups) chatGroupCache = groups;
+    if (!hasContacts && !hasGroups) return;
+    const contactsSnapshot = chatContactCache;
+    const groupsSnapshot = chatGroupCache;
+    const previousScrollTop = list.scrollTop;
+    const contactMarkup = contactsSnapshot.map((contact) => {
         const avatar = chatAvatarMarkup(contact, `chat-contact-avatar${contact.is_online ? ' is-online' : ''}`);
         return `<button type="button" class="chat-contact ${contact.unread_count ? 'unread' : ''}" data-user-id="${contact.id}">${avatar}<span><strong>@${escapeHtml(contact.username)}</strong><small>${escapeHtml(contact.latest_message || 'Start a conversation')}</small><time>${escapeHtml(formatRelativeTime(contact.latest_message_at))}</time></span></button>`;
     }).join('');
-    const groupMarkup = (chatGroupCache || []).map((group) => `<button type="button" class="chat-contact chat-group-contact" data-group-id="${group.group_id}">${chatAvatarMarkup(group, 'chat-contact-avatar')}<span><strong>${escapeHtml(group.name)}</strong><small>${escapeHtml(group.latest_message || chatInfoText('member_count', { count: group.member_count || 0 }))}</small><time>${escapeHtml(formatRelativeTime(group.latest_message_at))}</time></span></button>`).join('');
+    const groupMarkup = groupsSnapshot.map((group) => `<button type="button" class="chat-contact chat-group-contact" data-group-id="${group.group_id}">${chatAvatarMarkup(group, 'chat-contact-avatar')}<span><strong>${escapeHtml(group.name)}</strong><small>${escapeHtml(group.latest_message || chatInfoText('member_count', { count: group.member_count || 0 }))}</small><time>${escapeHtml(formatRelativeTime(group.latest_message_at))}</time></span></button>`).join('');
     list.innerHTML = `${groupMarkup}${contactMarkup}` || '<div class="bookmarks-empty">No contacts yet.</div>';
+    list.scrollTop = Math.min(previousScrollTop, list.scrollHeight);
     await Promise.all([...list.querySelectorAll('.chat-contact')].map(async (item) => {
         const isGroup = item.classList.contains('chat-group-contact');
         const conversationId = isGroup ? item.dataset.groupId : item.dataset.userId;
-        const source = (isGroup ? chatGroupCache : chatContactCache).find((entry) => String(isGroup ? entry.group_id : entry.id) === String(conversationId));
+        const source = (isGroup ? groupsSnapshot : contactsSnapshot).find((entry) => String(isGroup ? entry.group_id : entry.id) === String(conversationId));
         const preview = await decryptChatPreview(source?.latest_message, isGroup ? { id: conversationId, group_id: conversationId, is_group: true } : { id: conversationId });
         const summary = item.querySelector('small');
         if (summary && preview) summary.textContent = preview;
     }));
-    list.querySelectorAll('.chat-group-contact').forEach((item) => item.addEventListener('click', () => selectChatGroup(chatGroupCache.find((group) => String(group.group_id) === item.dataset.groupId))));
-    list.querySelectorAll('.chat-contact:not(.chat-group-contact)').forEach((item) => item.addEventListener('click', () => selectChatContact(chatContactCache.find((contact) => String(contact.id) === item.dataset.userId))));
 }
 
 async function loadUnreadChatCount() {
@@ -1841,8 +1865,54 @@ function setupMediaAndChat() {
     document.getElementById('chat-contact-search')?.addEventListener('input', (event) => document.querySelectorAll('.chat-contact').forEach((item) => item.classList.toggle('hidden', !item.textContent.toLowerCase().includes(event.target.value.toLowerCase()))));
     const newGroupModal = document.getElementById('chat-new-group-modal');
     const membersModal = document.getElementById('chat-group-members-modal');
+    if (membersModal && membersModal.parentElement !== document.body) document.body.appendChild(membersModal);
+    membersModal?.classList.add('view-all-modal-overlay');
     if (newGroupModal && newGroupModal.parentElement !== document.body) document.body.appendChild(newGroupModal);
     newGroupModal?.classList.add('new-group-modal-overlay');
+    const addMembersModal = document.createElement('div');
+    addMembersModal.id = 'chat-add-members-modal';
+    addMembersModal.className = 'modal-overlay group-member-modal-overlay hidden';
+    addMembersModal.setAttribute('role', 'dialog');
+    addMembersModal.setAttribute('aria-modal', 'true');
+    addMembersModal.setAttribute('aria-labelledby', 'chat-add-members-title');
+    addMembersModal.innerHTML = `<section class="chat-group-modal group-management-dialog"><div class="drawer-section-header"><h2 id="chat-add-members-title"></h2><button type="button" class="drawer-close-btn" data-close-add-members aria-label="Close">&times;</button></div><label class="sr-only" for="chat-add-members-search"></label><input id="chat-add-members-search" class="chat-group-name" type="search" autocomplete="off"><form id="chat-add-members-form"><div id="chat-add-members-list" class="chat-group-contact-picker"></div><p id="chat-add-members-feedback" class="field-error" role="alert"></p><div class="chat-group-actions"><button type="button" class="btn modal-cancel-btn" data-close-add-members></button><button type="submit" class="btn btn-primary" disabled></button></div></form></section>`;
+    document.body.appendChild(addMembersModal);
+    const confirmModal = document.createElement('div');
+    confirmModal.id = 'chat-custom-confirm-modal';
+    confirmModal.className = 'modal-overlay custom-confirm-overlay hidden';
+    confirmModal.setAttribute('role', 'presentation');
+    confirmModal.innerHTML = `<section class="custom-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="chat-confirm-title" aria-describedby="chat-confirm-description"><header><h2 id="chat-confirm-title"></h2><button type="button" class="drawer-close-btn" data-confirm-cancel aria-label="Close">&times;</button></header><p id="chat-confirm-description"></p><div class="chat-group-actions"><button type="button" class="btn modal-cancel-btn" data-confirm-cancel></button><button type="button" class="btn btn-primary" data-confirm-accept></button></div></section>`;
+    document.body.appendChild(confirmModal);
+    let confirmResolver = null;
+    let confirmReturnFocus = null;
+    const settleConfirm = (accepted) => {
+        confirmModal.classList.add('hidden');
+        confirmResolver?.(accepted);
+        confirmResolver = null;
+        confirmReturnFocus?.focus?.();
+    };
+    const showConfirmModal = ({ title, description, confirmLabel, cancelLabel, danger = true }) => new Promise((resolve) => {
+        confirmResolver = resolve;
+        confirmReturnFocus = document.activeElement;
+        document.getElementById('chat-confirm-title').textContent = title;
+        document.getElementById('chat-confirm-description').textContent = description;
+        confirmModal.querySelector('[data-confirm-accept]').textContent = confirmLabel;
+        confirmModal.querySelectorAll('[data-confirm-cancel]').forEach((button) => { button.textContent = cancelLabel; });
+        confirmModal.querySelector('[data-confirm-accept]').classList.toggle('delete-confirm-btn', danger);
+        confirmModal.classList.remove('hidden');
+        confirmModal.querySelector('[data-confirm-accept]').focus();
+    });
+    confirmModal.querySelector('[data-confirm-accept]').addEventListener('click', () => settleConfirm(true));
+    confirmModal.querySelectorAll('[data-confirm-cancel]').forEach((button) => button.addEventListener('click', () => settleConfirm(false)));
+    confirmModal.addEventListener('click', (event) => { if (event.target === confirmModal) settleConfirm(false); });
+    addMembersModal.querySelectorAll('[data-close-add-members]').forEach((button) => button.addEventListener('click', () => addMembersModal.classList.add('hidden')));
+    addMembersModal.addEventListener('click', (event) => { if (event.target === addMembersModal) addMembersModal.classList.add('hidden'); });
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        if (!confirmModal.classList.contains('hidden')) settleConfirm(false);
+        if (!addMembersModal.classList.contains('hidden')) addMembersModal.classList.add('hidden');
+        if (!membersModal?.classList.contains('hidden')) membersModal.classList.add('hidden');
+    });
     const translateNewGroupModal = () => {
         const translate = (value) => window.AeroI18n?.translateValue(value) || value;
         const title = document.getElementById('chat-new-group-title');
@@ -1897,17 +1967,64 @@ function setupMediaAndChat() {
             await selectChatGroup(data);
         } catch (error) { if (feedback) feedback.textContent = error.message; }
     });
+    const currentChatUser = () => JSON.parse(localStorage.getItem('aero_user') || '{}');
+    const canManageGroup = (group, user = currentChatUser()) => Number(group?.owner_id) === Number(user.id) || Boolean(group?.is_admin);
+    const syncGroupMemberCount = async (groupId, memberCount) => {
+        const id = String(groupId);
+        const count = Number(memberCount) || 0;
+        const activeGroup = activeChatUser || window.activeChatUser;
+        if (activeGroup?.is_group && String(activeGroup.group_id || activeGroup.id) === id) {
+            activeGroup.member_count = count;
+            const activeName = document.getElementById('chat-active-name');
+            if (activeName) activeName.textContent = `${activeGroup.name} · ${chatInfoText('member_count', { count })}`;
+        }
+        const cachedGroup = chatGroupCache.find((item) => String(item.group_id) === id);
+        if (cachedGroup) cachedGroup.member_count = count;
+        await loadChatContacts().catch(() => {});
+    };
+    const removeGroupMember = async (groupId, member, refreshView) => {
+        const accepted = await showConfirmModal({
+            title: chatInfoText('confirm_remove_member_title'),
+            description: chatInfoText('confirm_remove_member', { user: member.username || 'this user' }),
+            confirmLabel: chatInfoText('remove_member'),
+            cancelLabel: window.AeroI18n?.translateValue('Cancel') || 'Cancel'
+        });
+        if (!accepted) return;
+        const response = await fetch(`${API_BASE}/chat/groups/${groupId}/members/${member.id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) return window.showNotice?.(result.message || chatInfoText('unable_remove_member'), 'error');
+        await syncGroupMemberCount(groupId, result.member_count);
+        if (refreshView === 'drawer' && infoDrawer.classList.contains('is-open')) await openInfoDrawer();
+        else await openGroupMembers();
+        window.showNotice?.(chatInfoText('member_removed'), 'success');
+    };
     const openGroupMembers = async () => {
-        const group = activeChatUser;
+        const group = activeChatUser || window.activeChatUser;
         if (!group?.is_group) return;
-        const response = await fetch(`${API_BASE}/chat/groups/${group.group_id || group.id}/members`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
+        const groupId = group.group_id || group.id;
+        const response = await fetch(`${API_BASE}/chat/groups/${groupId}/members`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) return window.showNotice?.(data.message || chatInfoText('unable_load_group_members'), 'error');
-        document.getElementById('chat-group-members-title').textContent = data.group.name;
-        document.getElementById('chat-group-member-count').textContent = chatInfoText('member_count', { count: data.members.length });
-        document.getElementById('chat-group-members-list').innerHTML = data.members.map((member) => `<div class="chat-group-member">${chatAvatarMarkup(member, 'chat-contact-avatar')}<span><strong>@${escapeHtml(member.username)}</strong>${member.is_admin ? `<small>${chatInfoText('group_admin')}</small>` : ''}</span></div>`).join('');
-        const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
-        const isOwner = Number(data.group.owner_id) === Number(currentUser.id);
+        const user = currentChatUser();
+        const canManage = canManageGroup(data.group, user);
+        const title = document.getElementById('chat-group-members-title');
+        const countLabel = document.getElementById('chat-group-member-count');
+        if (title) title.textContent = chatInfoText('view_members');
+        if (countLabel) countLabel.textContent = chatInfoText('member_count', { count: data.members.length });
+        document.getElementById('chat-group-members-list').innerHTML = data.members.map((member) => {
+            const canRemove = canManage && !member.is_admin && Number(member.id) !== Number(data.group.owner_id);
+            return `<div class="chat-group-member">${chatAvatarMarkup(member, 'chat-contact-avatar')}<span><strong>@${escapeHtml(member.username)}</strong>${member.is_admin ? `<small>${chatInfoText('group_admin')}</small>` : `<small>${chatInfoText('member')}</small>`}</span>${canRemove ? `<button type="button" class="group-remove-member-btn" data-remove-member="${member.id}" aria-label="${chatInfoText('remove_member')} @${escapeHtml(member.username)}">${chatInfoText('remove_member')}</button>` : ''}</div>`;
+        }).join('');
+        document.getElementById('chat-group-members-list').querySelectorAll('[data-remove-member]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const member = data.members.find((item) => String(item.id) === button.dataset.removeMember);
+                if (member) removeGroupMember(groupId, member, 'members');
+            });
+        });
+        const isOwner = Number(data.group.owner_id) === Number(user.id);
         const deleteButton = document.getElementById('chat-group-delete-btn');
         const leaveButton = document.getElementById('chat-group-leave-btn');
         deleteButton?.classList.toggle('hidden', !isOwner);
@@ -1916,6 +2033,78 @@ function setupMediaAndChat() {
         if (leaveButton) leaveButton.textContent = chatInfoText('leave_group');
         membersModal?.classList.remove('hidden');
     };
+    const openAddGroupMembers = async (group) => {
+        if (!group?.is_group) return;
+        const groupId = group.group_id || group.id;
+        const headers = { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` };
+        const [, response] = await Promise.all([
+            loadChatContacts(),
+            fetch(`${API_BASE}/chat/groups/${groupId}/members`, { headers })
+        ]);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) return window.showNotice?.(data.message || chatInfoText('unable_load_group_members'), 'error');
+        if (!canManageGroup(data.group)) return window.showNotice?.(chatInfoText('member_management_unavailable'), 'error');
+        const currentMembers = new Set(data.members.map((member) => String(member.id)));
+        const availableContacts = chatContactCache.filter((contact) => !currentMembers.has(String(contact.id)) && Number(contact.id) !== Number(currentChatUser().id));
+        const title = addMembersModal.querySelector('#chat-add-members-title');
+        const search = addMembersModal.querySelector('#chat-add-members-search');
+        const list = addMembersModal.querySelector('#chat-add-members-list');
+        const feedback = addMembersModal.querySelector('#chat-add-members-feedback');
+        const submit = addMembersModal.querySelector('button[type="submit"]');
+        const closeButtons = addMembersModal.querySelectorAll('[data-close-add-members]');
+        title.textContent = chatInfoText('add_members_title');
+        search.placeholder = chatInfoText('search_contacts');
+        search.setAttribute('aria-label', chatInfoText('search_contacts'));
+        addMembersModal.querySelector('label[for="chat-add-members-search"]').textContent = chatInfoText('search_contacts');
+        closeButtons[0].setAttribute('aria-label', window.AeroI18n?.translateValue('Close') || 'Close');
+        closeButtons[1].textContent = window.AeroI18n?.translateValue('Cancel') || 'Cancel';
+        submit.textContent = chatInfoText('confirm_add_members');
+        feedback.textContent = '';
+        list.innerHTML = availableContacts.length
+            ? availableContacts.map((contact) => `<label class="chat-group-contact-option"><input type="checkbox" value="${contact.id}">${chatAvatarMarkup(contact, 'chat-contact-avatar')}<span>@${escapeHtml(contact.username)}</span></label>`).join('')
+            : `<p class="chat-info-empty">${chatInfoText('no_available_members')}</p>`;
+        const updateSelection = () => {
+            const selected = list.querySelectorAll('input:checked').length;
+            submit.disabled = selected === 0;
+            submit.textContent = `${chatInfoText('confirm_add_members')}${selected ? ` (${selected})` : ''}`;
+        };
+        list.onchange = updateSelection;
+        search.value = '';
+        search.oninput = () => {
+            const query = search.value.trim().toLowerCase();
+            list.querySelectorAll('.chat-group-contact-option').forEach((option) => {
+                option.classList.toggle('hidden', !option.textContent.toLowerCase().includes(query));
+            });
+        };
+        addMembersModal.dataset.groupId = String(groupId);
+        addMembersModal.classList.remove('hidden');
+        search.focus();
+    };
+    addMembersModal.querySelector('#chat-add-members-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const groupId = addMembersModal.dataset.groupId;
+        const userIds = [...addMembersModal.querySelectorAll('#chat-add-members-list input:checked')].map((input) => Number(input.value));
+        const feedback = addMembersModal.querySelector('#chat-add-members-feedback');
+        const submit = addMembersModal.querySelector('button[type="submit"]');
+        if (!userIds.length) return;
+        submit.disabled = true;
+        try {
+            const response = await fetch(`${API_BASE}/chat/groups/${groupId}/members`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` },
+                body: JSON.stringify({ user_ids: userIds })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || chatInfoText('unable_add_members'));
+            addMembersModal.classList.add('hidden');
+            await syncGroupMemberCount(groupId, data.member_count);
+            await openGroupMembers();
+            window.showNotice?.(chatInfoText('members_added'), 'success');
+        } catch (error) {
+            feedback.textContent = error.message || chatInfoText('unable_add_members');
+            submit.disabled = false;
+        }
+    });
     const chatPanel = document.querySelector('#view-chat .chat-panel');
     const infoBackdrop = document.createElement('button');
     infoBackdrop.type = 'button';
@@ -2083,7 +2272,7 @@ function setupMediaAndChat() {
                 <div class="chat-info-actions">
                     <button type="button" disabled title="${chatInfoText('call_unavailable')}"><span>☎</span>${chatInfoText('voice')}</button>
                     <button type="button" disabled title="${chatInfoText('call_unavailable')}"><span>▣</span>${chatInfoText('video')}</button>
-                    ${isGroup ? `<button type="button" data-info-action="add-member" disabled title="${chatInfoText('member_management_unavailable')}"><span>＋</span>${chatInfoText('add_member')}</button>` : ''}
+                    ${isGroup ? `<button type="button" data-info-action="add-member" ${canManageGroup(contact) ? '' : `disabled title="${chatInfoText('member_management_unavailable')}"`}><span>＋</span>${chatInfoText('add_member')}</button>` : ''}
                     <button type="button" data-info-action="search"><span>⌕</span>${chatInfoText('search')}</button>
                 </div>
                 <label class="chat-info-search hidden"><span class="sr-only">${chatInfoText('search_messages')}</span><input type="search" placeholder="${chatInfoText('search_messages')}"></label>
@@ -2091,7 +2280,7 @@ function setupMediaAndChat() {
                 ${membersMarkup}
                 <section class="chat-info-section chat-info-options">
                     <button type="button" data-info-action="starred">☆ <span>${chatInfoText('starred')}</span></button>
-                    ${!isGroup ? `<button type="button" data-info-action="mute">♧ <span>${chatInfoText(contact.is_muted ? 'unmute' : 'mute')}</span></button><button type="button" data-info-action="block" class="is-danger">${contact.is_blocked ? '🔓' : '🚫'} <span>${chatInfoText(contact.is_blocked ? 'unblock' : 'block')}</span></button>` : `<button type="button" disabled title="${chatInfoText('group_notifications_unavailable')}">♧ <span>${chatInfoText('notification_settings')}</span></button><button type="button" data-info-action="leave" class="is-danger">↪ <span>${chatInfoText('leave')}</span></button><button type="button" class="is-danger" disabled title="${chatInfoText('reporting_unavailable')}">⚑ <span>${chatInfoText('report')}</span></button>`}
+                    ${!isGroup ? `<button type="button" data-info-action="mute">♧ <span>${chatInfoText(contact.is_muted ? 'unmute' : 'mute')}</span></button><button type="button" data-info-action="block" class="is-danger">${contact.is_blocked ? '<svg class="chat-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="m17 11 2 2 4-4"/></svg>' : '<svg class="chat-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="m17 8 5 5m0-5-5 5"/></svg>'} <span>${chatInfoText(contact.is_blocked ? 'unblock' : 'block')}</span></button>` : `<button type="button" disabled title="${chatInfoText('group_notifications_unavailable')}">♧ <span>${chatInfoText('notification_settings')}</span></button><button type="button" data-info-action="leave" class="is-danger">↪ <span>${chatInfoText('leave')}</span></button><button type="button" class="is-danger" disabled title="${chatInfoText('reporting_unavailable')}">⚑ <span>${chatInfoText('report')}</span></button>`}
                     <button type="button" data-info-action="clear" class="is-danger" disabled title="${chatInfoText('clear_unavailable')}">⌫ <span>${chatInfoText('clear')}</span></button>
                 </section>
             </div>`;
@@ -2114,12 +2303,19 @@ function setupMediaAndChat() {
                 .then((data) => {
                     const list = infoDrawer.querySelector('.chat-info-members');
                     if (!list) return;
-                    list.innerHTML = `<div class="chat-info-section-heading"><strong>${chatInfoText('members')}</strong><button type="button" data-info-action="all-members">${chatInfoText('view_all', { count: data.members.length })}</button></div><input class="chat-info-member-search" type="search" placeholder="${chatInfoText('search_members')}" aria-label="${chatInfoText('search_members')}">${data.members.map((member) => `<div class="chat-info-member">${chatAvatarMarkup(member, 'chat-contact-avatar')}<span><strong>@${escapeHtml(member.username || 'User')}</strong><small>${member.is_admin ? chatInfoText('group_admin') : chatInfoText('member')}</small></span></div>`).join('')}`;
+                    list.innerHTML = `<div class="chat-info-section-heading"><strong>${chatInfoText('members')}</strong><button type="button" data-info-action="all-members">${chatInfoText('view_all', { count: data.members.length })}</button></div><input class="chat-info-member-search" type="search" placeholder="${chatInfoText('search_members')}" aria-label="${chatInfoText('search_members')}">${data.members.map((member) => {
+                        const canRemove = canManageGroup(contact) && !member.is_admin && Number(member.id) !== Number(contact.owner_id);
+                        return `<div class="chat-info-member">${chatAvatarMarkup(member, 'chat-contact-avatar')}<span><strong>@${escapeHtml(member.username || 'User')}</strong><small>${member.is_admin ? chatInfoText('group_admin') : chatInfoText('member')}</small></span>${canRemove ? `<button type="button" class="group-remove-member-btn" data-remove-info-member="${member.id}" aria-label="${chatInfoText('remove_member')} @${escapeHtml(member.username)}">${chatInfoText('remove_member')}</button>` : ''}</div>`;
+                    }).join('')}`;
                     list.querySelector('.chat-info-member-search')?.addEventListener('input', (event) => {
                         const query = event.target.value.toLowerCase();
                         list.querySelectorAll('.chat-info-member').forEach((member) => member.classList.toggle('hidden', !member.textContent.toLowerCase().includes(query)));
                     });
                     list.querySelector('[data-info-action="all-members"]')?.addEventListener('click', () => { closeInfoDrawer(); openGroupMembers(); });
+                    list.querySelectorAll('[data-remove-info-member]').forEach((button) => button.addEventListener('click', () => {
+                        const member = data.members.find((item) => String(item.id) === button.dataset.removeInfoMember);
+                        if (member) removeGroupMember(contact.group_id || contact.id, member, 'drawer');
+                    }));
                 })
                 .catch(() => { const list = infoDrawer.querySelector('.chat-info-members'); if (list) list.innerHTML = `<p class="chat-info-empty">${chatInfoText('unable_load_members')}</p>`; });
         }
@@ -2127,6 +2323,11 @@ function setupMediaAndChat() {
             const search = infoDrawer.querySelector('.chat-info-search');
             search?.classList.toggle('hidden');
             search?.querySelector('input')?.focus();
+        });
+        infoDrawer.querySelector('[data-info-action="add-member"]')?.addEventListener('click', async () => {
+            if (!canManageGroup(contact)) return;
+            closeInfoDrawer();
+            await openAddGroupMembers(contact);
         });
         infoDrawer.querySelector('.chat-info-search input')?.addEventListener('input', (event) => {
             const query = event.target.value.toLowerCase();
@@ -2144,7 +2345,14 @@ function setupMediaAndChat() {
         });
         infoDrawer.querySelector('[data-info-action="block"]')?.addEventListener('click', async () => {
             const wasBlocked = Boolean(contact.is_blocked);
-            if (!window.confirm(chatInfoText(wasBlocked ? 'confirm_unblock' : 'confirm_block', { user: contact.username || 'this user' }))) return;
+            const accepted = await showConfirmModal({
+                title: chatInfoText(wasBlocked ? 'confirm_unblock_title' : 'confirm_block_title'),
+                description: chatInfoText(wasBlocked ? 'confirm_unblock' : 'confirm_block', { user: contact.username || 'this user' }),
+                confirmLabel: chatInfoText(wasBlocked ? 'unblock' : 'block'),
+                cancelLabel: window.AeroI18n?.translateValue('Cancel') || 'Cancel',
+                danger: !wasBlocked
+            });
+            if (!accepted) return;
             const response = await fetch(`${API_BASE}/chat/contacts/${contact.id}/block`, {
                 method: wasBlocked ? 'DELETE' : 'POST',
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` }
@@ -2156,7 +2364,13 @@ function setupMediaAndChat() {
             loadChatContacts();
         });
         infoDrawer.querySelector('[data-info-action="leave"]')?.addEventListener('click', async () => {
-            if (!window.confirm(chatInfoText('confirm_leave', { group: name }))) return;
+            const accepted = await showConfirmModal({
+                title: chatInfoText('confirm_leave_title'),
+                description: chatInfoText('confirm_leave', { group: name }),
+                confirmLabel: chatInfoText('leave_group'),
+                cancelLabel: window.AeroI18n?.translateValue('Cancel') || 'Cancel'
+            });
+            if (!accepted) return;
             const response = await fetch(`${API_BASE}/chat/groups/${contact.group_id || contact.id}/leave`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } });
             if (!response.ok) return window.showNotice?.(chatInfoText('unable_leave'), 'error');
             closeInfoDrawer();
@@ -2190,6 +2404,7 @@ function setupMediaAndChat() {
             const activeName = document.getElementById('chat-active-name');
             if (activeName) activeName.textContent = `${group.name} · ${chatInfoText('member_count', { count: group.member_count || 0 })}`;
             if (!membersModal?.classList.contains('hidden')) openGroupMembers();
+            if (!addMembersModal.classList.contains('hidden')) openAddGroupMembers(group);
         } else if (group) {
             setMuteButtonState(document.getElementById('chat-mute-btn'), Boolean(group.is_muted), false);
         }

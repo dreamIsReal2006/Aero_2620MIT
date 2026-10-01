@@ -71,6 +71,7 @@ def _user_payload(user, viewer_id=None):
 
 def _group_payload(group, current_user_id):
     latest = Message.query.filter_by(group_id=group.id).order_by(Message.created_at.desc()).first()
+    membership = ChatGroupMember.query.filter_by(group_id=group.id, user_id=current_user_id).first()
     unread_count = Message.query.filter(
         Message.group_id == group.id,
         Message.recipient_id == current_user_id,
@@ -90,6 +91,7 @@ def _group_payload(group, current_user_id):
         "latest_message_at": f"{latest.created_at.isoformat()}Z" if latest else "",
         "unread_count": unread_count,
         "is_owner": group.owner_id == current_user_id,
+        "is_admin": bool(membership and membership.is_admin),
     }
 
 
@@ -261,6 +263,69 @@ def get_group_members(current_user, group_id):
     return jsonify({
         "group": _group_payload(group, current_user.id),
         "members": [{**_user_payload(member.user, current_user.id), "is_admin": member.is_admin} for member in members],
+    })
+
+
+@chat_bp.post("/chat/groups/<int:group_id>/members")
+@token_required
+def add_group_members(current_user, group_id):
+    group = db.session.get(ChatGroup, group_id)
+    membership = _group_member(group_id, current_user.id)
+    if not group or not membership:
+        return jsonify({"message": "Group not found"}), 404
+    if group.owner_id != current_user.id and not membership.is_admin:
+        return jsonify({"message": "Only group admins can add members"}), 403
+
+    raw_user_ids = (request.get_json(silent=True) or {}).get("user_ids")
+    if not isinstance(raw_user_ids, list) or not raw_user_ids:
+        return jsonify({"message": "Select at least one member"}), 400
+    try:
+        user_ids = {int(user_id) for user_id in raw_user_ids}
+    except (TypeError, ValueError):
+        return jsonify({"message": "Member IDs must be valid"}), 400
+    user_ids.discard(current_user.id)
+    existing_ids = {
+        row.user_id for row in ChatGroupMember.query.filter_by(group_id=group_id).all()
+    }
+    user_ids -= existing_ids
+    if not user_ids:
+        return jsonify({"message": "Choose users who are not already members"}), 400
+
+    users = User.query.filter(
+        User.id.in_(user_ids), User.active.is_(True), User.is_banned.is_(False)
+    ).all()
+    if len(users) != len(user_ids):
+        return jsonify({"message": "One or more selected members are unavailable"}), 400
+    db.session.add_all(
+        ChatGroupMember(group_id=group_id, user_id=user.id) for user in users
+    )
+    db.session.commit()
+    return jsonify({
+        "added": [{**_user_payload(user, current_user.id), "is_admin": False} for user in users],
+        "member_count": ChatGroupMember.query.filter_by(group_id=group_id).count(),
+    }), 201
+
+
+@chat_bp.delete("/chat/groups/<int:group_id>/members/<int:user_id>")
+@token_required
+def remove_group_member(current_user, group_id, user_id):
+    group = db.session.get(ChatGroup, group_id)
+    membership = _group_member(group_id, current_user.id)
+    if not group or not membership:
+        return jsonify({"message": "Group not found"}), 404
+    if group.owner_id != current_user.id and not membership.is_admin:
+        return jsonify({"message": "Only group admins can remove members"}), 403
+    target = _group_member(group_id, user_id)
+    if not target:
+        return jsonify({"message": "Member not found"}), 404
+    if target.user_id == group.owner_id or target.is_admin:
+        return jsonify({"message": "Group admins cannot be removed"}), 403
+    db.session.delete(target)
+    db.session.commit()
+    return jsonify({
+        "removed": True,
+        "user_id": user_id,
+        "member_count": ChatGroupMember.query.filter_by(group_id=group_id).count(),
     })
 
 
