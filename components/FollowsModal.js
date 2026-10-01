@@ -38,6 +38,14 @@ export default function FollowsModal({
   const copy = COPY[language];
 
   useEffect(() => {
+    const handleLanguageChange = () => {
+      setLanguage(String(document.documentElement.lang || '').toLowerCase().startsWith('zh') ? 'zh' : 'en');
+    };
+    window.addEventListener('aero:language-change', handleLanguageChange);
+    return () => window.removeEventListener('aero:language-change', handleLanguageChange);
+  }, []);
+
+  useEffect(() => {
     if (!isOpen) return;
     setActiveTab(initialTab === 'following' ? 'following' : 'followers');
     setCounts({ followers: Number(followersCount) || 0, following: Number(followingCount) || 0 });
@@ -133,7 +141,7 @@ export default function FollowsModal({
           aria-selected={activeTab === tab}
           className={activeTab === tab ? 'is-active' : ''}
           onClick={() => setActiveTab(tab)}
-        >{copy[tab]} <span>{counts[tab]}</span></button>)}
+        ><span data-i18n={tab === 'followers' ? 'Followers' : 'Following'}>{copy[tab]}</span> <span>{counts[tab]}</span></button>)}
       </div>
       <div className="follows-modal-list" role="tabpanel" aria-busy={loading}>
         {loading ? <p className="follows-modal-state">{copy.loading}</p>
@@ -153,7 +161,7 @@ export default function FollowsModal({
                     title={isFollowing ? copy.unfollowTitle : copy.followTitle}
                     disabled={Number(pendingUserId) === Number(user.id)}
                     onClick={() => toggleRelationship(user)}
-                  >{Number(pendingUserId) === Number(user.id) ? '…' : label}</button>}
+                  ><span data-i18n={isFollowing ? 'Following' : label === copy.followBack ? 'Follow back' : 'Follow'}>{Number(pendingUserId) === Number(user.id) ? '…' : label}</span></button>}
                 </div>;
               })}
       </div>

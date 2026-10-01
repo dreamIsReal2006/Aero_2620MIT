@@ -4,7 +4,7 @@
     const translations = {
         en: {
             screenTimeWeekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-            cancel: 'Cancel', new_thread: 'New Post', post: 'Post', reply_anyone: 'Anyone can reply', add_to_thread: 'Add to thread',
+            cancel: 'Cancel', remove: 'Remove', remove_member_title: 'Remove member?', remove_member_confirm: 'Remove {username} from this group?', new_thread: 'New Post', post: 'Post', reply_anyone: 'Anyone can reply', add_to_thread: 'Add to thread',
             drafts: 'Drafts', more_options: 'More options', topic_profile: 'Your profile', topic_technology: 'Technology', topic_design: 'Design', topic_community: 'Community',
             write_something: 'Write something...', remove_thread: 'Remove thread post', remove_attachment: 'Remove attachment', image_or_video: 'Image or video', gif_animation: 'GIF', emoji: 'Emoji', voice_input: 'Voice input', poll: 'Poll', poll_option_placeholder: 'Option {number}', poll_remove_option: 'Remove option {number}', poll_add_option: 'Add another option', poll_duration: 'Poll duration', poll_1_hour: '1 hour', poll_6_hours: '6 hours', poll_12_hours: '12 hours', poll_24_hours: '24 hours', poll_3_days: '3 days', poll_7_days: '7 days', poll_remove: 'Remove poll', poll_thread_single: 'Polls can only be added to a single post.', poll_option_required: 'Enter text for every poll option.', poll_option_duplicate: 'Poll options must be different.', quote: 'Quote', location: 'Location', audio: 'Audio',
             post_options: 'Post options', who_can_reply: 'Who can reply and quote', reply_followers: 'Your followers', reply_following: 'Profiles you follow', reply_mentioned: 'Profiles you mention', review_replies: 'Review and approve replies', share_to: 'Also share to...', dont_share: 'Don’t share',
@@ -32,7 +32,8 @@
             'auth.or_continue_with': 'Or continue with', 'auth.google': 'Sign in with Google', 'auth.github': 'Sign in with GitHub',
             'chat.info.title': 'Conversation info', 'chat.info.close': 'Close conversation information',
             'chat.info.group_count': 'Group · {count} members', 'chat.info.member_count': '{count} members',
-            'Followers': 'Followers', 'Follow back': 'Follow back', 'Follow user': 'Follow user', 'Unfollow': 'Unfollow',
+            'followers_count': 'Followers {count}', 'following_count': 'Following {count}', 'follow_back': 'Follow back', 'follow': 'Follow',
+            'Followers': 'Followers', 'Following': 'Following', 'Follow back': 'Follow back', 'Follow user': 'Follow user', 'Unfollow': 'Unfollow',
             'View followers': 'View followers', 'View following': 'View following', 'Loading people...': 'Loading people...',
             'No people to show yet.': 'No people to show yet.', 'Unable to load this list.': 'Unable to load this list.',
             'Unable to update follow status.': 'Unable to update follow status.',
@@ -92,7 +93,7 @@
         },
         zh: {
             screenTimeWeekdays: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-            cancel: '取消', new_thread: '新建帖子', post: '发布', reply_anyone: '任何人', add_to_thread: '添加到串文',
+            cancel: '取消', remove: '移除', remove_member_title: '移除成员？', remove_member_confirm: '确定要将 {username} 从此群组中移除吗？', new_thread: '新建帖子', post: '发布', reply_anyone: '任何人', add_to_thread: '添加到串文',
             drafts: '草稿箱', more_options: '更多选项', topic_profile: '个人主页', topic_technology: '科技', topic_design: '设计', topic_community: '社群',
             write_something: '写点什么...', remove_thread: '删除串文', remove_attachment: '移除附件', image_or_video: '图片或视频', gif_animation: 'GIF 动画', emoji: '表情', voice_input: '语音输入', poll: '投票', poll_option_placeholder: '选项 {number}', poll_remove_option: '删除选项 {number}', poll_add_option: '添加另一选项', poll_duration: '投票时长', poll_1_hour: '1 小时', poll_6_hours: '6 小时', poll_12_hours: '12 小时', poll_24_hours: '24 小时', poll_3_days: '3 天', poll_7_days: '7 天', poll_remove: '移除投票', poll_thread_single: '投票仅支持单条帖子。', poll_option_required: '请填写所有投票选项。', poll_option_duplicate: '投票选项不能重复。', quote: '引用', location: '位置', audio: '音频',
             post_options: '帖子选项', who_can_reply: '谁能回复和引用', reply_followers: '你的粉丝', reply_following: '你关注的主页', reply_mentioned: '你提及的主页', review_replies: '审核并批准回复', share_to: '同时分享到...', dont_share: '不分享',
@@ -147,7 +148,8 @@
             'auth.or_continue_with': '或使用以下方式继续', 'auth.google': '使用 Google 登录', 'auth.github': '使用 GitHub 登录',
             'chat.info.title': '会话信息', 'chat.info.close': '关闭会话信息',
             'chat.info.group_count': '群组 · {count} 位成员', 'chat.info.member_count': '{count} 位成员',
-            'Followers': '粉丝', 'Follow back': '回关', 'Follow user': '关注用户', 'Unfollow': '取消关注',
+            'followers_count': '粉丝 {count}', 'following_count': '关注 {count}', 'follow_back': '回关', 'follow': '关注',
+            'Followers': '粉丝', 'Following': '已关注', 'Follow back': '回关', 'Follow user': '关注用户', 'Unfollow': '取消关注',
             'View followers': '查看粉丝', 'View following': '查看已关注', 'Loading people...': '正在加载用户…',
             'No people to show yet.': '暂无用户。', 'Unable to load this list.': '无法加载此列表。',
             'Unable to update follow status.': '无法更新关注状态。',

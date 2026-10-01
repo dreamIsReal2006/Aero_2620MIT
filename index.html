@@ -342,6 +342,23 @@
 
         <div id="chat-new-group-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="chat-new-group-title"><form id="chat-new-group-form" class="chat-group-modal glass-card liquid-glass"><div class="drawer-section-header"><h2 id="chat-new-group-title">New Group</h2><button type="button" id="chat-new-group-close" class="drawer-close-btn" aria-label="Close">&times;</button></div><input id="chat-group-name" class="chat-group-name" maxlength="80" placeholder="Group name" required><div id="chat-group-contact-picker" class="chat-group-contact-picker"></div><p id="chat-group-feedback" class="field-error" role="alert"></p><div class="chat-group-actions"><button type="button" id="chat-new-group-cancel" class="btn modal-cancel-btn">Cancel</button><button type="submit" class="btn btn-primary">Create</button></div></form></div>
         <div id="chat-group-members-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="chat-group-members-title"><section class="chat-group-modal glass-card liquid-glass"><div class="drawer-section-header"><div><h2 id="chat-group-members-title">Group members</h2><p id="chat-group-member-count"></p></div><button type="button" id="chat-group-members-close" class="drawer-close-btn" aria-label="Close">&times;</button></div><div id="chat-group-members-list" class="chat-group-members-list"></div><div class="chat-group-actions"><button type="button" id="chat-group-leave-btn" class="btn modal-cancel-btn">Leave Group</button><button type="button" id="chat-group-delete-btn" class="btn delete-confirm-btn hidden">Delete Group</button></div></section></div>
+        <div class="modal-overlay hidden" id="remove-member-modal" role="dialog" aria-modal="true" aria-labelledby="remove-member-title" aria-describedby="remove-member-description">
+            <div class="modal-card remove-member-modal-card">
+                <div class="modal-header">
+                    <h3 class="modal-title" id="remove-member-title" data-i18n="remove_member_title">Remove member?</h3>
+                    <button type="button" class="modal-close-btn" id="close-remove-member-btn" aria-label="Close">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p class="modal-description" id="remove-member-description" data-i18n="remove_member_confirm" data-username="">Remove <span class="highlight-username"></span> from this group?</p>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-remove-btn" data-i18n="cancel">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirm-remove-btn" data-i18n="remove">Remove</button>
+                </div>
+            </div>
+        </div>
         <aside id="short-comments-drawer" class="short-comments-drawer glass-card liquid-glass hidden" aria-label="Short video comments">
             <div class="drawer-section-header"><h2>Comments</h2><button type="button" class="drawer-close-btn" id="close-short-comments" aria-label="Close comments">&times;</button></div>
             <div id="short-comments-list" class="short-comments-list"></div>

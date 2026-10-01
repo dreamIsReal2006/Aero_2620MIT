@@ -23,6 +23,10 @@ allowed_origins = [
 allowed_origins.extend([
     "https://aero-group4.netlify.app",
     "https://goh.pythonanywhere.com",
+    "http://localhost:3000",
+    "http://localhost:8765",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8765",
 ])
 
 app = FastAPI(title="Aero API", version="1.0.0")

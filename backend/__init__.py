@@ -86,6 +86,10 @@ def create_app():
         "https://aero-group4.netlify.app",
         r"https://.*\.netlify\.app",
         "https://goh.pythonanywhere.com",
+        "http://localhost:3000",
+        "http://localhost:8765",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8765",
     ]
     configured_origins = [
         origin.strip()

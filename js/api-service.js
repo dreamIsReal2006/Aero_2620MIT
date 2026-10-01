@@ -2011,11 +2011,57 @@ function setupMediaAndChat() {
     confirmModal.querySelector('[data-confirm-accept]').addEventListener('click', () => settleConfirm(true));
     confirmModal.querySelectorAll('[data-confirm-cancel]').forEach((button) => button.addEventListener('click', () => settleConfirm(false)));
     confirmModal.addEventListener('click', (event) => { if (event.target === confirmModal) settleConfirm(false); });
+    const removeMemberModal = document.getElementById('remove-member-modal');
+    if (removeMemberModal && removeMemberModal.parentElement !== document.body) document.body.appendChild(removeMemberModal);
+    let removeMemberResolver = null;
+    let removeMemberReturnFocus = null;
+    const settleRemoveMember = (accepted) => {
+        removeMemberModal?.classList.add('hidden');
+        removeMemberResolver?.(accepted);
+        removeMemberResolver = null;
+        removeMemberReturnFocus?.focus?.();
+    };
+    const translateRemoveMemberModal = () => {
+        if (!removeMemberModal) return;
+        const translate = (key, values) => window.AeroI18n?.t(key, values) || key;
+        const username = removeMemberModal.querySelector('.modal-description')?.dataset.username || '';
+        const description = removeMemberModal.querySelector('.modal-description');
+        const title = removeMemberModal.querySelector('.modal-title');
+        const cancel = removeMemberModal.querySelector('#cancel-remove-btn');
+        const confirm = removeMemberModal.querySelector('#confirm-remove-btn');
+        if (title) title.textContent = translate('remove_member_title');
+        if (description) {
+            const message = translate('remove_member_confirm', { username });
+            const [before, after] = username ? message.split(username) : [message, ''];
+            const highlightedUsername = document.createElement('span');
+            highlightedUsername.className = 'highlight-username';
+            highlightedUsername.textContent = username;
+            description.replaceChildren(document.createTextNode(before));
+            if (username) description.append(highlightedUsername, document.createTextNode(after));
+        }
+        if (cancel) cancel.textContent = translate('cancel');
+        if (confirm) confirm.textContent = translate('remove');
+    };
+    const showRemoveMemberModal = (username) => new Promise((resolve) => {
+        if (!removeMemberModal) return resolve(false);
+        removeMemberResolver = resolve;
+        removeMemberReturnFocus = document.activeElement;
+        const description = removeMemberModal.querySelector('.modal-description');
+        if (description) description.dataset.username = username;
+        translateRemoveMemberModal();
+        removeMemberModal.classList.remove('hidden');
+        removeMemberModal.querySelector('#confirm-remove-btn')?.focus();
+    });
+    removeMemberModal?.querySelector('#confirm-remove-btn')?.addEventListener('click', () => settleRemoveMember(true));
+    removeMemberModal?.querySelectorAll('#cancel-remove-btn, #close-remove-member-btn').forEach((button) => button.addEventListener('click', () => settleRemoveMember(false)));
+    removeMemberModal?.addEventListener('click', (event) => { if (event.target === removeMemberModal) settleRemoveMember(false); });
+    window.addEventListener('aero:language-change', translateRemoveMemberModal);
     addMembersModal.querySelectorAll('[data-close-add-members]').forEach((button) => button.addEventListener('click', () => addMembersModal.classList.add('hidden')));
     addMembersModal.addEventListener('click', (event) => { if (event.target === addMembersModal) addMembersModal.classList.add('hidden'); });
     document.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return;
         if (!confirmModal.classList.contains('hidden')) settleConfirm(false);
+        if (!removeMemberModal?.classList.contains('hidden')) settleRemoveMember(false);
         if (!addMembersModal.classList.contains('hidden')) addMembersModal.classList.add('hidden');
         if (!membersModal?.classList.contains('hidden')) membersModal.classList.add('hidden');
     });
@@ -2089,12 +2135,7 @@ function setupMediaAndChat() {
         await loadChatContacts().catch(() => {});
     };
     const removeGroupMember = async (groupId, member, refreshView) => {
-        const accepted = await showConfirmModal({
-            title: chatInfoText('confirm_remove_member_title'),
-            description: chatInfoText('confirm_remove_member', { user: member.username || 'this user' }),
-            confirmLabel: chatInfoText('remove_member'),
-            cancelLabel: window.AeroI18n?.translateValue('Cancel') || 'Cancel'
-        });
+        const accepted = await showRemoveMemberModal(`@${member.username || 'this user'}`);
         if (!accepted) return;
         const response = await fetch(`${API_BASE}/chat/groups/${groupId}/members/${member.id}`, {
             method: 'DELETE',

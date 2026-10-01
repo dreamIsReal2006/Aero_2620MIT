@@ -78,8 +78,8 @@
         const overlay = document.getElementById('profile-follows-modal');
         if (!overlay || !followsModalState) return;
         const { tab, counts } = followsModalState;
-        overlay.querySelector('[data-follows-tab="followers"]').innerHTML = `${followsText('Followers')} <span>${counts.followers}</span>`;
-        overlay.querySelector('[data-follows-tab="following"]').innerHTML = `${followsText('Following')} <span>${counts.following}</span>`;
+        overlay.querySelector('[data-follows-tab="followers"]').innerHTML = `<span data-i18n="Followers">${followsText('Followers')}</span> <span>${counts.followers}</span>`;
+        overlay.querySelector('[data-follows-tab="following"]').innerHTML = `<span data-i18n="Following">${followsText('Following')}</span> <span>${counts.following}</span>`;
         overlay.querySelectorAll('[data-follows-tab]').forEach((button) => {
             const active = button.dataset.followsTab === tab;
             button.classList.toggle('is-active', active);
@@ -110,8 +110,9 @@
         list.innerHTML = users.map((person) => {
             const avatar = profileAvatarValue(person);
             const following = Boolean(person.is_following);
-            const label = following ? followsText('Following') : tab === 'followers' && person.is_followed_by ? followsText('Follow back') : followsText('Follow');
-            const action = Number(person.id) === viewerId ? '' : `<button type="button" class="profile-follows-action ${following ? 'is-following' : ''}" data-follows-action="${person.id}" title="${followsText(following ? 'Unfollow' : 'Follow')}">${label}</button>`;
+            const labelKey = following ? 'Following' : tab === 'followers' && person.is_followed_by ? 'Follow back' : 'Follow';
+            const label = followsText(labelKey);
+            const action = Number(person.id) === viewerId ? '' : `<button type="button" class="profile-follows-action ${following ? 'is-following' : ''}" data-follows-action="${person.id}" title="${followsText(following ? 'Unfollow' : 'Follow')}"><span data-i18n="${labelKey}">${label}</span></button>`;
             return `<div class="profile-follows-user"><button type="button" class="profile-follows-user-main" data-open-follow-profile="${person.id}"><img class="profile-follows-avatar" src="${profileEscape(avatar.url)}" data-avatar-fallback="${profileEscape(avatar.fallbackUrl)}" alt=""/><span class="profile-follows-user-copy"><strong>@${profileEscape(person.username)}</strong><small>${profileEscape(person.display_name || person.username)}</small></span></button>${action}</div>`;
         }).join('');
         list.querySelectorAll('[data-avatar-fallback]').forEach((image) => image.addEventListener('error', () => { image.src = image.dataset.avatarFallback; }, { once: true }));
