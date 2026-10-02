@@ -22,6 +22,7 @@
         document.body?.classList.toggle("dark-mode", isDark);
         document.body?.classList.toggle("dark", isDark);
         document.body?.classList.toggle("light-mode", !isDark);
+        window.dispatchEvent(new CustomEvent("aero:theme-change", { detail: { dark: isDark, theme: value } }));
         const select = document.getElementById("theme-select");
         if (select && select.value !== value) select.value = value;
     }

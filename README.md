@@ -31,3 +31,14 @@ The frontend is now available as a Next.js App Router application with Tailwind 
 The Following feed uses the browser Supabase client from `lib/supabaseClient.js`; For You requests the backend's `/api/posts` hybrid recommendation ranking. Configure Supabase RLS policies to allow the intended anon `select` access for `posts`, `users`, and `follows`; missing configuration, denied reads, and empty results render the normal empty states instead of interrupting the page.
 
 The main Feed is at `/` and the Admin Dashboard is at `/admin`. Authentication, post loading, search, and post creation reuse the existing `/api` contract and browser keys (`aero_token` and `aero_user`).
+
+## Repository layout
+
+Legacy HTML pages remain at the repository root to preserve their public URLs. Browser assets are organized under `static/`:
+
+- `static/css/` contains shared and page-specific styles.
+- `static/js/` contains browser modules and realtime clients.
+- `static/assets/` contains images and audio.
+- `backend/` contains Flask blueprints, services, and models.
+
+Flask serves canonical assets from `/static/`. The legacy `/css/`, `/js/`, and `/assets/` routes remain as compatibility aliases. Supabase realtime channels, API contracts, SendGrid delivery, and Render startup commands are unchanged.

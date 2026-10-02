@@ -5,15 +5,16 @@
         en: {
             screenTimeWeekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
             cancel: 'Cancel', remove: 'Remove', remove_member_title: 'Remove member?', remove_member_confirm: 'Remove {username} from this group?', new_thread: 'New Post', post: 'Post', reply_anyone: 'Anyone can reply', add_to_thread: 'Add to thread',
-            drafts: 'Drafts', more_options: 'More options', topic_profile: 'Your profile', topic_technology: 'Technology', topic_design: 'Design', topic_community: 'Community',
+            drafts: 'Drafts', topic_profile: 'Your profile', topic_technology: 'Technology', topic_design: 'Design', topic_community: 'Community',
             write_something: 'Write something...', remove_thread: 'Remove thread post', remove_attachment: 'Remove attachment', image_or_video: 'Image or video', gif_animation: 'GIF', emoji: 'Emoji', voice_input: 'Voice input', poll: 'Poll', poll_option_placeholder: 'Option {number}', poll_remove_option: 'Remove option {number}', poll_add_option: 'Add another option', poll_duration: 'Poll duration', poll_1_hour: '1 hour', poll_6_hours: '6 hours', poll_12_hours: '12 hours', poll_24_hours: '24 hours', poll_3_days: '3 days', poll_7_days: '7 days', poll_remove: 'Remove poll', poll_thread_single: 'Polls can only be added to a single post.', poll_option_required: 'Enter text for every poll option.', poll_option_duplicate: 'Poll options must be different.', quote: 'Quote', location: 'Location', audio: 'Audio',
-            post_options: 'Post options', who_can_reply: 'Who can reply and quote', reply_followers: 'Your followers', reply_following: 'Profiles you follow', reply_mentioned: 'Profiles you mention', review_replies: 'Review and approve replies', share_to: 'Also share to...', dont_share: 'Don’t share',
-            select_publish_time: 'Schedule post...', complete: 'Done', recommended_tags: 'Add suggested tag', scheduled_post: 'Schedule', no_drafts: 'No drafts yet', unnamed_draft: 'Untitled draft', selected_gif: 'Selected GIF', remove_gif: 'Remove GIF', choose_topic: 'Choose community or topic', post_attachments: 'Post attachments and tools', select_gif: 'Select GIF',
+            post_options: 'Post options', who_can_reply: 'Who can reply and quote', reply_followers: 'Your followers', reply_following: 'Profiles you follow', reply_mentioned: 'Profiles you mention',
+            scheduled_post: 'Schedule', no_drafts: 'No drafts yet', unnamed_draft: 'Untitled draft', selected_gif: 'Selected GIF', remove_gif: 'Remove GIF', choose_topic: 'Choose community or topic', post_attachments: 'Post attachments and tools', select_gif: 'Select GIF',
             unsupported_voice: 'Voice input is not supported in this browser.', unsupported_audio: 'Audio attachments are not available yet.', unable_upload: 'Unable to upload media', unable_publish: 'Unable to publish post', device_location: 'This device cannot provide a location.', location_failed: 'Unable to get your location.',
             loading_comments: 'Loading comments...', 'no_comments': 'No comments yet.',
             no_shorts: 'No Shorts available yet.', 'upload_first_video': '+ Upload First Video', 'upload_video_btn': '+ Video',
             shared_post_from: 'Shared a post from {user}', 'delete_post': 'Delete Post', 'report_post_title': 'Report post',
             report_reason_prompt: 'Tell us what is wrong...', 'submit_report': 'Submit report', 'role_admin': 'Admin', 'role_moderator': 'Moderator',
+            admin_back_to_aero: '← Back to Aero', admin_dashboard_title: 'Admin Dashboard', admin_total_users: 'TOTAL USERS', admin_total_posts: 'TOTAL POSTS', admin_pending_reports: 'PENDING REPORTS', admin_account_access: 'ACCOUNT ACCESS', admin_users: 'Users', admin_search_placeholder: 'Search by username or email', admin_support_queue: 'SUPPORT QUEUE', admin_appeals: 'Appeals',
             search_users_title: 'USERS', 'search_posts_title': 'POSTS / TOPICS', 'no_posts_found': 'No posts found',
             press_enter_search: 'Press Enter or Click to see all results for "{query}"', 'visit': 'Visit',
             tab_all: 'All', 'tab_mentions': 'Mentions', 'tab_likes': 'Likes', 'followed_you': 'followed you',
@@ -94,10 +95,10 @@
         zh: {
             screenTimeWeekdays: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
             cancel: '取消', remove: '移除', remove_member_title: '移除成员？', remove_member_confirm: '确定要将 {username} 从此群组中移除吗？', new_thread: '新建帖子', post: '发布', reply_anyone: '任何人', add_to_thread: '添加到串文',
-            drafts: '草稿箱', more_options: '更多选项', topic_profile: '个人主页', topic_technology: '科技', topic_design: '设计', topic_community: '社群',
+            drafts: '草稿箱', topic_profile: '个人主页', topic_technology: '科技', topic_design: '设计', topic_community: '社群',
             write_something: '写点什么...', remove_thread: '删除串文', remove_attachment: '移除附件', image_or_video: '图片或视频', gif_animation: 'GIF 动画', emoji: '表情', voice_input: '语音输入', poll: '投票', poll_option_placeholder: '选项 {number}', poll_remove_option: '删除选项 {number}', poll_add_option: '添加另一选项', poll_duration: '投票时长', poll_1_hour: '1 小时', poll_6_hours: '6 小时', poll_12_hours: '12 小时', poll_24_hours: '24 小时', poll_3_days: '3 天', poll_7_days: '7 天', poll_remove: '移除投票', poll_thread_single: '投票仅支持单条帖子。', poll_option_required: '请填写所有投票选项。', poll_option_duplicate: '投票选项不能重复。', quote: '引用', location: '位置', audio: '音频',
-            post_options: '帖子选项', who_can_reply: '谁能回复和引用', reply_followers: '你的粉丝', reply_following: '你关注的主页', reply_mentioned: '你提及的主页', review_replies: '审核并批准回复', share_to: '同时分享到...', dont_share: '不分享',
-            select_publish_time: '预设发布时间...', complete: '完成', recommended_tags: '添加推荐标签', scheduled_post: '定时发布', no_drafts: '还没有草稿', unnamed_draft: '未命名草稿', selected_gif: '所选 GIF', remove_gif: '移除 GIF', choose_topic: '选择社群或话题', post_attachments: '帖子附件和工具', select_gif: '选择 GIF',
+            post_options: '帖子选项', who_can_reply: '谁能回复和引用', reply_followers: '你的粉丝', reply_following: '你关注的主页', reply_mentioned: '你提及的主页',
+            scheduled_post: '定时发布', no_drafts: '还没有草稿', unnamed_draft: '未命名草稿', selected_gif: '所选 GIF', remove_gif: '移除 GIF', choose_topic: '选择社群或话题', post_attachments: '帖子附件和工具', select_gif: '选择 GIF',
             unsupported_voice: '此浏览器暂不支持语音输入。', unsupported_audio: '音频附件暂不可用。', unable_upload: '无法上传媒体', unable_publish: '无法发布帖子', device_location: '此设备无法获取位置。', location_failed: '无法获取位置。',
             loading_comments: '加载评论中...', 'no_comments': '暂无评论',
             no_shorts: '暂无短视频', 'upload_first_video': '+ 上传第一个视频', 'upload_video_btn': '+ 视频',
@@ -125,7 +126,7 @@
             'Share what\'s on your mind...': '分享你的想法...', 'Add media': '添加媒体', 'Create post': '创建帖子',
             'Post': '发布', 'Cancel': '取消', 'Delete': '删除', 'Follow': '关注', 'Following': '已关注',
             'Send': '发送', 'Comments': '评论', 'No contacts yet.': '暂无联系人。', 'No notifications yet.': '暂无通知。',
-            'Search by username or email': '按用户名或邮箱搜索', 'Hello !': '你好！', 'Welcome': '欢迎',
+            'Search by username or email': '按用户名或邮箱搜索', admin_back_to_aero: '← 返回 Aero', admin_dashboard_title: '管理员控制台', admin_total_users: '总用户数', admin_total_posts: '总动态数', admin_pending_reports: '待处理举报', admin_account_access: '账户权限管理', admin_users: '用户列表', admin_search_placeholder: '按用户名或邮箱搜索', admin_support_queue: '工单与申诉队列', admin_appeals: '申诉处理', 'Hello !': '你好！', 'Welcome': '欢迎',
             'Create Account': '创建账户', 'Sign In': '登录', 'Continue': '继续', 'Forgot?': '忘记密码？',
             'Email Address': '邮箱地址', 'Confirm Password': '确认密码', 'New Password': '新密码',
             'Current Password': '当前密码', 'Update Password': '更新密码', 'Username or email': '用户名或邮箱',
@@ -361,7 +362,7 @@
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    window.AeroI18n = { getLanguage, applyLanguage, setLanguage, restoreUserLanguage, translateValue, t: translate, formatChatTimestamp, formatChatDateDivider, getScreenTimeWeekdays };
+    window.AeroI18n = { getLanguage, applyLanguage, setLanguage, restoreUserLanguage, translateValue, t: translate, updatePageText: applyLanguage, formatChatTimestamp, formatChatDateDivider, getScreenTimeWeekdays };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup);
     else setup();
 })();

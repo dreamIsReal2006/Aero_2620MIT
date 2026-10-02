@@ -13,6 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent
 
 @app.route("/")
 def home():
+    # Keep the legacy home page URL stable.
     return send_from_directory(BASE_DIR, "index.html")
 
 

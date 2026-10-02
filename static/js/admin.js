@@ -1,4 +1,24 @@
 document.addEventListener('DOMContentLoaded', async () => {
+    const savedTheme = localStorage.getItem('theme');
+    const savedLanguage = localStorage.getItem('lang') || localStorage.getItem('aero_user_lang') || localStorage.getItem('aero_language');
+    const syncTheme = theme => {
+        const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+        document.documentElement.classList.toggle('dark-mode', isDark);
+        document.documentElement.classList.toggle('dark-theme', isDark);
+        document.body.classList.toggle('dark-mode', isDark);
+        document.body.classList.toggle('dark-theme', isDark);
+    };
+    syncTheme(savedTheme || 'system');
+    window.addEventListener('aero:theme-change', event => syncTheme(event.detail?.theme || localStorage.getItem('theme') || 'system'));
+    window.AeroI18n?.updatePageText?.(savedLanguage || undefined, { persist: false });
+    window.addEventListener('storage', event => {
+        if (event.key === 'theme') syncTheme(event.newValue || 'system');
+        if (event.key === 'lang' || event.key === 'aero_user_lang' || event.key === 'aero_language') {
+            window.AeroI18n?.updatePageText?.(event.newValue || undefined, { persist: false });
+        }
+    });
+    window.addEventListener('aero:language-change', () => window.AeroI18n?.updatePageText?.(undefined, { persist: false }));
     const token = localStorage.getItem('aero_token');
     const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
     const apiBase = window.AeroConfig.ADMIN_API_BASE || `${window.AeroConfig.API_ORIGIN}/api/admin`;

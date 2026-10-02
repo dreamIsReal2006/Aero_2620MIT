@@ -15,12 +15,11 @@ const apiHeaders = () => ({ Accept: 'application/json', Authorization: `Bearer $
 const composerTranslations = {
   en: {
     cancel: 'Cancel', new_thread: 'New Post', post: 'Post', reply_anyone: 'Anyone can reply', add_to_thread: 'Add to thread',
-    drafts: 'Drafts', more_options: 'More options', topic_profile: 'Your profile', topic_technology: 'Technology', topic_design: 'Design', topic_community: 'Community',
+    drafts: 'Drafts', topic_profile: 'Your profile', topic_technology: 'Technology', topic_design: 'Design', topic_community: 'Community',
     write_something: 'Write something...', remove_thread: 'Remove thread post', attachment: 'Attachment', remove_attachment: 'Remove attachment',
     image_or_video: 'Image or video', gif_animation: 'GIF', emoji: 'Emoji', voice_input: 'Voice input', poll: 'Poll', quote: 'Quote', location: 'Location', audio: 'Audio',
     post_options: 'Post options', who_can_reply: 'Who can reply and quote', reply_followers: 'Your followers', reply_following: 'Profiles you follow', reply_mentioned: 'Profiles you mention',
-    review_replies: 'Review and approve replies', share_to: 'Also share to...', dont_share: 'Don’t share', facebook: 'Facebook', instagram: 'Instagram',
-    select_publish_time: 'Schedule post...', complete: 'Done', recommended_tags: 'Add suggested tag', scheduled_post: 'Schedule', no_drafts: 'No drafts yet', unnamed_draft: 'Untitled draft',
+    scheduled_post: 'Schedule', no_drafts: 'No drafts yet', unnamed_draft: 'Untitled draft',
     selected_gif: 'Selected GIF', remove_gif: 'Remove GIF', choose_topic: 'Choose community or topic', post_attachments: 'Post attachments and tools',
     poll_option_placeholder: 'Option {number}', add_poll_option: 'Add another option', remove_poll_option: 'Remove option', remove_poll: 'Remove poll', poll_duration: 'Poll duration', poll_1_hour: '1 hour', poll_6_hours: '6 hours', poll_12_hours: '12 hours', poll_24_hours: '24 hours', poll_3_days: '3 days', poll_7_days: '7 days', poll_option_required: 'Enter text for every poll option.', poll_options_distinct: 'Poll options must be different.', poll_thread_unavailable: 'Polls can only be added to a single post.',
     unsupported_voice: 'Voice input is not supported in this browser.', unsupported_audio: 'Audio attachments are not available yet.', unable_upload: 'Unable to upload media', unable_publish: 'Unable to publish post', optimizing_media: 'Optimizing media…', uploading_media: 'Uploading media…', compressing_video: 'Compressing video…', publishing_post: 'Publishing post…',
@@ -28,12 +27,11 @@ const composerTranslations = {
   },
   zh: {
     cancel: '取消', new_thread: '新建帖子', post: '发布', reply_anyone: '任何人', add_to_thread: '添加到串文',
-    drafts: '草稿箱', more_options: '更多选项', topic_profile: '个人主页', topic_technology: '科技', topic_design: '设计', topic_community: '社群',
+    drafts: '草稿箱', topic_profile: '个人主页', topic_technology: '科技', topic_design: '设计', topic_community: '社群',
     write_something: '写点什么...', remove_thread: '删除串文', attachment: '附件', remove_attachment: '移除附件',
     image_or_video: '图片或视频', gif_animation: 'GIF 动画', emoji: '表情', voice_input: '语音输入', poll: '投票', quote: '引用', location: '位置', audio: '音频',
     post_options: '帖子选项', who_can_reply: '谁能回复和引用', reply_followers: '你的粉丝', reply_following: '你关注的主页', reply_mentioned: '你提及的主页',
-    review_replies: '审核并批准回复', share_to: '同时分享到...', dont_share: '不分享', facebook: 'Facebook', instagram: 'Instagram',
-    select_publish_time: '预设发布时间...', complete: '完成', recommended_tags: '添加推荐标签', scheduled_post: '定时发布', no_drafts: '还没有草稿', unnamed_draft: '未命名草稿',
+    scheduled_post: '定时发布', no_drafts: '还没有草稿', unnamed_draft: '未命名草稿',
     selected_gif: '所选 GIF', remove_gif: '移除 GIF', choose_topic: '选择社群或话题', post_attachments: '帖子附件和工具',
     poll_option_placeholder: '选项 {number}', add_poll_option: '添加另一选项', remove_poll_option: '移除选项', remove_poll: '移除投票', poll_duration: '投票时长', poll_1_hour: '1 小时', poll_6_hours: '6 小时', poll_12_hours: '12 小时', poll_24_hours: '24 小时', poll_3_days: '3 天', poll_7_days: '7 天', poll_option_required: '请填写所有投票选项。', poll_options_distinct: '投票选项不能重复。', poll_thread_unavailable: '投票仅支持单条帖子。',
     unsupported_voice: '此浏览器暂不支持语音输入。', unsupported_audio: '音频附件暂不可用。', unable_upload: '无法上传媒体', unable_publish: '无法发布帖子', optimizing_media: '正在优化媒体…', uploading_media: '正在上传媒体…', compressing_video: '正在压缩视频…', publishing_post: '正在发布帖子…',
@@ -364,8 +362,6 @@ export default function FeedShell() {
   const [activePanel, setActivePanel] = useState('none');
   const [activeSubpanel, setActiveSubpanel] = useState('none');
   const [replyPermission, setReplyPermission] = useState('everyone');
-  const [reviewReplies, setReviewReplies] = useState(false);
-  const [shareTo, setShareTo] = useState('none');
   const [topic, setTopic] = useState('profile');
   const [scheduledAt, setScheduledAt] = useState('');
   const [selectedGif, setSelectedGif] = useState('');
@@ -540,8 +536,6 @@ export default function FeedShell() {
         posts: payloadPosts,
         scheduled_at: scheduledAt || null,
         reply_permission: replyPermission,
-        review_replies: reviewReplies,
-        share_to: shareTo,
         topic,
         poll: pollData ? {
           options: pollData.options.map((option) => option.trim()),
@@ -613,14 +607,6 @@ export default function FeedShell() {
             <h2 id="threads-compose-title">{composerView === 'drafts' ? t('drafts') : t('new_thread')}</h2>
             <div className="threads-header-actions">
               <button type="button" className="threads-icon-button" aria-label={t('drafts')} title={t('drafts')} onClick={() => { setComposerView(composerView === 'drafts' ? 'compose' : 'drafts'); setActivePanel(composerView === 'drafts' ? 'none' : 'drafts'); setActiveSubpanel('none'); }}><Icon name="draft" className="threads-header-icon" /></button>
-              <div className="threads-menu-anchor">
-                <button type="button" className="threads-icon-button threads-more-button threads-dropdown-trigger" aria-label={t('more_options')} title={t('more_options')} onClick={() => togglePanel('more_menu')}><Icon name="more" className="threads-header-icon" /></button>
-                {isPanelOpen('more_menu') && <div className={`threads-dropdown-menu threads-more-menu${activePanel.endsWith('-closing') ? ' is-closing' : ''}`}>
-                  <button type="button" onClick={() => { appendToPost(0, `${threadPosts[0].content.trim() ? ' ' : ''}#Aero`); setActivePanel('none'); }}>{t('recommended_tags')}</button>
-                  <button type="button" onClick={() => setActivePanel('schedule')}>{t('select_publish_time')}</button>
-                </div>}
-                {isPanelOpen('schedule') && <div className={`threads-dropdown-menu threads-schedule-menu${activePanel.endsWith('-closing') ? ' is-closing' : ''}`}><label htmlFor="threads-schedule">{t('select_publish_time')}</label><input id="threads-schedule" type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} /><button type="button" onClick={() => setActivePanel('none')}>{t('complete')}</button></div>}
-              </div>
             </div>
           </header>
           {composerView === 'drafts' ? <div className="threads-drafts-view">
@@ -694,12 +680,6 @@ export default function FeedShell() {
                     <div className="threads-option-group"><strong>{t('who_can_reply')}</strong><button type="button" className="threads-option-trigger threads-dropdown-trigger" aria-expanded={isSubpanelOpen('reply')} onClick={() => toggleSubpanel('reply')}>{t(replyLabel)}<Icon name="chevron" className="threads-chevron-icon" /></button>
                       {isSubpanelOpen('reply') && <div className="threads-dropdown-menu threads-reply-menu" role="listbox" aria-label={t('who_can_reply')}>
                         {replyOptions.map(([value, label]) => <button type="button" role="option" aria-selected={replyPermission === value} key={value} onClick={() => { setReplyPermission(value); setActiveSubpanel('none'); }}>{t(label)}{replyPermission === value && <Icon name="check" className="threads-option-check" />}</button>)}
-                      </div>}
-                    </div>
-                    <label className="threads-toggle-row">{t('review_replies')}<input type="checkbox" checked={reviewReplies} onChange={(event) => setReviewReplies(event.target.checked)} /><span className="threads-toggle" /></label>
-                    <div className="threads-option-group"><strong>{t('share_to')}</strong><button type="button" className="threads-option-trigger threads-dropdown-trigger" aria-expanded={isSubpanelOpen('share')} onClick={() => toggleSubpanel('share')}>{t(shareTo === 'none' ? 'dont_share' : shareTo)}<Icon name="chevron" className="threads-chevron-icon" /></button>
-                      {isSubpanelOpen('share') && <div className="threads-dropdown-menu threads-share-menu" role="listbox" aria-label={t('share_to')}>
-                        {[['none', 'dont_share'], ['facebook', 'facebook'], ['instagram', 'instagram']].map(([value, label]) => <button type="button" role="option" aria-selected={shareTo === value} key={value} onClick={() => { setShareTo(value); setActiveSubpanel('none'); }}>{t(label)}{shareTo === value && <Icon name="check" className="threads-option-check" />}</button>)}
                       </div>}
                     </div>
                   </div>}

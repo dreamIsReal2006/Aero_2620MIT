@@ -3,38 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="js/i18n.js"></script>
-    <script src="js/config.js"></script>
+    <script src="/static/js/i18n.js"></script>
+    <script src="/static/js/config.js"></script>
     <title>Aero Admin Dashboard</title>
-    <link rel="icon" type="image/png" sizes="16x16" href="./assets/img/logo.png">
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/assets/img/logo.png">
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body class="light-mode admin-page">
     <main class="admin-shell">
         <header class="admin-header admin-card glass-card liquid-glass">
             <div>
-                <a class="admin-back-link" href="index.html">&larr; Back to Aero</a>
-                <h1 id="admin-dashboard-title">Admin Dashboard</h1>
+                <a class="admin-back-link" data-i18n="admin_back_to_aero" href="index.html">&larr; Back to Aero</a>
+                <h1 id="admin-dashboard-title" data-i18n="admin_dashboard_title">Admin Dashboard</h1>
                 <span id="admin-role-badge" class="admin-role-badge">Admin</span>
             </div>
         </header>
 
         <div id="admin-error" class="admin-state hidden"></div>
         <section class="admin-stats" aria-label="Platform statistics">
-            <article class="admin-stat-card admin-card glass-card liquid-glass liquid-glass-interactive"><span>Total Users</span><strong id="admin-users-count">-</strong></article>
-            <article class="admin-stat-card admin-card glass-card liquid-glass liquid-glass-interactive"><span>Total Posts</span><strong id="admin-posts-count">-</strong></article>
-            <article class="admin-stat-card admin-card glass-card liquid-glass liquid-glass-interactive"><span>Pending Reports</span><strong id="admin-reports-count">-</strong></article>
+            <article class="admin-stat-card admin-card glass-card liquid-glass liquid-glass-interactive"><span data-i18n="admin_total_users">TOTAL USERS</span><strong id="admin-users-count">-</strong></article>
+            <article class="admin-stat-card admin-card glass-card liquid-glass liquid-glass-interactive"><span data-i18n="admin_total_posts">TOTAL POSTS</span><strong id="admin-posts-count">-</strong></article>
+            <article class="admin-stat-card admin-card glass-card liquid-glass liquid-glass-interactive"><span data-i18n="admin_pending_reports">PENDING REPORTS</span><strong id="admin-reports-count">-</strong></article>
         </section>
         <section class="admin-reports-section admin-card glass-card liquid-glass">
-            <div class="admin-section-heading"><div><span class="admin-eyebrow">Account access</span><h2>Users</h2></div></div>
+            <div class="admin-section-heading"><div><span class="admin-eyebrow" data-i18n="admin_account_access">ACCOUNT ACCESS</span><h2 data-i18n="admin_users">Users</h2></div></div>
             <label class="admin-search-field" for="admin-user-search">
                 <span class="admin-search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 5 5"></path></svg></span>
-                <input id="admin-user-search" type="search" placeholder="Search by username or email" autocomplete="off">
+                <input id="admin-user-search" type="search" data-i18n-placeholder="admin_search_placeholder" placeholder="Search by username or email" autocomplete="off">
             </label>
             <div id="admin-users-list" class="admin-users-list"></div>
         </section>
         <section class="admin-reports-section admin-card glass-card liquid-glass">
-            <div class="admin-section-heading"><div><span class="admin-eyebrow">Support queue</span><h2>Appeals</h2></div></div>
+            <div class="admin-section-heading"><div><span class="admin-eyebrow" data-i18n="admin_support_queue">SUPPORT QUEUE</span><h2 data-i18n="admin_appeals">Appeals</h2></div></div>
             <div id="admin-appeals-list" class="admin-users-list"></div>
         </section>
 
@@ -65,7 +65,8 @@
             </div>
         </section>
     </div>
-    <script src="js/api-service.js"></script>
-    <script src="js/admin.js"></script>
+    <script src="/static/js/api-service.js"></script>
+    <script src="/static/js/theme.js"></script>
+    <script src="/static/js/admin.js"></script>
 </body>
 </html>

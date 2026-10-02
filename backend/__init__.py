@@ -47,10 +47,13 @@ def initialize_database(app):
 
 def create_app():
     base_dir = Path(__file__).resolve().parent.parent
+    # Serve browser assets from the standardized static directory.
+    static_dir = base_dir / "static"
     app = Flask(
         __name__,
-        static_folder=str(base_dir / "assets"),
-        static_url_path="/assets",
+        static_folder=str(static_dir),
+        static_url_path="/static",
+        template_folder=str(base_dir),
     )
 
     secret_key = os.environ.get("AERO_SECRET_KEY", "").strip()
@@ -114,11 +117,16 @@ def create_app():
 
     @app.get("/css/<path:filename>")
     def serve_css(filename):
-        return send_from_directory(base_dir / "css", filename)
+        return send_from_directory(static_dir / "css", filename)
 
     @app.get("/js/<path:filename>")
     def serve_js(filename):
-        return send_from_directory(base_dir / "js", filename)
+        return send_from_directory(static_dir / "js", filename)
+
+    @app.get("/assets/<path:filename>")
+    def serve_assets(filename):
+        # Preserve legacy asset URLs during the directory migration.
+        return send_from_directory(static_dir / "assets", filename)
 
     @app.get("/index.html")
     @app.get("/otp.html")

@@ -4643,8 +4643,40 @@ body.threads-media-open {
     white-space: nowrap;
 }
 
+:root {
+    --admin-bg: #f8fafc;
+    --admin-card-bg: #ffffff;
+    --admin-card-border: rgba(0, 0, 0, 0.08);
+    --admin-text-primary: #0f172a;
+    --admin-text-secondary: #64748b;
+    --admin-input-bg: #f1f5f9;
+    --admin-input-text: #0f172a;
+    --admin-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"],
+.dark-theme {
+    --admin-bg: #0f172a;
+    --admin-card-bg: #1e293b;
+    --admin-card-border: rgba(255, 255, 255, 0.1);
+    --admin-text-primary: #f8fafc;
+    --admin-text-secondary: #94a3b8;
+    --admin-input-bg: #334155;
+    --admin-input-text: #f8fafc;
+    --admin-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+}
+
 .admin-page {
     padding: 32px 20px;
+    background-color: var(--admin-bg);
+    color: var(--admin-text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.admin-container {
+    background-color: var(--admin-bg);
+    color: var(--admin-text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .admin-shell {
@@ -4659,9 +4691,13 @@ body.threads-media-open {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    padding: 2rem;
+    padding: 20px;
     box-sizing: border-box;
-    border-radius: 16px;
+    border: 1px solid var(--admin-card-border);
+    border-radius: 20px;
+    background-color: var(--admin-card-bg);
+    box-shadow: var(--admin-shadow);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .admin-header,
@@ -4677,19 +4713,20 @@ body.threads-media-open {
     align-items: stretch;
     gap: 1.5rem;
     padding: 2rem;
-    background: var(--bg-glass);
+    background-color: var(--admin-card-bg);
     box-shadow: var(--shadow-floating);
     backdrop-filter: blur(12px) saturate(150%);
     -webkit-backdrop-filter: blur(12px) saturate(150%);
 }
 
 .admin-back-link {
-    color: var(--text-secondary);
+    color: var(--admin-text-secondary);
     font-size: 0.85rem;
     text-decoration: none;
 }
 
 .admin-header h1 {
+    color: var(--admin-text-primary);
     margin-top: 8px;
     font-size: clamp(1.7rem, 4vw, 2.4rem);
 }
@@ -4724,24 +4761,22 @@ body.threads-media-open {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    padding: 2rem;
-    border: 1px solid var(--border-subtle);
-    background: var(--bg-glass);
-    box-shadow: var(--shadow-floating);
+    padding: 20px;
     backdrop-filter: blur(12px) saturate(150%);
     -webkit-backdrop-filter: blur(12px) saturate(150%);
 }
 
 .admin-stat-card span,
 .admin-eyebrow {
-    color: var(--text-secondary);
-    font-size: 0.78rem;
+    color: var(--admin-text-secondary);
+    font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
 
 .admin-stat-card strong {
+    color: var(--admin-text-primary);
     font-size: 2rem;
 }
 
@@ -4749,15 +4784,13 @@ body.threads-media-open {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    padding: 2rem;
-    border: 1px solid var(--border-subtle);
-    background: var(--bg-glass);
-    box-shadow: var(--shadow-floating);
+    padding: 20px;
     backdrop-filter: blur(12px) saturate(150%);
     -webkit-backdrop-filter: blur(12px) saturate(150%);
 }
 
 .admin-section-heading h2 {
+    color: var(--admin-text-primary);
     margin: 0;
     font-size: 1.25rem;
 }
@@ -4784,10 +4817,11 @@ body.threads-media-open {
     width: 100%;
     min-height: 44px;
     padding: 10px 14px 10px 42px;
-    border: 1px solid var(--border-subtle);
+    border: 1px solid var(--admin-card-border);
     border-radius: 12px;
-    color: var(--text-primary);
-    background: var(--bg-glass);
+    color: var(--admin-input-text);
+    background-color: var(--admin-input-bg);
+    transition: background-color 0.3s ease, color 0.3s ease;
     box-sizing: border-box;
 }
 
@@ -4800,7 +4834,7 @@ body.threads-media-open {
     position: absolute;
     left: 14px;
     display: flex;
-    color: var(--text-secondary);
+    color: var(--admin-text-secondary);
     pointer-events: none;
 }
 
@@ -6398,23 +6432,23 @@ body.dark-mode .create-post-modal,
 }
 
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page {
-    color: #f8fafc;
-    background: #0f172a;
+    color: var(--admin-text-primary);
+    background: var(--admin-bg);
 }
 
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-card,
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-header,
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-stat-card,
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-reports-section {
-    background: rgba(30, 41, 59, 0.6) !important;
-    border-color: rgba(255, 255, 255, 0.1) !important;
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28) !important;
+    background: var(--admin-card-bg) !important;
+    border-color: var(--admin-card-border) !important;
+    box-shadow: var(--admin-shadow) !important;
 }
 
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page h1,
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page h2,
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page strong {
-    color: #f8fafc;
+    color: var(--admin-text-primary);
 }
 
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-back-link,
@@ -6423,23 +6457,23 @@ body.dark-mode .create-post-modal,
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-user-role,
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-user-status,
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-reports-table th {
-    color: #94a3b8;
+    color: var(--admin-text-secondary);
 }
 
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-search-field input {
-    color: #ffffff;
-    background: rgba(15, 23, 42, 0.6) !important;
-    border-color: rgba(255, 255, 255, 0.12) !important;
+    color: var(--admin-input-text);
+    background: var(--admin-input-bg) !important;
+    border-color: var(--admin-card-border) !important;
 }
 
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-search-field input::placeholder {
-    color: #94a3b8;
+    color: var(--admin-text-secondary);
 }
 
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-user-row,
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-reports-table td,
 :is(html.dark-mode, html[data-theme="dark"], body.dark-mode, .dark) .admin-page .admin-reports-table th {
-    border-color: rgba(255, 255, 255, 0.1);
+    border-color: var(--admin-card-border);
 }
 
 /* Profile sharing must escape content layout and center over the full viewport. */
@@ -6932,9 +6966,9 @@ html[data-theme="dark"].dark-mode .admin-page .admin-card,
 html[data-theme="dark"] .admin-page .admin-card,
 body.dark-mode .admin-page .admin-card,
 .dark .admin-page .admin-card {
-    background: rgba(30, 41, 59, 0.6) !important;
-    border-color: rgba(255, 255, 255, 0.1) !important;
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28) !important;
+    background: var(--admin-card-bg) !important;
+    border-color: var(--admin-card-border) !important;
+    box-shadow: var(--admin-shadow) !important;
 }
 
 .threads-compose-overlay {
@@ -7080,8 +7114,7 @@ body.threads-compose-open { overflow: hidden; }
 [data-theme="dark"] .threads-primary-btn { background: #f3f4f6 !important; color: #121212 !important; }
 [data-theme="dark"] .threads-dropdown-menu,
 [data-theme="dark"] .reply-settings-panel,
-[data-theme="dark"] .threads-emoji-picker,
-[data-theme="dark"] .threads-more-menu {
+[data-theme="dark"] .threads-emoji-picker {
     background-color: #1e1e1e !important;
     color: #f3f4f6 !important;
     border: 1px solid #333 !important;
