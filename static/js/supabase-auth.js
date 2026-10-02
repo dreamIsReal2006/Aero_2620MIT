@@ -29,7 +29,10 @@
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.message || 'Unable to complete social sign in');
-        localStorage.setItem('aero_token', data.token);
+        const token = data.token || data.access_token || data.accessToken;
+        if (!token) throw new Error('Social sign in succeeded but no access token was returned.');
+        window.AeroToken?.set?.(token);
+        localStorage.setItem('aero_token', token);
         localStorage.setItem('aero_user', JSON.stringify(data.user));
         window.AeroI18n?.restoreUserLanguage?.(data.user);
         return true;
@@ -51,7 +54,7 @@
             button.addEventListener('click', () => signIn(button.dataset.socialProvider));
         });
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session || localStorage.getItem('aero_token')) return;
+        if (!session || window.AeroToken?.get?.()) return;
         try {
             if (await exchangeSession(session)) window.location.reload();
         } catch (error) {

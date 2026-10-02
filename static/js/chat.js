@@ -148,7 +148,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('chat-current-username').textContent = JSON.parse(localStorage.getItem('aero_user') || '{}').username || 'Messages';
-        fetch(`${apiBase}/notes`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` } }).then((response) => response.ok ? response.json() : []).then((notes) => {
+        fetch(`${apiBase}/notes`, { headers: window.AeroAuthHeaders?.() || {} }).then((response) => response.ok ? response.json() : []).then((notes) => {
             const notesArea = document.querySelector('.chat-notes');
             if (notesArea) notesArea.innerHTML = notes.length ? notes.map((note) => `<span class="chat-note">${escapeText(note.content)}</span>`).join('') : '';
         }).catch(() => {});

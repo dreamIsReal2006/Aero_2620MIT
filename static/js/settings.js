@@ -5,10 +5,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const byId = (id) => document.getElementById(id);
     const API_BASE = window.AeroConfig.API_BASE_URL;
 
-    const token = () => localStorage.getItem("aero_token");
+    const token = () => window.AeroToken?.get?.() || localStorage.getItem("aero_token") || localStorage.getItem("token");
 
     function clearAuthState() {
-        ["aero_token", "token", "aero_user", "currentUser"].forEach((key) => localStorage.removeItem(key));
+        ["aero_token", "token", "access_token", "sb-access-token", "aero_user", "currentUser"].forEach((key) => localStorage.removeItem(key));
         sessionStorage.clear();
     }
 
@@ -24,7 +24,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await response.json().catch(() => ({}));
         if (response.status === 401) {
             clearAuthState();
-            window.location.href = "index.html";
+            const isHomePage = window.location.pathname === "/" || window.location.pathname.endsWith("/index.html");
+            if (!isHomePage) window.location.href = "index.html";
             throw new Error("Your session has expired");
         }
         if (!response.ok) throw new Error(data.message || "Request failed");

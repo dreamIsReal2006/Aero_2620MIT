@@ -14,7 +14,8 @@ function isThreadDebugEnabled() {
 }
 
 function getAuthToken() {
-    const token = localStorage.getItem('aero_token');
+    const token = window.AeroToken?.get?.() || localStorage.getItem('aero_token') || localStorage.getItem('token');
+    if (token && !localStorage.getItem('aero_token')) localStorage.setItem('aero_token', token);
     return token && token !== 'null' && token !== 'undefined' ? token : '';
 }
 
@@ -3300,7 +3301,10 @@ const AeroAPI = {
 
             const data = await res.json();
             if (res.ok) {
-                localStorage.setItem('aero_token', data.token);
+                const token = data.token || data.access_token || data.accessToken;
+                if (!token) throw new Error('Sign in succeeded but no access token was returned.');
+                window.AeroToken?.set?.(token);
+                localStorage.setItem('aero_token', token);
                 localStorage.setItem('aero_user', JSON.stringify(data.user));
                 window.AeroI18n?.restoreUserLanguage?.(data.user);
                 window.location.href = 'index.html?tab=for_you';
@@ -3348,7 +3352,10 @@ const AeroAPI = {
             });
             const data = await res.json();
             if (res.ok) {
-                localStorage.setItem('aero_token', data.token);
+                const token = data.token || data.access_token || data.accessToken;
+                if (!token) throw new Error('OTP verification succeeded but no access token was returned.');
+                window.AeroToken?.set?.(token);
+                localStorage.setItem('aero_token', token);
                 localStorage.setItem('aero_user', JSON.stringify(data.user));
                 window.AeroI18n?.restoreUserLanguage?.(data.user);
                 sessionStorage.setItem('aero_profile_onboarding', '1');
