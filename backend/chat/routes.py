@@ -444,8 +444,10 @@ def get_contacts(current_user):
 @chat_bp.get("/chat/unread-count")
 @token_required
 def get_unread_count(current_user):
-    unread_count = Message.query.filter_by(
-        recipient_id=current_user.id, is_read=False
+    unread_count = Message.query.filter(
+        Message.recipient_id == current_user.id,
+        Message.sender_id != current_user.id,
+        Message.is_read.is_(False),
     ).count()
     return jsonify({"unread_count": unread_count})
 
@@ -484,9 +486,10 @@ def mark_messages_read(current_user):
 
     updated_count = query.update({Message.is_read: True}, synchronize_session=False)
     db.session.commit()
-    unread_count = Message.query.filter_by(
-        recipient_id=current_user.id,
-        is_read=False,
+    unread_count = Message.query.filter(
+        Message.recipient_id == current_user.id,
+        Message.sender_id != current_user.id,
+        Message.is_read.is_(False),
     ).count()
     return jsonify({"marked_read": updated_count, "unread_count": unread_count}), 200
 
@@ -722,7 +725,17 @@ def send_message(current_user):
         return jsonify({"message": "A valid recipient and message are required"}), 400
     if not group_id and (Block.query.filter_by(blocker_id=recipient_id, blocked_id=current_user.id).first() or Block.query.filter_by(blocker_id=current_user.id, blocked_id=recipient_id).first()):
         return jsonify({"message": "Messaging is unavailable for this contact"}), 403
-    message = Message(sender_id=current_user.id, recipient_id=current_user.id if group_id else recipient_id, group_id=group_id or None, content=content, media_url=media_url, type=message_type, file_name=file_name, file_size=file_size)
+    message = Message(
+        sender_id=current_user.id,
+        recipient_id=current_user.id if group_id else recipient_id,
+        group_id=group_id or None,
+        content=content,
+        media_url=media_url,
+        type=message_type,
+        file_name=file_name,
+        file_size=file_size,
+        is_read=bool(group_id),
+    )
     db.session.add(message)
     db.session.commit()
     if recipient and recipient.email and not has_recent_presence(recipient):
