@@ -18,6 +18,15 @@ function getAuthToken() {
     return token && token !== 'null' && token !== 'undefined' ? token : '';
 }
 
+function getStoredUser() {
+    try {
+        return JSON.parse(localStorage.getItem('aero_user') || '{}');
+    } catch (error) {
+        localStorage.removeItem('aero_user');
+        return {};
+    }
+}
+
 function authHeaders(extra = {}) {
     const token = getAuthToken();
     return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
@@ -163,6 +172,7 @@ function openThreadsMediaViewer(mediaList, startIndex = 0) {
         if (Math.abs(delta) > 50) change(delta < 0 ? 1 : -1);
     }, { passive: true });
     modal.addEventListener('click', event => { if (event.target === modal || event.target === stage) close(); });
+
     document.addEventListener('keydown', onKeyDown);
     document.body.appendChild(modal);
     document.body.classList.add('threads-media-open');
@@ -232,7 +242,6 @@ async function showHashtagPage(tag, updateHistory = true) {
             const article = document.createElement('article');
             article.className = 'post-card glass-card liquid-glass liquid-glass-interactive';
             const author = document.createElement('strong');
-            author.className = 'post-author';
             author.textContent = `@${post.username || 'User'}`;
             const content = document.createElement('div');
             content.className = 'post-content';
@@ -4522,7 +4531,7 @@ const AeroAPI = {
             });
         });
         const token = getAuthToken();
-        const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
+        const user = getStoredUser();
         renderHeaderNav(user);
         
         if (token && mainApp) {
@@ -4532,13 +4541,13 @@ const AeroAPI = {
             window.setFabAuthState?.(true);
             if (authOverlay) authOverlay.classList.add('hidden');
             mainApp.classList.remove('hidden');
-            document.getElementById('nav-username').innerText = user.username || 'User';
+            document.getElementById('nav-username')?.replaceChildren(document.createTextNode(user.username || 'User'));
             syncCurrentUserAvatars(user);
             const latestUser = await refreshCurrentUser();
             const initialFeedType = new URLSearchParams(window.location.search).get('tab') === 'following'
                 ? 'following'
                 : 'for_you';
-            if (latestUser) document.getElementById('nav-username').innerText = latestUser.display_name || latestUser.username || 'User';
+            if (latestUser) document.getElementById('nav-username')?.replaceChildren(document.createTextNode(latestUser.display_name || latestUser.username || 'User'));
             await this.renderFeed(initialFeedType);
             if (sessionStorage.getItem('aero_profile_onboarding') === '1') {
                 document.getElementById('profile-onboarding-overlay')?.classList.remove('hidden');
@@ -4564,7 +4573,7 @@ const AeroAPI = {
         const mainApp = document.getElementById('main-app');
         if (!authOverlay || !mainApp) return;
 
-        const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
+        const user = getStoredUser();
         syncLandingState(false);
         window.setFabAuthState?.(true);
         renderHeaderNav(user);
@@ -4572,7 +4581,7 @@ const AeroAPI = {
         mainApp.classList.remove('hidden');
         mainApp.classList.add('app-entering');
         authOverlay.classList.add('is-exiting');
-        document.getElementById('nav-username').textContent = user.username || 'User';
+        document.getElementById('nav-username')?.replaceChildren(document.createTextNode(user.username || 'User'));
         syncCurrentUserAvatars(user);
         this.renderFeed();
         window.setupChatRealtime?.();
@@ -5149,7 +5158,7 @@ function setDefaultScheduleTime() {
 }
 
 function updateThreadsUser() {
-    const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
+    const user = getStoredUser();
     const username = user.display_name || user.username || 'User';
     const avatarUrl = window.getUserAvatarUrl?.(user) || user.avatar_url || '';
     document.querySelectorAll('#threads-compose-overlay .current-user-name').forEach((node) => { node.textContent = username; });
@@ -5246,7 +5255,7 @@ function renderThreadChildren() {
     if (!editor || !root) return;
     root.querySelector('.threads-thread-line')?.classList.toggle('hidden', threadsPostState.length < 2);
     editor.querySelectorAll('.threads-post-item:not([data-index="0"])').forEach((item) => item.remove());
-    const user = JSON.parse(localStorage.getItem('aero_user') || '{}');
+    const user = getStoredUser();
     const username = user.display_name || user.username || 'User';
     const avatarUrl = window.getUserAvatarUrl?.(user) || user.avatar_url || '';
     for (let index = 1; index < threadsPostState.length; index += 1) {
@@ -5454,8 +5463,10 @@ function setupCreatePostExperience() {
         input.addEventListener('keyup', (event) => { if (!['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key)) updateMentionPicker(input); });
         input.addEventListener('keydown', onMentionKeydown);
     }
-    document.querySelectorAll('#global-fab-btn, #compose-trigger, .compose-trigger-media, [data-mobile-action="compose"], .btn-new-post, #new-post-btn, .share-box-input, [data-action="create-post"]').forEach((button) => {
-        button.addEventListener('click', openCreatePostModal);
+    document.addEventListener('click', (event) => {
+        if (!(event.target instanceof Element)) return;
+        const button = event.target.closest('#global-fab-btn, #compose-trigger, .compose-trigger-media, [data-mobile-action="compose"], .btn-new-post, #new-post-btn, .share-box-input, [data-action="create-post"]');
+        if (button) openCreatePostModal(event);
     });
     document.getElementById('compose-trigger')?.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') openCreatePostModal(event);
@@ -5688,16 +5699,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (toSignUpBtn) {
         toSignUpBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            signinForm.classList.add('hidden');
-            signupForm.classList.remove('hidden');
+            signinForm?.classList.add('hidden');
+            signupForm?.classList.remove('hidden');
         });
     }
 
     if (toSignInBtn) {
         toSignInBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            signupForm.classList.add('hidden');
-            signinForm.classList.remove('hidden');
+            signupForm?.classList.add('hidden');
+            signinForm?.classList.remove('hidden');
         });
     }
 
@@ -5705,9 +5716,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (signinForm) {
         signinForm.addEventListener('submit', (e) => {
             e.preventDefault();
+            const username = document.getElementById('signin-username');
+            const password = document.getElementById('signin-password');
+            if (!username || !password) return;
             AeroAPI.signin(
-                document.getElementById('signin-username').value,
-                document.getElementById('signin-password').value
+                username.value,
+                password.value
             );
         });
     }
@@ -5725,13 +5739,14 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const updatePasswordFeedback = () => {
+            if (!passwordInput || !strengthBar || !strengthLabel) return;
             const value = passwordInput.value;
             let satisfied = 0;
             Object.entries(requirements).forEach(([name, test]) => {
                 const item = signupForm.querySelector(`[data-requirement="${name}"]`);
                 const valid = test(value);
                 satisfied += valid ? 1 : 0;
-                item.classList.toggle('is-met', valid);
+                item?.classList.toggle('is-met', valid);
             });
             const level = satisfied >= 4 ? 'strong' : satisfied >= 2 ? 'medium' : satisfied ? 'weak' : '';
             strengthBar.style.width = `${satisfied * 25}%`;
@@ -5741,24 +5756,23 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const validatePasswordMatch = () => {
+            if (!confirmInput || !passwordInput) return false;
             const mismatch = confirmInput.value.length > 0 && confirmInput.value !== passwordInput.value;
             confirmInput.classList.toggle('has-error', mismatch);
-            document.getElementById('password-match-error').classList.toggle('is-visible', mismatch);
+            document.getElementById('password-match-error')?.classList.toggle('is-visible', mismatch);
             return !mismatch;
         };
 
-        passwordInput.addEventListener('input', updatePasswordFeedback);
-        confirmInput.addEventListener('blur', validatePasswordMatch);
-        confirmInput.addEventListener('input', validatePasswordMatch);
+        passwordInput?.addEventListener('input', updatePasswordFeedback);
+        confirmInput?.addEventListener('blur', validatePasswordMatch);
+        confirmInput?.addEventListener('input', validatePasswordMatch);
         signupForm.addEventListener('submit', (e) => {
             e.preventDefault();
             if (!validatePasswordMatch()) return;
-            AeroAPI.signup(
-                document.getElementById('signup-username').value,
-                document.getElementById('signup-email').value,
-                document.getElementById('signup-password').value,
-                document.getElementById('signup-confirm-password').value
-            );
+            const username = document.getElementById('signup-username');
+            const email = document.getElementById('signup-email');
+            if (!username || !email || !passwordInput || !confirmInput) return;
+            AeroAPI.signup(username.value, email.value, passwordInput.value, confirmInput.value);
         });
     }
 
@@ -5824,20 +5838,29 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.key === 'Escape' && deleteModal && !deleteModal.classList.contains('hidden')) closeDeleteModal();
     });
 
-    // Sign out
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-            window.setFabAuthState?.(false);
-            window.AeroStopNotificationRealtime?.();
-            window.AeroSupabaseSignOut?.().catch(() => {});
-            ['aero_token', 'token', 'aero_user', 'currentUser'].forEach((key) => localStorage.removeItem(key));
-            location.reload();
-        });
-    }
 });
 
+function handleLogout() {
+    window.setFabAuthState?.(false);
+    window.AeroStopNotificationRealtime?.();
+    Promise.resolve(window.AeroSupabaseSignOut?.()).catch(() => {});
+    ['aero_token', 'token', 'aero_user', 'currentUser'].forEach((key) => {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
+    });
+    window.location.href = 'index.html';
+}
+
+window.handleLogout = handleLogout;
+
 document.addEventListener('click', event => {
+    if (!(event.target instanceof Element)) return;
+    const logoutButton = event.target.closest('#logout-btn, .logout-btn');
+    if (logoutButton) {
+        event.preventDefault();
+        handleLogout();
+        return;
+    }
     if (!event.target.closest('.post-more-btn') && !event.target.closest('.post-dropdown-menu, .post-menu')) {
         closeAllPostMenus();
     }

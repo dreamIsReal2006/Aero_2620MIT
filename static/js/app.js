@@ -404,7 +404,6 @@
         });
         window.cleanupShortsPlayback?.();
     }
-
     function setFabAuthState(authenticated) {
         isAuthenticated = authenticated;
         if (!authenticated) {
@@ -1039,6 +1038,7 @@
         document.getElementById('post-detail-back')?.addEventListener('click', closePostDetail);
         setupProfilePostNavigation();
         document.addEventListener('click', (event) => {
+            if (!(event.target instanceof Element)) return;
             const adminLink = event.target.closest('#admin-dashboard-link');
             if (adminLink) {
                 event.preventDefault();
