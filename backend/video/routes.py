@@ -1,3 +1,5 @@
+# Video feed and video interaction routes
+# From: static/js/shorts.js -> To: videos, likes, comments, and JSON responses
 from pathlib import Path
 
 from flask import jsonify, request

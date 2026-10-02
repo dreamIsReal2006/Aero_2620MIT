@@ -1,3 +1,5 @@
+# Poll vote persistence model
+# From: feed routes -> To: post_votes table
 from datetime import datetime
 
 from backend import db

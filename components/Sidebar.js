@@ -1,3 +1,5 @@
+// Desktop docks and mobile navigation controls
+// From: navigation state -> To: parent route and view handlers
 'use client';
 
 import { useEffect, useRef } from 'react';

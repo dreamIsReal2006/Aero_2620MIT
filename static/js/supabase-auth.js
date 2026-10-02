@@ -1,3 +1,5 @@
+// Optional Supabase authentication bridge
+// From: browser auth state -> To: Supabase Auth and Aero session storage
 (() => {
     const config = window.AeroConfig;
     if (!config || !window.supabase?.createClient) return;

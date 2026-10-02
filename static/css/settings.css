@@ -1,3 +1,5 @@
+/* Settings page layout and controls */
+/* Used by: settings.html; reads state from static/js/settings.js */
 * {
     box-sizing: border-box;
 }
@@ -372,13 +374,8 @@ body.compact-mode .form-group {
     margin-bottom: 14px;
 }
 
-body.compact-mode .setting-row,
-body.compact-mode .security-row {
+body.compact-mode .setting-row {
     padding: 12px 0;
-}
-
-body.compact-mode .security-row {
-    padding: 14px 0;
 }
 
 body.compact-mode .danger-zone {
@@ -588,8 +585,7 @@ body.dark-mode select#theme-select option {
    SETTING ROWS
 ================================= */
 
-.setting-row,
-.security-row {
+.setting-row {
     display: flex;
 
     align-items: center;
@@ -603,18 +599,15 @@ body.dark-mode select#theme-select option {
     border-bottom: 1px solid var(--border);
 }
 
-.setting-row:first-child,
-.security-row:first-child {
+.setting-row:first-child {
     padding-top: 0;
 }
 
-.setting-row:last-child,
-.security-row:last-child {
+.setting-row:last-child {
     border-bottom: 0;
 }
 
 .setting-row h3,
-.security-row h3,
 .danger-zone h3 {
     margin: 0;
 
@@ -622,7 +615,6 @@ body.dark-mode select#theme-select option {
 }
 
 .setting-row p,
-.security-row p,
 .danger-zone p {
     margin: 0;
 
@@ -715,11 +707,27 @@ body.dark-mode select#theme-select option {
    SECURITY
 ================================= */
 
-.security-row {
-    padding: 20px 0;
+.security-card-body {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 20px;
 }
 
-.danger-zone {
+.security-card-body .setting-item {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 20px;
+
+    border-bottom: none !important;
+}
+
+.security-card-body .danger-zone {
     display: flex;
 
     justify-content: space-between;
@@ -728,11 +736,9 @@ body.dark-mode select#theme-select option {
 
     gap: 20px;
 
-    padding-top: 25px;
+    padding-top: 0;
 
-    margin-top: 5px;
-
-    border-top: 1px solid var(--border);
+    margin-top: 0;
 }
 
 
@@ -1037,7 +1043,7 @@ body.dark-mode select#theme-select option {
     }
 
     .setting-row,
-    .security-row,
+    .setting-item,
     .danger-zone {
         align-items: flex-start;
 
@@ -1119,13 +1125,13 @@ body.dark-mode select#theme-select option {
     .user-profile-summary,
     .profile-preview { gap: 12px !important; }
     .setting-row,
-    .security-row,
+    .setting-item,
     .danger-zone { width: 100%; min-width: 0; align-items: center; flex-direction: row; gap: 12px; padding: 16px 0; }
     .setting-row > div,
-    .security-row > div,
+    .setting-item > div,
     .danger-zone > div { min-width: 0; overflow-wrap: anywhere; }
     .setting-row h3,
-    .security-row h3,
+    .setting-item h3,
     .danger-zone h3 { overflow-wrap: anywhere; }
     .setting-row select { flex: 0 0 132px; width: 132px; max-width: 42%; }
     .secondary-button,

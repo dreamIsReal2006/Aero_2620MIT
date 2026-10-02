@@ -1,3 +1,5 @@
+# Post like relationship model
+# From: interaction routes -> To: likes table
 from datetime import datetime
 from backend import db
 

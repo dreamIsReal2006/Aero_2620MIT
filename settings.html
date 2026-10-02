@@ -1,3 +1,6 @@
+<!-- Account and application settings page -->
+<!-- Links to: static/css/settings.css, static/js/settings.js -->
+<!-- Calls API: /api/auth, /api/users -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -505,16 +508,17 @@
                     </div>
 
 
-                    <div class="settings-card liquid-glass">
+                    <div class="settings-card security-card liquid-glass">
+                        <div class="security-card-body">
 
 
                         <!-- CHANGE PASSWORD -->
 
-                        <div class="security-row">
+                        <div class="setting-item">
 
                             <div>
 
-                                <h3>Password</h3>
+                                <h3 data-i18n="Password">Password</h3>
 
 
                             </div>
@@ -524,7 +528,7 @@
                                 class="secondary-button"
                                 id="change-password-button"
                             >
-                                Change Password
+                                <span data-i18n="Change Password">Change Password</span>
                             </button>
 
                         </div>
@@ -533,11 +537,11 @@
 
                         <!-- ACTIVE SESSIONS -->
 
-                        <div class="security-row">
+                        <div class="setting-item">
 
                             <div>
 
-                                <h3>Active Sessions</h3>
+                                <h3 data-i18n="Active Sessions">Active Sessions</h3>
 
 
                             </div>
@@ -547,7 +551,7 @@
                                 class="secondary-button"
                                 id="sessions-button"
                             >
-                                View Sessions
+                                <span data-i18n="View Sessions">View Sessions</span>
                             </button>
 
                         </div>
@@ -556,11 +560,11 @@
 
                         <!-- DELETE ACCOUNT -->
 
-                        <div class="danger-zone">
+                        <div class="setting-item danger-zone">
 
                             <div>
 
-                                <h3>Delete Account</h3>
+                                <h3 data-i18n="Delete Account">Delete Account</h3>
 
 
                             </div>
@@ -570,8 +574,10 @@
                                 class="danger-button"
                                 id="delete-account-button"
                             >
-                                Delete Account
+                                <span data-i18n="Delete Account">Delete Account</span>
                             </button>
+
+                        </div>
 
                         </div>
 

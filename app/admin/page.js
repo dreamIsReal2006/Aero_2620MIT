@@ -1,3 +1,5 @@
+// Admin page entry point and moderation data view
+// From: browser navigation -> To: /api/admin endpoints and admin components
 'use client';
 
 import { useEffect, useState } from 'react';

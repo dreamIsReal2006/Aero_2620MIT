@@ -1,3 +1,5 @@
+# Hashtag and post-topic relationship models
+# From: feed routes -> To: hashtags and association tables
 from datetime import datetime
 
 from backend import db

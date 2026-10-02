@@ -1,3 +1,5 @@
+// Sign-in and sign-up form for the React client
+// From: user credentials -> To: /api/auth/signin or /api/auth/signup
 'use client';
 
 import { useState } from 'react';

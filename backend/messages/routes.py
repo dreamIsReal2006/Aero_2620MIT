@@ -1,3 +1,5 @@
+# Direct message routes
+# From: chat clients -> To: messages table and recipient notification records
 from flask import jsonify, request
 
 from backend import db

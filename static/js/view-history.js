@@ -1,3 +1,5 @@
+// Viewed-post history tracker
+// From: feed navigation events -> To: local storage and history UI
 (() => {
     const STORAGE_KEY = 'aero_view_history';
     const HISTORY_LIMIT = 20;

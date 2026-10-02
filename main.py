@@ -6,6 +6,8 @@ New native FastAPI routes can be added under the same ``/api`` prefix without
 changing the public contract.
 """
 
+# FastAPI deployment entry point with Flask compatibility mounting
+# From: public HTTP requests -> To: native /api routes and Flask blueprints
 import os
 
 from fastapi import APIRouter, FastAPI

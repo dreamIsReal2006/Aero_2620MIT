@@ -1,3 +1,5 @@
+# Feed blueprint registration
+# From: backend application factory -> To: /api/posts route handlers
 from flask import Blueprint
 
 

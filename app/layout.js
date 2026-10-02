@@ -1,3 +1,5 @@
+// Root Next.js layout and document metadata
+// From: app/page.js -> To: app/globals.css and shared browser UI
 import './globals.css';
 
 export const metadata = { title: 'Aero - Liquid Social Platform', description: 'Aero social platform' };

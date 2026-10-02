@@ -1,3 +1,5 @@
+# Flask application factory, database setup, and shared static routes
+# From: app.py/main.py -> To: SQLAlchemy, blueprints, and browser assets
 import logging
 import os
 from pathlib import Path

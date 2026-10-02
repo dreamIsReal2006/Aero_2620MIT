@@ -1,3 +1,5 @@
+// Sign-in, sign-up, and session management controller
+// From: index.html and otp.html forms -> To: /api/auth endpoints and local storage
 (() => {
     const apiBase = window.AeroConfig.API_BASE_URL;
     const escapeText = (value) => String(value || '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));

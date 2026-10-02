@@ -1,3 +1,5 @@
+// Feed post renderer with media, polls, likes, and mentions
+// From: post payload -> To: browser UI and /api/posts/:id/vote or dwell routes
 'use client';
 
 import { useEffect, useRef, useState } from 'react';

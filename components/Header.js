@@ -1,3 +1,5 @@
+// Global search, profile, and session header
+// From: user input and session state -> To: parent navigation callbacks
 'use client';
 
 import { useState } from 'react';

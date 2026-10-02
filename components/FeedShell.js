@@ -1,3 +1,5 @@
+// Main feed shell, composer, navigation, and client state
+// From: user actions and Supabase fallback -> To: /api/posts and media upload routes
 'use client';
 
 import { useEffect, useRef, useState } from 'react';

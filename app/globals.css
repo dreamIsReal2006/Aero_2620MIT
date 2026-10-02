@@ -1,3 +1,5 @@
+/* Shared Next.js application styles */
+/* Used by: app/layout.js and components/*; renders in the browser */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

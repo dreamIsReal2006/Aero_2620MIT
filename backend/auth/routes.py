@@ -1,3 +1,5 @@
+# Authentication, session, and OTP routes
+# From: auth forms and tokens -> To: users table, email service, and JSON responses
 import datetime as dt
 import json
 import logging

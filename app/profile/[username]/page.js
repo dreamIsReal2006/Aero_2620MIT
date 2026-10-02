@@ -1,3 +1,5 @@
+// Public profile route for user content and relationships
+// From: /profile/:username -> To: backend user and post endpoints
 'use client';
 
 import Link from 'next/link';

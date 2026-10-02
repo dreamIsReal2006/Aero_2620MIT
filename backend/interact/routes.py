@@ -1,3 +1,5 @@
+# Likes, comments, bookmarks, reports, and post interaction routes
+# From: static/js/app.js -> To: interaction tables and JSON responses
 from flask import jsonify, request
 
 from backend import db

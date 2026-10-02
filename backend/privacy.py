@@ -1,3 +1,5 @@
+# Privacy and relationship access helpers
+# From: route authorization checks -> To: block, mute, follow, and user data
 from backend import db
 from backend.models import Follow, User
 

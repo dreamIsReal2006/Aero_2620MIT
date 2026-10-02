@@ -1,3 +1,5 @@
+# User notification persistence model
+# From: interaction and chat services -> To: notifications table
 from datetime import datetime
 
 from backend import db

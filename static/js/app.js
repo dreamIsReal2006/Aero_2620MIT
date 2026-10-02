@@ -1,3 +1,5 @@
+// Main legacy page controller and feed view state
+// From: index.html events -> To: /api/posts and browser-rendered feed views
 (() => {
     const views = {
         main: 'view-main',

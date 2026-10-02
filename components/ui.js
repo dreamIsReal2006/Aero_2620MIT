@@ -1,3 +1,5 @@
+// Shared React icons, avatars, and glass-surface primitives
+// From: feature components -> To: rendered UI elements
 export function Icon({ name, className = 'h-5 w-5' }) {
   const paths = {
     search: <><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></>,

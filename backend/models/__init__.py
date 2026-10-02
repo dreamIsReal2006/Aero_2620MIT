@@ -1,3 +1,5 @@
+# SQLAlchemy model export registry
+# From: backend application factory -> To: shared database tables and relationships
 from backend.models.user import User
 from backend.models.post import Post
 from backend.models.post_vote import PostVote

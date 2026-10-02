@@ -1,3 +1,5 @@
+# User block relationship model
+# From: social routes -> To: blocks table
 from backend import db
 
 

@@ -1,3 +1,5 @@
+# Mention parsing and notification helpers
+# From: post/comment text -> To: user records and notification rows
 import re
 
 from backend import db

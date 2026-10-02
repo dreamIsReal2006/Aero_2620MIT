@@ -1,3 +1,5 @@
+# User account and profile persistence model
+# From: auth and social routes -> To: users table and identity data
 from backend import db
 from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import validates

@@ -1,3 +1,5 @@
+# Post, thread, poll, and media persistence model
+# From: feed routes -> To: posts table and related post data
 import json
 from datetime import datetime
 from backend import db

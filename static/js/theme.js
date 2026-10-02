@@ -1,3 +1,5 @@
+// Theme preference and system color-mode synchronizer
+// From: user preference and media query -> To: document theme attributes
 (() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 

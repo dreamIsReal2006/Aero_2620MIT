@@ -1,3 +1,5 @@
+# Video like relationship model
+# From: video routes -> To: video_likes table
 from datetime import datetime
 
 from backend import db

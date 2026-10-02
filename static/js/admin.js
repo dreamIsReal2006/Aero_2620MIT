@@ -1,3 +1,5 @@
+// Admin dashboard interactions and moderation actions
+// From: admin.html controls -> To: /api/admin endpoints
 document.addEventListener('DOMContentLoaded', async () => {
     const savedTheme = localStorage.getItem('theme');
     const savedLanguage = localStorage.getItem('lang') || localStorage.getItem('aero_user_lang') || localStorage.getItem('aero_language');

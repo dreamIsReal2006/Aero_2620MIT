@@ -1,3 +1,5 @@
+# Private profile note model
+# From: profile routes -> To: notes table
 from datetime import datetime
 
 from backend import db

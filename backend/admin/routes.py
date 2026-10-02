@@ -1,3 +1,5 @@
+# Moderation and administrator management routes
+# From: admin.html and admin.js -> To: moderation tables and JSON responses
 import json
 
 from flask import g, jsonify, request

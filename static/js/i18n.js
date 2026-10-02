@@ -1,3 +1,5 @@
+// Client language selection and translation registry
+// From: browser storage and language events -> To: localized HTML labels
 (() => {
     const STORAGE_KEY = 'aero_user_lang';
     const originalTitle = document.title;

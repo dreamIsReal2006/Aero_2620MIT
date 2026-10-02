@@ -1,3 +1,5 @@
+# Direct message persistence model
+# From: chat and message routes -> To: messages table
 from datetime import datetime
 
 from backend import db

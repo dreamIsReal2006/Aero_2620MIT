@@ -1,3 +1,5 @@
+# Moderation audit log model
+# From: admin routes -> To: moderation_logs table
 from datetime import datetime
 
 from backend import db

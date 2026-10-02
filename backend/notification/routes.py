@@ -1,3 +1,5 @@
+# Notification listing and read-state routes
+# From: static/js/app.js -> To: notifications table and JSON responses
 from backend import db
 from backend.auth.routes import token_required
 from backend.models import Notification, Post, User

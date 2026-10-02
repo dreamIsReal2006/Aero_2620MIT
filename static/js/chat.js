@@ -1,3 +1,5 @@
+// Chat UI, presence polling, and message delivery controller
+// From: index.html chat controls -> To: /api/chat and messages tables
 (() => {
     const supabaseConfig = window.AeroConfig || {};
     const supabaseFactory = window.supabase?.createClient;

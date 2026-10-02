@@ -1,3 +1,5 @@
+// Screen-time tracking and usage limit controller
+// From: browser activity -> To: local storage and settings UI
 (() => {
     const STORAGE_KEY = 'aero_screen_time';
     const TICK_MS = 1000;

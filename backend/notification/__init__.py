@@ -1,3 +1,5 @@
+# Notification blueprint registration
+# From: backend application factory -> To: /api/notifications route handlers
 from flask import Blueprint
 
 notification_bp = Blueprint(

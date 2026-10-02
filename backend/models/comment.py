@@ -1,3 +1,5 @@
+# Post comment persistence model
+# From: interaction routes -> To: comments table
 from datetime import datetime
 from backend import db
 

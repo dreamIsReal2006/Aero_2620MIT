@@ -1,3 +1,5 @@
+// Tailwind content paths and design tokens for React components
+// From: app and components class names -> To: generated CSS consumed by the browser
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./app/**/*.{js,jsx}', './components/**/*.{js,jsx}'],

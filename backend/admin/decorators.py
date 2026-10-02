@@ -1,3 +1,5 @@
+# Admin authorization decorators
+# From: admin route calls -> To: verified user roles and access decisions
 from functools import wraps
 
 import jwt

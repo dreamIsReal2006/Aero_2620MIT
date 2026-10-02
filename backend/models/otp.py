@@ -1,3 +1,5 @@
+# One-time password persistence model
+# From: auth routes -> To: otps table and email verification flow
 from datetime import datetime
 
 from backend import db

@@ -1,3 +1,5 @@
+# User follow relationship model
+# From: social routes -> To: follows table
 from datetime import datetime
 from backend import db
 

@@ -1,3 +1,5 @@
+// Browser API origin and runtime configuration
+// From: environment and hostname -> To: window.AeroConfig used by all client modules
 (function configureAeroApi() {
     const productionApiOrigin = 'https://aero-2620mit.onrender.com';
 

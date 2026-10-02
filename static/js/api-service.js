@@ -1,3 +1,5 @@
+// Shared legacy API wrapper and social interaction helpers
+// From: static HTML events -> To: Flask/FastAPI endpoints under /api
 const API_BASE = window.AeroConfig.API_BASE_URL;
 const API_ORIGIN = window.AeroConfig.API_ORIGIN;
 const ADMIN_API_BASE = window.AeroConfig.ADMIN_API_BASE || `${API_ORIGIN}/api/admin`;

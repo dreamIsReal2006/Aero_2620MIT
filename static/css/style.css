@@ -1,3 +1,6 @@
+/* Legacy application theme and component styles */
+/* Used by: index.html, admin.html, otp.html, suspended.html */
+/* Styles data rendered by: static/js/*.js from Flask routes */
 /* Theme variables and colors */
 :root {
     --bottom-nav-height: 65px;

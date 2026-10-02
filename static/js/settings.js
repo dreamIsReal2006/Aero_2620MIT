@@ -1,3 +1,5 @@
+// Settings page event handlers and account preferences
+// From: settings.html controls -> To: local state and /api/auth or /api/users
 document.addEventListener("DOMContentLoaded", () => {
     const $ = (selector) => document.querySelector(selector);
     const byId = (id) => document.getElementById(id);

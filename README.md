@@ -12,10 +12,10 @@ DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-0-ap-southeast-1
 
 The backend requires PostgreSQL through the Supabase transaction pooler. It does
 not fall back to a local SQLite database when PostgreSQL is unavailable; a
-connection failure is logged and startup stops. Apply `supabase_for_you_feed.sql`
-in the Supabase SQL editor when deploying hashtag search and personalized tag ranking.
+connection failure is logged and startup stops. Hashtag and feed schema changes
+are maintained through the backend model and migration process.
 
-The backend uses `pool_pre_ping=true`, `pool_recycle=280`, and `pool_size=10` for PostgreSQL. Start it locally with `uvicorn main:app --host 0.0.0.0 --port 8000`, or deploy with the included `Procfile` command: `gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000`.
+The backend uses `pool_pre_ping=true`, `pool_recycle=280`, and `pool_size=10` for PostgreSQL. Start it locally with `uvicorn main:app --host 0.0.0.0 --port 8000`; Render uses the command defined in `render.yaml`.
 
 ## Next.js frontend
 
@@ -24,7 +24,7 @@ The frontend is now available as a Next.js App Router application with Tailwind 
 ### Run locally
 
 1. Install Node.js 18.17+ (Node.js 20 LTS recommended).
-2. Copy `.env.local.example` to `.env.local` and adjust the API origin if needed.
+2. Copy `.env.example` to `.env` and adjust the API settings if needed.
 3. Run `npm install` to install `@supabase/supabase-js` and the Next.js dependencies.
 4. Run `npm run dev` and open `http://localhost:3000`.
 

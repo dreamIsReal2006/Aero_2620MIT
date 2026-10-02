@@ -1,3 +1,5 @@
+# User interaction history model
+# From: feed service -> To: user_interactions table
 from datetime import datetime
 
 from backend import db

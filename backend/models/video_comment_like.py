@@ -1,3 +1,5 @@
+# Video comment like model
+# From: video routes -> To: video_comment_likes table
 from datetime import datetime
 
 from backend import db

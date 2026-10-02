@@ -1,3 +1,5 @@
+# Flask application entry point and legacy document routes
+# From: browser requests -> To: backend.create_app and public HTML files
 from pathlib import Path
 
 from dotenv import load_dotenv

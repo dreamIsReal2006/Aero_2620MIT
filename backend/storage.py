@@ -1,3 +1,5 @@
+# Media storage and upload processing helpers
+# From: browser multipart uploads -> To: local storage or configured object storage
 import mimetypes
 import os
 import uuid

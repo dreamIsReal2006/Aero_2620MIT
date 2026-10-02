@@ -1,3 +1,5 @@
+# Video comment persistence model
+# From: video routes -> To: video_comments table
 from datetime import datetime
 
 from backend import db

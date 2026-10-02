@@ -1,3 +1,5 @@
+# Group chat and membership models
+# From: chat routes -> To: chat_groups and membership tables
 from datetime import datetime
 
 from backend import db

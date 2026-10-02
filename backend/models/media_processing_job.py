@@ -1,3 +1,5 @@
+# Asynchronous media processing job model
+# From: upload routes -> To: media_processing_jobs table and worker status
 from datetime import datetime
 
 from backend import db

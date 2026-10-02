@@ -1,3 +1,5 @@
+# User-saved GIF model
+# From: feed and chat clients -> To: user_custom_gifs table
 from datetime import datetime
 
 from backend import db

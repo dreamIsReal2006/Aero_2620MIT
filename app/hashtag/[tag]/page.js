@@ -1,3 +1,5 @@
+// Hashtag route for topic-specific post discovery
+// From: /hashtag/:tag -> To: backend hashtag post endpoints
 'use client';
 
 import Link from 'next/link';

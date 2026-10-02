@@ -1,3 +1,5 @@
+# Social relationship blueprint registration
+# From: backend application factory -> To: /api/social route handlers
 from flask import Blueprint
 
 

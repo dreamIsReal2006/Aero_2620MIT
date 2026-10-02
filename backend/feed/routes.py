@@ -1,3 +1,5 @@
+# Post feed, upload, poll, and hashtag routes
+# From: feed clients -> To: posts, media jobs, hashtags, and JSON responses
 import json
 import datetime as dt
 import logging

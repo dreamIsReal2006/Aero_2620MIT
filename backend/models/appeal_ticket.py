@@ -1,3 +1,5 @@
+# Appeal ticket persistence model
+# From: moderation routes -> To: appeal_tickets table
 from datetime import datetime
 
 from backend import db

@@ -1,3 +1,5 @@
+// User search and profile selection modal
+// From: search text -> To: /api/users/search and profile navigation
 'use client';
 
 import { Avatar, Glass } from './ui';

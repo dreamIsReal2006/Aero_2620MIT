@@ -1,3 +1,5 @@
+// Short-video feed and video interaction controller
+// From: index.html shorts view -> To: /api/video endpoints and video tables
 (() => {
     const apiBase = window.AeroConfig.API_BASE_URL;
     let videos = [];

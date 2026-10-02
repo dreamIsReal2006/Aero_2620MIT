@@ -1,3 +1,5 @@
+# Short video persistence model
+# From: video routes -> To: videos table and media URLs
 from datetime import datetime
 
 from backend import db

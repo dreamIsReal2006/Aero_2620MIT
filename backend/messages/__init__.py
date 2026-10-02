@@ -1,3 +1,5 @@
+# Message blueprint registration
+# From: backend application factory -> To: /api/messages route handlers
 from flask import Blueprint
 
 messages_bp = Blueprint(

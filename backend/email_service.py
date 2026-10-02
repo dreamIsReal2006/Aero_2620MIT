@@ -1,3 +1,5 @@
+# Email delivery service for authentication and chat notifications
+# From: backend routes -> To: configured SMTP provider and recipient inboxes
 import html
 import json
 import logging

@@ -1,3 +1,5 @@
+# User mute relationship model
+# From: social routes -> To: mutes table
 from datetime import datetime
 
 from backend import db

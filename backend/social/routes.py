@@ -1,3 +1,5 @@
+# Follow, block, mute, profile, and user search routes
+# From: profile and social UI -> To: relationship tables and user JSON payloads
 import json
 import re
 

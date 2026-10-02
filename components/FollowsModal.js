@@ -1,3 +1,5 @@
+// Followers and following relationship modal
+// From: profile user id -> To: /api/users/:id/follows and /api/social/follow/:id
 'use client';
 
 import Link from 'next/link';

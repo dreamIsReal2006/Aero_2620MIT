@@ -1,3 +1,5 @@
+# Chat email notification cooldown model
+# From: chat service -> To: chat_email_cooldowns table
 from datetime import datetime
 
 from backend import db

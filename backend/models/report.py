@@ -1,3 +1,5 @@
+# User and content report model
+# From: interaction and admin routes -> To: reports table
 from datetime import datetime
 
 from backend import db

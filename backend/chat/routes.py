@@ -1,3 +1,5 @@
+# Chat, group, presence, and unread-count routes
+# From: static/js/chat.js -> To: messages tables and JSON chat payloads
 import json
 import logging
 import os

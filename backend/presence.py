@@ -1,3 +1,5 @@
+# User presence and last-seen service
+# From: chat/activity requests -> To: user presence fields and response payloads
 from datetime import datetime, timedelta
 
 
