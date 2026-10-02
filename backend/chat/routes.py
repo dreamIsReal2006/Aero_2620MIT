@@ -240,7 +240,9 @@ def upload_video_to_gif(current_user):
 def get_groups(current_user):
     memberships = ChatGroupMember.query.filter_by(user_id=current_user.id).all()
     groups = [db.session.get(ChatGroup, membership.group_id) for membership in memberships]
-    return jsonify([_group_payload(group, current_user.id) for group in groups if group])
+    payload = [_group_payload(group, current_user.id) for group in groups if group]
+    payload.sort(key=lambda group: group["latest_message_at"] or "", reverse=True)
+    return jsonify(payload)
 
 
 @chat_bp.post("/chat/groups")
@@ -421,7 +423,7 @@ def get_contacts(current_user):
     followed_ids = [row.following_id for row in Follow.query.filter_by(follower_id=current_user.id, status="approved").all()]
     follower_ids = [row.follower_id for row in Follow.query.filter_by(following_id=current_user.id, status="approved").all()]
     ids = set(followed_ids + follower_ids)
-    contacts = User.query.filter(User.id.in_(ids)).order_by(User.username.asc()).all() if ids else []
+    contacts = User.query.filter(User.id.in_(ids)).all() if ids else []
     payload = []
     for user in contacts:
         latest = Message.query.filter(
@@ -435,6 +437,7 @@ def get_contacts(current_user):
             sender_id=user.id, recipient_id=current_user.id, is_read=False
         ).count()
         payload.append(item)
+    payload.sort(key=lambda contact: contact["latest_message_at"] or "", reverse=True)
     return jsonify(payload)
 
 
@@ -583,6 +586,7 @@ def get_messages(current_user):
         "sender_id": message.sender_id,
         "sender_username": message.sender.username if message.sender else "User",
         "created_at": f"{message.created_at.isoformat()}Z",
+        "is_read": bool(message.is_read),
         "can_delete": message.sender_id == current_user.id,
         "file_name": message.file_name or "",
         "file_size": message.file_size or 0,

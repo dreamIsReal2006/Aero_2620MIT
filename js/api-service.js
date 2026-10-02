@@ -1194,6 +1194,45 @@ function updateDockBadge(buttonId, count) {
     }
 }
 
+function chatStatusMarkup(message, currentUser) {
+    if (Number(message.sender_id) !== Number(currentUser.id)) return '';
+    const status = message.status === 'sending'
+        ? 'sent'
+        : message.delivery_status || (message.is_read ? 'read' : 'delivered');
+    const ticks = status === 'sent'
+        ? '<path d="M11.0001 0.999939L4.50006 7.49994L1.50006 4.49994"/>'
+        : '<path d="M11.0001 0.999939L4.50006 7.49994L1.50006 4.49994"/><path d="M14.5001 0.999939L8.00006 7.49994"/>';
+    return `<span class="message-status ${status}" aria-label="${status}"><svg width="16" height="11" viewBox="0 0 16 11" fill="none" class="status-ticks" aria-hidden="true"><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ticks}</g></svg></span>`;
+}
+
+function updateChatContactUnread(conversation, count = 0) {
+    if (!conversation) return;
+    const selector = conversation.is_group
+        ? `.chat-contact[data-group-id="${CSS.escape(String(conversation.group_id || conversation.id))}"]`
+        : `.chat-contact[data-user-id="${CSS.escape(String(conversation.id))}"]`;
+    const item = document.querySelector(selector);
+    const unreadCount = Math.max(0, Number(count) || 0);
+    conversation.unread_count = unreadCount;
+    item?.classList.toggle('unread', unreadCount > 0);
+    const badge = item?.querySelector('.chat-unread-badge');
+    if (badge) {
+        badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+        badge.classList.toggle('hidden', unreadCount < 1);
+    }
+}
+
+function moveChatContactToTop(message) {
+    const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
+    const contactId = message.group_id
+        ? message.group_id
+        : Number(message.sender_id) === Number(currentUser.id) ? message.recipient_id : message.sender_id;
+    const selector = message.group_id
+        ? `.chat-contact[data-group-id="${CSS.escape(String(message.group_id))}"]`
+        : `.chat-contact[data-user-id="${CSS.escape(String(contactId))}"]`;
+    const item = document.querySelector(selector);
+    if (item?.parentElement) item.parentElement.prepend(item);
+}
+
 function setNotificationDrawerVisibility(isOpen) {
     const drawer = document.getElementById('notifications-drawer');
     const button = document.getElementById('notification-dock-btn');
@@ -1494,7 +1533,7 @@ async function appendSingleMessageToUI(message, conversation = activeChatUser ||
             : '';
     node.classList.toggle('is-sending', message.status === 'sending');
     node.classList.toggle('is-failed', message.status === 'failed');
-    node.innerHTML = `${contact.is_group && Number(message.sender_id) !== Number(currentUser.id) ? '<small class="chat-group-sender">New message</small>' : ''}<div class="chat-bubble-content message-bubble">${media}${content}</div><div class="chat-message-meta"><time class="message-time">${escapeHtml(timestamp)}</time>${deliveryStatus}</div>`;
+    node.innerHTML = `${contact.is_group && Number(message.sender_id) !== Number(currentUser.id) ? '<small class="chat-group-sender">New message</small>' : ''}<div class="chat-bubble-content message-bubble">${media}${content}</div><div class="chat-message-meta"><time class="message-time">${escapeHtml(timestamp)}</time>${chatStatusMarkup(message, currentUser)}${deliveryStatus}</div>`;
     box.appendChild(node);
     box.scrollTop = box.scrollHeight;
     return true;
@@ -1525,9 +1564,10 @@ function updateChatContactPreview(message, preview, conversation = activeChatUse
     const timestamp = item.querySelector('time');
     if (timestamp) timestamp.textContent = formatRelativeTime(message.created_at);
     item.dataset.latestMessageAt = message.created_at || '';
+    moveChatContactToTop(message);
     const isCurrentConversation = conversation && (message.group_id
         ? conversation.is_group && String(conversation.group_id || conversation.id) === String(message.group_id)
-        : !conversation.is_group && String(conversation.id) === String(contactId));
+        : !conversation?.is_group && String(conversation?.id) === String(contactId));
     item.classList.toggle('unread', !isCurrentConversation && Number(message.sender_id) !== Number(currentUser.id));
 }
 
@@ -1570,7 +1610,7 @@ function setupChatRealtime() {
                 if (isIncoming && message.group_id) {
                     const groupId = String(message.group_id);
                     chatGroupUnreadCounts.set(groupId, (chatGroupUnreadCounts.get(groupId) || 0) + 1);
-                    updateDockBadge('chat-dock-btn', (chatUnreadCount || 0) + getLocalGroupUnreadCount());
+                    updateDockBadge('chat-dock-btn', chatUnreadCount || 0);
                 }
                 const preview = message.type === 'system'
                     ? Promise.resolve(formatChatSystemEvent(message, currentUser))
@@ -1641,10 +1681,15 @@ async function loadChatContacts() {
     const previousScrollTop = list.scrollTop;
     const contactMarkup = contactsSnapshot.map((contact) => {
         const avatar = chatAvatarMarkup(contact, `chat-contact-avatar${contact.is_online ? ' is-online' : ''}`);
-        return `<button type="button" class="chat-contact ${contact.unread_count ? 'unread' : ''}" data-user-id="${contact.id}">${avatar}<span><strong>@${escapeHtml(contact.username)}</strong><small>${escapeHtml(contact.latest_message || 'Start a conversation')}</small><time>${escapeHtml(formatRelativeTime(contact.latest_message_at))}</time></span></button>`;
+        const unreadCount = Number(contact.unread_count) || 0;
+        return `<button type="button" class="chat-contact ${unreadCount ? 'unread' : ''}" data-user-id="${contact.id}" data-latest-message-at="${escapeHtml(contact.latest_message_at || '')}">${avatar}<span><strong>@${escapeHtml(contact.username)}</strong><small>${escapeHtml(contact.latest_message || 'Start a conversation')}</small><time>${escapeHtml(formatRelativeTime(contact.latest_message_at))}</time></span><span class="chat-unread-badge ${unreadCount ? '' : 'hidden'}" aria-label="Unread messages">${unreadCount > 99 ? '99+' : unreadCount}</span></button>`;
     }).join('');
-    const groupMarkup = groupsSnapshot.map((group) => `<button type="button" class="chat-contact chat-group-contact" data-group-id="${group.group_id}">${chatAvatarMarkup(group, 'chat-contact-avatar')}<span><strong>${escapeHtml(group.name)}</strong><small>${escapeHtml(group.latest_message || chatInfoText('member_count', { count: group.member_count || 0 }))}</small><time>${escapeHtml(formatRelativeTime(group.latest_message_at))}</time></span></button>`).join('');
-    list.innerHTML = `${groupMarkup}${contactMarkup}` || '<div class="bookmarks-empty">No contacts yet.</div>';
+    const groupMarkup = groupsSnapshot.map((group) => {
+        const unreadCount = Number(group.unread_count) || 0;
+        return `<button type="button" class="chat-contact chat-group-contact ${unreadCount ? 'unread' : ''}" data-group-id="${group.group_id}" data-latest-message-at="${escapeHtml(group.latest_message_at || '')}">${chatAvatarMarkup(group, 'chat-contact-avatar')}<span><strong>${escapeHtml(group.name)}</strong><small>${escapeHtml(group.latest_message || chatInfoText('member_count', { count: group.member_count || 0 }))}</small><time>${escapeHtml(formatRelativeTime(group.latest_message_at))}</time></span><span class="chat-unread-badge ${unreadCount ? '' : 'hidden'}" aria-label="Unread messages">${unreadCount > 99 ? '99+' : unreadCount}</span></button>`;
+    }).join('');
+    list.innerHTML = `${groupMarkup}${contactMarkup}` || `<div class="bookmarks-empty" data-i18n="chat.info.no_contacts">${window.AeroI18n?.t('chat.info.no_contacts') || 'No contacts yet.'}</div>`;
+    [...list.querySelectorAll('.chat-contact')].sort((left, right) => new Date(right.dataset.latestMessageAt || 0) - new Date(left.dataset.latestMessageAt || 0)).forEach((item) => list.appendChild(item));
     list.scrollTop = Math.min(previousScrollTop, list.scrollHeight);
     await Promise.all([...list.querySelectorAll('.chat-contact')].map(async (item) => {
         const isGroup = item.classList.contains('chat-group-contact');
@@ -1666,7 +1711,7 @@ async function loadUnreadChatCount() {
     const unreadCount = Number(data.unread_count) || 0;
     if (chatUnreadCount !== null && unreadCount > chatUnreadCount) playNotificationSound();
     chatUnreadCount = unreadCount;
-    updateDockBadge('chat-dock-btn', unreadCount + getLocalGroupUnreadCount());
+    updateDockBadge('chat-dock-btn', unreadCount);
 }
 
 async function markConversationRead(conversation) {
@@ -1685,8 +1730,9 @@ async function markConversationRead(conversation) {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || 'Unable to mark messages as read');
-    updateDockBadge('chat-dock-btn', (data.unread_count || 0) + getLocalGroupUnreadCount());
+    updateDockBadge('chat-dock-btn', data.unread_count || 0);
     chatUnreadCount = Number(data.unread_count) || 0;
+    updateChatContactUnread(conversation, 0);
 }
 
 function setMuteButtonState(button, muted, animate = true) {
@@ -1717,6 +1763,7 @@ async function selectChatGroup(group) {
     activeChatUser = { ...group, id: group.group_id, is_group: true };
     window.activeChatUser = activeChatUser;
     setChatBlockState(activeChatUser, false, false);
+    updateChatContactUnread(activeChatUser, 0);
     setChatContactState(true);
     const activeAvatar = document.getElementById('chat-active-avatar');
     const activeName = document.getElementById('chat-active-name');
@@ -1748,6 +1795,7 @@ async function selectChatContact(contact) {
     activeChatUser = contact;
     window.activeChatUser = contact;
     setChatBlockState(contact, Boolean(contact.is_blocked), Boolean(contact.is_blocked_by));
+    updateChatContactUnread(contact, 0);
     document.getElementById('chat-group-info-btn')?.classList.add('hidden');
     setChatContactState(true);
     const activeAvatar = document.getElementById('chat-active-avatar');
@@ -1928,7 +1976,7 @@ async function renderChatMessages(messages, contact) {
             if (eventText) timelineMarkup.push(`<div class="chat-system-message chat-timeline-message" data-message-id="${message.id}" data-chat-date-key="${dateKey}">${escapeHtml(eventText)}</div>`);
             return;
         }
-        timelineMarkup.push(`<div class="chat-message chat-timeline-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}" data-chat-date-key="${dateKey}">${contact.is_group && message.sender_id !== currentUser.id ? `<small class="chat-group-sender">@${escapeHtml(message.sender_username || 'User')}</small>` : ''}<div class="chat-bubble-content">${message.shared_post ? sharedPostMarkup(message.shared_post) : mediaMarkup(message)}${message.type === 'post_share' ? '' : (message.content ? renderMessageText(message.content) : '')}</div><div class="chat-message-meta"><time>${escapeHtml(window.AeroI18n?.formatChatTimestamp?.(message.created_at) || '')}</time><button type="button" class="chat-star-message ${starredIds.has(String(message.id)) ? 'is-starred' : ''}" data-star-message="${message.id}" aria-label="${chatInfoText(starredIds.has(String(message.id)) ? 'unstar_message' : 'star_message')}" aria-pressed="${starredIds.has(String(message.id))}">${starredIds.has(String(message.id)) ? '★' : '☆'}</button>${message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : ''}</div></div>`);
+        timelineMarkup.push(`<div class="chat-message chat-timeline-message ${message.sender_id === currentUser.id ? 'mine' : ''}" data-message-id="${message.id}" data-chat-date-key="${dateKey}">${contact.is_group && message.sender_id !== currentUser.id ? `<small class="chat-group-sender">@${escapeHtml(message.sender_username || 'User')}</small>` : ''}<div class="chat-bubble-content">${message.shared_post ? sharedPostMarkup(message.shared_post) : mediaMarkup(message)}${message.type === 'post_share' ? '' : (message.content ? renderMessageText(message.content) : '')}</div><div class="chat-message-meta"><time>${escapeHtml(window.AeroI18n?.formatChatTimestamp?.(message.created_at) || '')}</time>${chatStatusMarkup(message, currentUser)}<button type="button" class="chat-star-message ${starredIds.has(String(message.id)) ? 'is-starred' : ''}" data-star-message="${message.id}" aria-label="${chatInfoText(starredIds.has(String(message.id)) ? 'unstar_message' : 'star_message')}" aria-pressed="${starredIds.has(String(message.id))}">${starredIds.has(String(message.id)) ? '★' : '☆'}</button>${message.can_delete ? `<span class="chat-message-tools"><button type="button" data-delete-message="${message.id}" aria-label="Delete message">Delete</button></span>` : ''}</div></div>`);
     });
     box.innerHTML = timelineMarkup.join('');
     box.querySelectorAll('[data-lightbox-src]').forEach((item) => item.addEventListener('click', () => { const lightbox = document.getElementById('chat-lightbox'); const image = document.getElementById('chat-lightbox-image'); image.src = item.dataset.lightboxSrc; lightbox.classList.remove('hidden'); }));
@@ -1954,6 +2002,12 @@ function setupMediaAndChat() {
         setChatContactState(false);
     });
     document.getElementById('chat-back-button')?.addEventListener('click', () => setChatContactState(false));
+    const markActiveChatRead = () => {
+        if (!document.hidden && (activeChatUser || window.activeChatUser)) markConversationRead(activeChatUser || window.activeChatUser).catch(() => {});
+        if (!document.hidden) loadUnreadChatCount().catch(() => {});
+    };
+    window.addEventListener('focus', markActiveChatRead);
+    document.addEventListener('visibilitychange', markActiveChatRead);
     window.addEventListener('resize', () => {
         if (window.innerWidth > 768) setChatContactState(false);
     }, { passive: true });
