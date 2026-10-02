@@ -5453,6 +5453,7 @@ function openCreatePostModal(event) {
 function setupCreatePostExperience() {
     const overlay = document.getElementById('threads-compose-overlay');
     if (!overlay) return;
+    const shareTarget = document.querySelector('.share-box-input');
     shareTarget?.addEventListener('focus', () => { shareTarget.dataset.previousValue = shareTarget.value; });
     updateStaticPollLanguage(overlay);
     window.addEventListener('aero:language-change', () => updateStaticPollLanguage(overlay));
