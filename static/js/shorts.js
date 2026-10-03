@@ -7,7 +7,6 @@
     let activeMedia = null;
     let shortObserver = null;
     let tapTimer = 0;
-    let touchStartY = 0;
     let shortsCommentsCloseTimer = 0;
     let shortsCommentsAnimationEnd = null;
     let shortCardPositionAnimation = null;
@@ -59,163 +58,146 @@
         share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 7 7-7 7M21 12H4"></path></svg>',
     })[name];
 
-    function renderCurrentVideo(direction = 0) {
+    function renderCurrentVideo() {
         const stage = document.getElementById('shorts-stage');
-        const video = videos[currentIndex];
         activeMedia?.pause();
-        if (!stage || !video) {
+        shortObserver?.disconnect();
+        if (!stage || !videos.length) {
             if (stage) stage.innerHTML = `<div class="shorts-empty"><div class="shorts-empty-content"><span>${window.AeroI18n?.t('no_shorts') || 'No Shorts available yet.'}</span><button type="button" id="shorts-empty-upload" class="shorts-empty-upload">${window.AeroI18n?.t('upload_first_video') || '+ Upload First Video'}</button></div></div>`;
             return;
         }
-        const author = video.author || video.user || {};
-        const avatarUrl = author.avatar_url || video.author_avatar || '';
-        const videoSourceType = /\.mov(?:$|\?)/i.test(video.video_url) ? 'video/quicktime' : /\.webm(?:$|\?)/i.test(video.video_url) ? 'video/webm' : /\.m4v(?:$|\?)/i.test(video.video_url) ? 'video/x-m4v' : 'video/mp4';
-        const avatar = window.AeroAvatar?.markup({ ...author, avatar_url: avatarUrl }, 'short-author-avatar') || (avatarUrl ? `<img src="${escapeText(mediaUrl(avatarUrl))}" alt="" loading="lazy" decoding="async">` : escapeText((author.username || 'U').charAt(0).toUpperCase()));
-        stage.innerHTML = `<article class="short-card"><video id="active-short-video" playsinline loop autoplay preload="metadata" data-hdr-fallback="${!window.AeroMediaCapabilities?.isHDRSupported()}"><source src="${escapeText(mediaUrl(video.video_url))}" type="${videoSourceType}"></video><span class="short-playback-indicator" aria-hidden="true"></span><div class="short-card-overlay"><div class="short-card-copy"><div class="short-author">${avatar}<strong>@${escapeText(author.username || 'User')}</strong><button type="button" class="short-subscribe ${video.is_following ? 'subscribed' : ''}" data-user-id="${author.id || ''}">${video.is_following ? 'Subscribed' : 'Subscribe'}</button></div><p>${escapeText(video.caption)}</p><div class="short-track">♫ <span>${escapeText(video.track_name || 'Original audio')}</span></div></div><div class="short-interactions"><button type="button" id="short-like-btn" class="short-action ${video.is_liked ? 'is-liked' : ''}" aria-label="Like" aria-pressed="${Boolean(video.is_liked)}">${icon('heart')}<small>${video.likes_count || 0}</small></button><button type="button" id="short-comment-btn" class="short-action" aria-label="Comments" aria-expanded="false">${icon('comment')}<small>Comments</small></button><button type="button" id="short-share-btn" class="short-action" aria-label="Share">${icon('share')}<small>Share</small></button><button type="button" id="short-audio-btn" class="short-audio-cover" aria-label="Original audio">♫</button></div></div><div class="short-nav"><button type="button" id="short-prev" aria-label="Previous Short">↑</button><button type="button" id="short-next" aria-label="Next Short">↓</button></div></article>`;
-        const card = stage.querySelector('.short-card');
-        if (direction) card?.classList.add(direction > 0 ? 'is-entering-from-next' : 'is-entering-from-previous');
-        const media = document.getElementById('active-short-video');
-        activeMedia = media;
-        media.muted = false;
-        media.autoplay = false;
-        media.pause();
-        const togglePlayback = () => {
-            const indicator = stage.querySelector('.short-playback-indicator');
-            if (media.paused) {
-                media.play().catch(() => {});
-                indicator.textContent = '▶';
-            } else {
-                media.pause();
-                indicator.textContent = '❚❚';
-            }
-            indicator.classList.remove('is-visible');
-            void indicator.offsetWidth;
-            indicator.classList.add('is-visible');
-        };
-        media.addEventListener('click', () => {
-            if (tapTimer) {
-                window.clearTimeout(tapTimer);
-                tapTimer = 0;
-                stage.querySelector('#short-like-btn')?.click();
-                return;
-            }
-            tapTimer = window.setTimeout(() => {
-                tapTimer = 0;
-                togglePlayback();
-            }, 240);
-        });
-        stage.querySelector('.short-subscribe')?.addEventListener('click', async (event) => {
-            const button = event.currentTarget;
-            if (!button.dataset.userId) return;
-            button.disabled = true;
-            try {
-                const response = await fetch(`${apiBase}/users/${button.dataset.userId}/follow`, { method: 'POST', headers: authHeaders() });
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.message || 'Unable to update subscription');
-                button.textContent = result.is_following ? 'Subscribed' : 'Subscribe';
-                button.classList.toggle('subscribed', result.is_following);
-                video.is_following = result.is_following;
-                if (result.is_following) {
-                    window.addContactToChatList?.({
-                        id: Number(button.dataset.userId),
-                        name: (author.username || 'User'),
-                        username: (author.username || 'User'),
-                        avatar: avatarUrl
-                    });
-                }
-            } catch (error) {
-                showShortNotice(error.message || 'Unable to update subscription', 'error');
-            } finally {
-                button.disabled = false;
-            }
-        });
-        stage.querySelector('#short-prev')?.setAttribute('title', 'Previous Short');
-        stage.querySelector('#short-next')?.setAttribute('title', 'Next Short');
-        stage.querySelector('#short-prev')?.addEventListener('click', () => changeVideo(-1));
-        stage.querySelector('#short-next')?.addEventListener('click', () => changeVideo(1));
-        stage.querySelector('#short-like-btn')?.addEventListener('click', async (event) => {
-            const button = event.currentTarget;
-            button.disabled = true;
-            try {
-                const response = await fetch(`${apiBase}/shorts/${video.id}/like`, { method: 'POST', headers: authHeaders() });
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.message || 'Unable to update like');
-                video.is_liked = result.liked;
-                video.likes_count = result.likes_count;
-                button.classList.toggle('is-liked', result.liked);
-                button.setAttribute('aria-pressed', String(result.liked));
-                button.querySelector('small').textContent = result.likes_count;
-            } catch (error) {
-                showShortNotice(error.message || 'Unable to update like', 'error');
-            } finally {
-                button.disabled = false;
-            }
-        });
-        stage.querySelector('#short-share-btn')?.addEventListener('click', async () => {
-            try {
-                if (navigator.share) {
-                    await navigator.share({ title: 'Aero Short', text: video.caption || 'Watch this Short', url: window.location.href });
-                } else if (navigator.clipboard?.writeText) {
-                    await navigator.clipboard.writeText(window.location.href);
-                    showShortNotice('Link copied to clipboard!', 'success');
-                } else {
-                    throw new Error('Sharing is not available in this browser');
-                }
-            } catch (error) {
-                if (error.name !== 'AbortError') showShortNotice(error.message || 'Unable to share this Short', 'error');
-            }
-        });
-        stage.querySelector('#short-comment-btn')?.addEventListener('click', (event) => {
-            const drawer = document.getElementById('shorts-comment-drawer');
-            const isOpen = drawer?.classList.contains('open');
-            toggleShortsComments(!isOpen, drawer);
-            event.currentTarget.setAttribute('aria-expanded', String(!isOpen));
-            if (!isOpen) openShortComments(video.id);
-        });
-        stage.querySelector('#short-audio-btn')?.addEventListener('click', () => {
-            showShortNotice(`Original audio: ${video.track_name || 'Original audio'}`);
-        });
-        shortObserver?.disconnect();
-        shortObserver = new IntersectionObserver((entries) => {
-            entries.forEach((entry) => {
-                if (entry.intersectionRatio >= 0.8) {
-                    activeMedia = media;
+        stage.innerHTML = videos.map((video, index) => {
+            const author = video.author || video.user || {};
+            const avatarUrl = author.avatar_url || video.author_avatar || '';
+            const videoSourceType = /\.mov(?:$|\?)/i.test(video.video_url) ? 'video/quicktime' : /\.webm(?:$|\?)/i.test(video.video_url) ? 'video/webm' : /\.m4v(?:$|\?)/i.test(video.video_url) ? 'video/x-m4v' : 'video/mp4';
+            const avatar = window.AeroAvatar?.markup({ ...author, avatar_url: avatarUrl }, 'short-author-avatar') || (avatarUrl ? `<img src="${escapeText(mediaUrl(avatarUrl))}" alt="" loading="lazy" decoding="async">` : escapeText((author.username || 'U').charAt(0).toUpperCase()));
+            return `<section class="short-video-page" data-short-index="${index}"><article class="short-card"><video class="short-video-media" playsinline loop preload="${index === currentIndex ? 'metadata' : 'none'}" data-hdr-fallback="${!window.AeroMediaCapabilities?.isHDRSupported()}"><source src="${escapeText(mediaUrl(video.video_url))}" type="${videoSourceType}"></video><span class="short-playback-indicator" aria-hidden="true"></span><div class="short-card-overlay"><div class="short-card-copy"><div class="short-author">${avatar}<strong>@${escapeText(author.username || 'User')}</strong><button type="button" class="short-subscribe ${video.is_following ? 'subscribed' : ''}" data-user-id="${author.id || ''}">${video.is_following ? 'Subscribed' : 'Subscribe'}</button></div><p>${escapeText(video.caption)}</p><div class="short-track">♫ <span>${escapeText(video.track_name || 'Original audio')}</span></div></div><div class="short-interactions"><button type="button" class="short-action short-like-btn ${video.is_liked ? 'is-liked' : ''}" aria-label="Like" aria-pressed="${Boolean(video.is_liked)}">${icon('heart')}<small>${video.likes_count || 0}</small></button><button type="button" class="short-action short-comment-btn" aria-label="Comments" aria-expanded="false">${icon('comment')}<small>Comments</small></button><button type="button" class="short-action short-share-btn" aria-label="Share">${icon('share')}<small>Share</small></button><button type="button" class="short-audio-cover short-audio-btn" aria-label="Original audio">♫</button></div></div></article></section>`;
+        }).join('');
+
+        const pages = [...stage.querySelectorAll('.short-video-page')];
+        pages.forEach((page, index) => {
+            const video = videos[index];
+            const author = video.author || video.user || {};
+            const avatarUrl = author.avatar_url || video.author_avatar || '';
+            const card = page.querySelector('.short-card');
+            const media = page.querySelector('.short-video-media');
+            const togglePlayback = () => {
+                const indicator = page.querySelector('.short-playback-indicator');
+                if (media.paused) {
                     media.muted = false;
-                    media.play().catch(() => { media.muted = true; media.play().catch(() => {}); });
+                    media.play().catch(() => {});
+                    indicator.textContent = '▶';
                 } else {
                     media.pause();
-                    media.currentTime = 0;
+                    indicator.textContent = '❚❚';
+                }
+                indicator.classList.remove('is-visible');
+                void indicator.offsetWidth;
+                indicator.classList.add('is-visible');
+            };
+            media.addEventListener('click', () => {
+                if (tapTimer) {
+                    window.clearTimeout(tapTimer);
+                    tapTimer = 0;
+                    page.querySelector('.short-like-btn')?.click();
+                    return;
+                }
+                tapTimer = window.setTimeout(() => {
+                    tapTimer = 0;
+                    togglePlayback();
+                }, 240);
+            });
+            page.querySelector('.short-subscribe')?.addEventListener('click', async (event) => {
+                const button = event.currentTarget;
+                if (!button.dataset.userId) return;
+                button.disabled = true;
+                try {
+                    const response = await fetch(`${apiBase}/users/${button.dataset.userId}/follow`, { method: 'POST', headers: authHeaders() });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.message || 'Unable to update subscription');
+                    button.textContent = result.is_following ? 'Subscribed' : 'Subscribe';
+                    button.classList.toggle('subscribed', result.is_following);
+                    video.is_following = result.is_following;
+                    if (result.is_following) window.addContactToChatList?.({ id: Number(button.dataset.userId), name: author.username || 'User', username: author.username || 'User', avatar: avatarUrl });
+                } catch (error) {
+                    showShortNotice(error.message || 'Unable to update subscription', 'error');
+                } finally {
+                    button.disabled = false;
                 }
             });
-        }, { threshold: [0, 0.8, 1] });
-        if (card) shortObserver.observe(card);
+            page.querySelector('.short-like-btn')?.addEventListener('click', async (event) => {
+                const button = event.currentTarget;
+                button.disabled = true;
+                try {
+                    const response = await fetch(`${apiBase}/shorts/${video.id}/like`, { method: 'POST', headers: authHeaders() });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.message || 'Unable to update like');
+                    video.is_liked = result.liked;
+                    video.likes_count = result.likes_count;
+                    button.classList.toggle('is-liked', result.liked);
+                    button.setAttribute('aria-pressed', String(result.liked));
+                    button.querySelector('small').textContent = result.likes_count;
+                } catch (error) {
+                    showShortNotice(error.message || 'Unable to update like', 'error');
+                } finally {
+                    button.disabled = false;
+                }
+            });
+            page.querySelector('.short-share-btn')?.addEventListener('click', async () => {
+                try {
+                    if (navigator.share) await navigator.share({ title: 'Aero Short', text: video.caption || 'Watch this Short', url: window.location.href });
+                    else if (navigator.clipboard?.writeText) {
+                        await navigator.clipboard.writeText(window.location.href);
+                        showShortNotice('Link copied to clipboard!', 'success');
+                    } else throw new Error('Sharing is not available in this browser');
+                } catch (error) {
+                    if (error.name !== 'AbortError') showShortNotice(error.message || 'Unable to share this Short', 'error');
+                }
+            });
+            page.querySelector('.short-comment-btn')?.addEventListener('click', (event) => {
+                const drawer = document.getElementById('shorts-comment-drawer');
+                const isOpen = drawer?.classList.contains('open');
+                toggleShortsComments(!isOpen, drawer);
+                event.currentTarget.setAttribute('aria-expanded', String(!isOpen));
+                if (!isOpen) openShortComments(video.id);
+            });
+            page.querySelector('.short-audio-btn')?.addEventListener('click', () => showShortNotice(`Original audio: ${video.track_name || 'Original audio'}`));
+            card?.addEventListener('animationend', () => card.classList.remove('is-entering-from-next', 'is-entering-from-previous'));
+        });
+
+        shortObserver = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                const media = entry.target.querySelector('.short-video-media');
+                if (!media) return;
+                if (entry.intersectionRatio >= 0.8) {
+                    currentIndex = Number(entry.target.dataset.shortIndex) || 0;
+                    activeMedia = media;
+                    media.muted = true;
+                    media.play().catch(() => {});
+                } else {
+                    media.pause();
+                    if (activeMedia === media) activeMedia = null;
+                }
+            });
+        }, { root: stage, threshold: [0, 0.8, 1] });
+        pages.forEach((page) => shortObserver.observe(page));
+        stage.scrollTop = currentIndex * stage.clientHeight;
     }
 
     function changeVideo(direction) {
-        if (!videos.length || isChangingVideo) return;
+        const stage = document.getElementById('shorts-stage');
+        const nextIndex = currentIndex + direction;
+        const nextPage = stage?.querySelector(`[data-short-index="${nextIndex}"]`);
+        if (!stage || !nextPage || isChangingVideo) return;
         isChangingVideo = true;
         window.clearTimeout(videoChangeTimeout);
         videoChangeTimeout = window.setTimeout(() => {
             isChangingVideo = false;
             videoChangeTimeout = 0;
-        }, 380);
+        }, 700);
         toggleShortsComments(false);
-        currentIndex = (currentIndex + direction + videos.length) % videos.length;
-        renderCurrentVideo(direction);
-        document.getElementById('shorts-stage')?.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    function setupTouchFallback(stage) {
-        stage.addEventListener('touchstart', (event) => {
-            touchStartY = event.touches[0]?.clientY || 0;
-        }, { passive: true });
-        stage.addEventListener('touchend', (event) => {
-            if (!touchStartY) return;
-            const deltaY = (event.changedTouches[0]?.clientY || 0) - touchStartY;
-            touchStartY = 0;
-            if (Math.abs(deltaY) <= 50) return;
-            changeVideo(deltaY < 0 ? 1 : -1);
-        }, { passive: true });
+        nextPage.querySelector('.short-card')?.classList.add(direction > 0 ? 'is-entering-from-next' : 'is-entering-from-previous');
+        stage.scrollTo({ top: nextPage.offsetTop, behavior: 'smooth' });
     }
 
     async function loadShorts() {
@@ -388,12 +370,19 @@
             if (event.target.closest('#shorts-empty-upload')) window.openVideoUploadModal();
         });
         const shortsStage = document.getElementById('shorts-stage');
-        shortsStage && setupTouchFallback(shortsStage);
         shortsStage?.addEventListener('wheel', (event) => {
             if (Math.abs(event.deltaY) <= 20) return;
             event.preventDefault();
             changeVideo(event.deltaY > 0 ? 1 : -1);
         }, { passive: false });
+        shortsStage?.addEventListener('scroll', () => {
+            if (!isChangingVideo) return;
+            window.clearTimeout(videoChangeTimeout);
+            videoChangeTimeout = window.setTimeout(() => {
+                isChangingVideo = false;
+                videoChangeTimeout = 0;
+            }, 140);
+        }, { passive: true });
         document.addEventListener('click', (event) => {
             const drawer = document.getElementById('shorts-comment-drawer');
             const target = event.target;
