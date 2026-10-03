@@ -1495,6 +1495,18 @@ function applyGroupSystemEvent(message, group) {
     return true;
 }
 
+function scrollChatToBottom(chatContainer) {
+    if (!chatContainer) return;
+    chatContainer.querySelectorAll('img, video').forEach((media) => {
+        if (media.dataset.chatScrollBound) return;
+        media.dataset.chatScrollBound = 'true';
+        media.addEventListener(media.tagName === 'VIDEO' ? 'loadedmetadata' : 'load', () => scrollChatToBottom(chatContainer), { once: true });
+    });
+    requestAnimationFrame(() => {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    });
+}
+
 async function appendSingleMessageToUI(message, conversation = activeChatUser || window.activeChatUser) {
     const contact = conversation;
     const box = document.getElementById('chat-messages-list') || document.getElementById('chat-messages');
@@ -1518,7 +1530,7 @@ async function appendSingleMessageToUI(message, conversation = activeChatUser ||
         node.dataset.chatDateKey = dateKey;
         node.textContent = eventText;
         box.appendChild(node);
-        box.scrollTop = box.scrollHeight;
+        scrollChatToBottom(box);
         return true;
     }
     const content = escapeHtml(await decryptChatContent(message.content, contact));
@@ -1547,7 +1559,7 @@ async function appendSingleMessageToUI(message, conversation = activeChatUser ||
     node.classList.toggle('is-failed', message.status === 'failed');
     node.innerHTML = `${contact.is_group && Number(message.sender_id) !== Number(currentUser.id) ? '<small class="chat-group-sender">New message</small>' : ''}<div class="chat-bubble-content message-bubble">${media}${content}</div><div class="chat-message-meta"><time class="message-time">${escapeHtml(timestamp)}</time>${chatStatusMarkup(message, currentUser)}${deliveryStatus}</div>`;
     box.appendChild(node);
-    box.scrollTop = box.scrollHeight;
+    scrollChatToBottom(box);
     return true;
 }
 
@@ -2005,7 +2017,7 @@ async function renderChatMessages(messages, contact) {
         button.setAttribute('aria-pressed', String(isStarred));
         button.classList.toggle('is-starred', isStarred);
     }));
-    box.scrollTop = box.scrollHeight;
+    scrollChatToBottom(box);
 }
 
 function setupMediaAndChat() {
@@ -2491,8 +2503,6 @@ function setupMediaAndChat() {
             <div class="chat-info-scroll">
                 <section class="chat-info-profile">${avatarMarkup}<strong>${escapeHtml(name)}</strong><small>${isGroup ? chatInfoText('group_count', { count: Number(contact.member_count) || 0 }) : `@${escapeHtml(contact.username || 'user')}`}</small>${!isGroup ? `<p>${escapeHtml(about)}</p>` : ''}</section>
                 <div class="chat-info-actions">
-                    <button type="button" disabled title="${chatInfoText('call_unavailable')}"><span>☎</span>${chatInfoText('voice')}</button>
-                    <button type="button" disabled title="${chatInfoText('call_unavailable')}"><span>▣</span>${chatInfoText('video')}</button>
                     ${isGroup ? `<button type="button" data-info-action="add-member" ${canManageGroup(contact) ? '' : `disabled title="${chatInfoText('member_management_unavailable')}"`}><span>＋</span>${chatInfoText('add_member')}</button>` : ''}
                     ${isGroup && canManageGroup(contact) ? `<button type="button" data-info-action="edit-group"><span>✎</span>${chatInfoText('edit_group')}</button>` : ''}
                     <button type="button" data-info-action="search"><span>⌕</span>${chatInfoText('search')}</button>
@@ -2503,7 +2513,6 @@ function setupMediaAndChat() {
                 <section class="chat-info-section chat-info-options">
                     <button type="button" data-info-action="starred">☆ <span>${chatInfoText('starred')}</span></button>
                     ${!isGroup ? `<button type="button" data-info-action="mute">♧ <span>${chatInfoText(contact.is_muted ? 'unmute' : 'mute')}</span></button><button type="button" data-info-action="block" class="is-danger">${contact.is_blocked ? '<svg class="chat-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="m17 11 2 2 4-4"/></svg>' : '<svg class="chat-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="m17 8 5 5m0-5-5 5"/></svg>'} <span>${chatInfoText(contact.is_blocked ? 'unblock' : 'block')}</span></button>` : `<button type="button" disabled title="${chatInfoText('group_notifications_unavailable')}"><svg class="chat-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg><span>${chatInfoText('notification_settings')}</span></button><button type="button" data-info-action="leave" class="is-danger">↪ <span>${chatInfoText('leave')}</span></button><button type="button" class="is-danger" disabled title="${chatInfoText('reporting_unavailable')}">⚑ <span>${chatInfoText('report')}</span></button>`}
-                    <button type="button" data-info-action="clear" class="is-danger" disabled title="${chatInfoText('clear_unavailable')}">⌫ <span>${chatInfoText('clear')}</span></button>
                 </section>
             </div>`;
         renderInfoAssets(cachedMessages, true);
@@ -2643,7 +2652,6 @@ function setupMediaAndChat() {
             if (!showingStarred && !starred.size) window.showNotice?.(chatInfoText('no_starred'), 'info');
             closeInfoDrawer();
         });
-        infoDrawer.querySelector('[data-info-action="clear"]')?.addEventListener('click', () => window.showNotice?.(chatInfoText('history_clear_unavailable'), 'info'));
     };
     window.addEventListener('aero:language-change', () => {
         const group = activeChatUser || window.activeChatUser;

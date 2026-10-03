@@ -41,6 +41,18 @@
         return document.getElementById('chat-contacts-list') || document.getElementById('chat-contact-list');
     }
 
+    function scrollChatToBottom(chatContainer) {
+        if (!chatContainer) return;
+        chatContainer.querySelectorAll('img, video').forEach((media) => {
+            if (media.dataset.chatScrollBound) return;
+            media.dataset.chatScrollBound = 'true';
+            media.addEventListener(media.tagName === 'VIDEO' ? 'loadedmetadata' : 'load', () => scrollChatToBottom(chatContainer), { once: true });
+        });
+        requestAnimationFrame(() => {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        });
+    }
+
     function renderChatHeader(contact) {
         const name = contact?.username || contact?.name || 'User';
         const nameElement = document.getElementById('chat-active-name');
@@ -142,7 +154,7 @@
             if (response.ok) button.closest('.chat-message')?.remove();
             else window.showNotice?.('Unable to delete message.', 'error');
         }));
-        box.scrollTop = box.scrollHeight;
+        scrollChatToBottom(box);
         document.getElementById('view-chat')?.classList.remove('hidden');
     };
 

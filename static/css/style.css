@@ -3139,7 +3139,7 @@ body.dark-mode .chat-info-drawer, html.dark-mode body.light-mode .chat-info-draw
 .chat-info-profile > strong { max-width: 100%; overflow-wrap: anywhere; font-size: 1.12rem; }
 .chat-info-profile > small, .chat-info-profile > p { margin: 0; color: var(--text-secondary); font-size: .82rem; }
 .chat-info-profile > p { max-width: 270px; padding-top: 5px; }
-.chat-info-actions { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 6px; padding: 12px 0 16px; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
+.chat-info-actions { display: grid; grid-template-columns: repeat(auto-fit,minmax(64px,76px)); justify-content: center; gap: 6px; padding: 12px 0 16px; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
 .chat-info-actions button { display: grid; justify-items: center; gap: 5px; min-width: 0; padding: 5px 2px; border: 0; color: var(--accent-primary); background: transparent; cursor: pointer; font: inherit; font-size: .67rem; }
 .chat-info-actions button span { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--border-subtle); border-radius: 50%; font-size: 1rem; }
 .chat-info-actions button:disabled { color: var(--text-secondary); opacity: .55; cursor: not-allowed; }
@@ -3187,7 +3187,7 @@ body.dark-mode .chat-info-doc, html.dark-mode body.light-mode .chat-info-doc, :r
 .chat-action-icon { display: block; width: 18px; height: 18px; flex: 0 0 18px; }
 .group-remove-member-btn { display: inline-flex; min-width: 72px; min-height: 40px; align-items: center; justify-content: center; padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--color-danger) 32%, var(--border-subtle)); border-radius: var(--g2-radius-control); color: var(--color-danger); background: transparent; cursor: pointer; font: inherit; font-size: .76rem; }
 .group-remove-member-btn:hover { background: color-mix(in srgb, var(--color-danger) 10%, transparent); }
-.chat-info-options { display: grid; gap: 2px; }
+.chat-info-options { display: grid; gap: 4px; padding-bottom: 10px; }
 .chat-info-options > button { display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 4px; border: 0; color: var(--text-primary); background: transparent; cursor: pointer; text-align: left; font: inherit; }
 .chat-info-options > button span { font-size: .82rem; }
 .chat-info-options > button.is-danger { color: var(--color-danger); }
