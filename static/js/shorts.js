@@ -11,6 +11,8 @@
     let shortsCommentsCloseTimer = 0;
     let shortsCommentsAnimationEnd = null;
     let shortCardPositionAnimation = null;
+    let isChangingVideo = false;
+    let videoChangeTimeout = 0;
 
     const authHeaders = () => ({ 'Authorization': `Bearer ${localStorage.getItem('aero_token')}` });
     const escapeText = (value) => String(value || '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));
@@ -57,7 +59,7 @@
         share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 7 7-7 7M21 12H4"></path></svg>',
     })[name];
 
-    function renderCurrentVideo() {
+    function renderCurrentVideo(direction = 0) {
         const stage = document.getElementById('shorts-stage');
         const video = videos[currentIndex];
         activeMedia?.pause();
@@ -70,10 +72,13 @@
         const videoSourceType = /\.mov(?:$|\?)/i.test(video.video_url) ? 'video/quicktime' : /\.webm(?:$|\?)/i.test(video.video_url) ? 'video/webm' : /\.m4v(?:$|\?)/i.test(video.video_url) ? 'video/x-m4v' : 'video/mp4';
         const avatar = window.AeroAvatar?.markup({ ...author, avatar_url: avatarUrl }, 'short-author-avatar') || (avatarUrl ? `<img src="${escapeText(mediaUrl(avatarUrl))}" alt="" loading="lazy" decoding="async">` : escapeText((author.username || 'U').charAt(0).toUpperCase()));
         stage.innerHTML = `<article class="short-card"><video id="active-short-video" playsinline loop autoplay preload="metadata" data-hdr-fallback="${!window.AeroMediaCapabilities?.isHDRSupported()}"><source src="${escapeText(mediaUrl(video.video_url))}" type="${videoSourceType}"></video><span class="short-playback-indicator" aria-hidden="true"></span><div class="short-card-overlay"><div class="short-card-copy"><div class="short-author">${avatar}<strong>@${escapeText(author.username || 'User')}</strong><button type="button" class="short-subscribe ${video.is_following ? 'subscribed' : ''}" data-user-id="${author.id || ''}">${video.is_following ? 'Subscribed' : 'Subscribe'}</button></div><p>${escapeText(video.caption)}</p><div class="short-track">♫ <span>${escapeText(video.track_name || 'Original audio')}</span></div></div><div class="short-interactions"><button type="button" id="short-like-btn" class="short-action ${video.is_liked ? 'is-liked' : ''}" aria-label="Like" aria-pressed="${Boolean(video.is_liked)}">${icon('heart')}<small>${video.likes_count || 0}</small></button><button type="button" id="short-comment-btn" class="short-action" aria-label="Comments" aria-expanded="false">${icon('comment')}<small>Comments</small></button><button type="button" id="short-share-btn" class="short-action" aria-label="Share">${icon('share')}<small>Share</small></button><button type="button" id="short-audio-btn" class="short-audio-cover" aria-label="Original audio">♫</button></div></div><div class="short-nav"><button type="button" id="short-prev" aria-label="Previous Short">↑</button><button type="button" id="short-next" aria-label="Next Short">↓</button></div></article>`;
+        const card = stage.querySelector('.short-card');
+        if (direction) card?.classList.add(direction > 0 ? 'is-entering-from-next' : 'is-entering-from-previous');
         const media = document.getElementById('active-short-video');
         activeMedia = media;
         media.muted = false;
-        media.play().catch(() => { media.muted = true; media.play().catch(() => {}); });
+        media.autoplay = false;
+        media.pause();
         const togglePlayback = () => {
             const indicator = stage.querySelector('.short-playback-indicator');
             if (media.paused) {
@@ -124,6 +129,8 @@
                 button.disabled = false;
             }
         });
+        stage.querySelector('#short-prev')?.setAttribute('title', 'Previous Short');
+        stage.querySelector('#short-next')?.setAttribute('title', 'Next Short');
         stage.querySelector('#short-prev')?.addEventListener('click', () => changeVideo(-1));
         stage.querySelector('#short-next')?.addEventListener('click', () => changeVideo(1));
         stage.querySelector('#short-like-btn')?.addEventListener('click', async (event) => {
@@ -171,7 +178,7 @@
         shortObserver?.disconnect();
         shortObserver = new IntersectionObserver((entries) => {
             entries.forEach((entry) => {
-                if (entry.intersectionRatio >= 0.75) {
+                if (entry.intersectionRatio >= 0.8) {
                     activeMedia = media;
                     media.muted = false;
                     media.play().catch(() => { media.muted = true; media.play().catch(() => {}); });
@@ -180,15 +187,21 @@
                     media.currentTime = 0;
                 }
             });
-        }, { threshold: [0, 0.75, 1] });
-        shortObserver.observe(stage.querySelector('.short-card'));
+        }, { threshold: [0, 0.8, 1] });
+        if (card) shortObserver.observe(card);
     }
 
     function changeVideo(direction) {
-        if (!videos.length) return;
+        if (!videos.length || isChangingVideo) return;
+        isChangingVideo = true;
+        window.clearTimeout(videoChangeTimeout);
+        videoChangeTimeout = window.setTimeout(() => {
+            isChangingVideo = false;
+            videoChangeTimeout = 0;
+        }, 380);
         toggleShortsComments(false);
         currentIndex = (currentIndex + direction + videos.length) % videos.length;
-        renderCurrentVideo();
+        renderCurrentVideo(direction);
         document.getElementById('shorts-stage')?.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -376,7 +389,11 @@
         });
         const shortsStage = document.getElementById('shorts-stage');
         shortsStage && setupTouchFallback(shortsStage);
-        shortsStage?.addEventListener('wheel', (event) => { if (Math.abs(event.deltaY) > 20) { event.preventDefault(); changeVideo(event.deltaY > 0 ? 1 : -1); } }, { passive: false });
+        shortsStage?.addEventListener('wheel', (event) => {
+            if (Math.abs(event.deltaY) <= 20) return;
+            event.preventDefault();
+            changeVideo(event.deltaY > 0 ? 1 : -1);
+        }, { passive: false });
         document.addEventListener('click', (event) => {
             const drawer = document.getElementById('shorts-comment-drawer');
             const target = event.target;
@@ -384,7 +401,14 @@
             if (drawer.contains(target) || target.closest('#short-comment-btn')) return;
             toggleShortsComments(false, drawer);
         });
-        document.addEventListener('keydown', (event) => { if (document.getElementById('view-shorts')?.classList.contains('hidden')) return; if (event.key === 'ArrowDown') changeVideo(1); if (event.key === 'ArrowUp') changeVideo(-1); });
+        document.addEventListener('keydown', (event) => {
+            if (document.getElementById('view-shorts')?.classList.contains('hidden') || event.repeat) return;
+            const target = event.target;
+            if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+            event.preventDefault();
+            changeVideo(event.key === 'ArrowDown' ? 1 : -1);
+        });
         document.querySelector('.comment-drawer-close')?.addEventListener('click', () => {
             toggleShortsComments(false, document.getElementById('shorts-comment-drawer'));
         });

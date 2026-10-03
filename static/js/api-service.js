@@ -1386,6 +1386,7 @@ let feedHasMore = true;
 let feedLoading = false;
 let feedTypeState = 'for_you';
 let feedLoadObserver = null;
+const loadedFeedPostIds = new Set();
 
 function chatConversationKeyId(conversation) {
     const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
@@ -3772,6 +3773,7 @@ const AeroAPI = {
             feedCursor = '';
             feedHasMore = true;
             feedTypeState = feedType;
+            loadedFeedPostIds.clear();
             feedLoadObserver?.disconnect();
             feedContainer.innerHTML = '';
         } else {
@@ -3789,7 +3791,7 @@ const AeroAPI = {
         const seenPostIds = new Set();
         (Array.isArray(posts) ? posts : []).forEach((post) => {
             const postId = Number(post?.id);
-            if (!Number.isInteger(postId) || seenPostIds.has(postId)) return;
+            if (!Number.isInteger(postId) || seenPostIds.has(postId) || loadedFeedPostIds.has(postId)) return;
             seenPostIds.add(postId);
             uniquePosts.push(post);
         });
@@ -3798,8 +3800,6 @@ const AeroAPI = {
             feedContainer.innerHTML = `<div class="post-card glass-card text-center"><p>No posts available yet.</p></div>`;
             return;
         }
-        if (uniquePosts.length === 0) return;
-
         const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
         uniquePosts.forEach(post => {
             const postEl = document.createElement('div');
@@ -4380,6 +4380,7 @@ const AeroAPI = {
                 if (!isHidden) await loadComments();
             });
             feedContainer.appendChild(postEl);
+            loadedFeedPostIds.add(Number(post.id));
         });
         let sentinel = document.getElementById('feed-load-sentinel');
         if (!sentinel) {
