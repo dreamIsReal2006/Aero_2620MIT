@@ -3478,7 +3478,11 @@ const AeroAPI = {
             const data = await res.json().catch(() => ({}));
             throw new Error(data.message || 'Unable to delete post');
         }
-        const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+        const normalizedPostId = Number(postId);
+        if (Number.isInteger(normalizedPostId)) loadedFeedPostIds.delete(normalizedPostId);
+        const postElement = Array.from(
+            document.querySelectorAll('#posts-feed [data-post-id]')
+        ).find(element => element.dataset.postId === String(postId));
         if (postElement) {
             postElement.classList.add('post-removing');
             window.setTimeout(() => postElement.remove(), 240);
