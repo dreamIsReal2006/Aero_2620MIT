@@ -2087,6 +2087,7 @@ function setupMediaAndChat() {
         confirmModal.classList.remove('hidden');
         (inputPlaceholder ? input : confirmModal.querySelector('[data-confirm-accept]')).focus();
     });
+    window.confirmModal = showConfirmModal;
     confirmModal.querySelector('[data-confirm-accept]').addEventListener('click', () => settleConfirm(true));
     confirmModal.querySelectorAll('[data-confirm-cancel]').forEach((button) => button.addEventListener('click', () => settleConfirm(false)));
     confirmModal.addEventListener('click', (event) => { if (event.target === confirmModal) settleConfirm(false); });

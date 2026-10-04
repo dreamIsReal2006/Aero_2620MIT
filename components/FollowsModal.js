@@ -10,12 +10,12 @@ import { getValidUrl } from '../lib/apiUrl';
 const COPY = {
   en: {
     followers: 'Followers', following: 'Following', follow: 'Follow', followBack: 'Follow back',
-    followed: 'Following', close: 'Close', loading: 'Loading people...', empty: 'No people to show yet.',
+    subscribed: 'Subscribed', followed: 'Following', close: 'Close', loading: 'Loading people...', empty: 'No people to show yet.',
     failed: 'Unable to load this list.', unfollowTitle: 'Remove following', followTitle: 'Follow user',
   },
   zh: {
     followers: '粉丝', following: '已关注', follow: '关注', followBack: '回关',
-    followed: '已关注', close: '关闭', loading: '正在加载…', empty: '暂时没有用户。',
+    subscribed: '已订阅', followed: '已关注', close: '关闭', loading: '正在加载…', empty: '暂时没有用户。',
     failed: '无法加载列表。', unfollowTitle: '取消关注', followTitle: '关注用户',
   },
 };
@@ -49,8 +49,7 @@ export default function FollowsModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    setActiveTab(initialTab === 'following' ? 'following' : 'followers');
-    setCounts({ followers: Number(followersCount) || 0, following: Number(followingCount) || 0 });
+    setActiveTab(['following', 'subscriptions'].includes(initialTab) ? initialTab : 'followers');
     setLanguage(String(document.documentElement.lang || '').toLowerCase().startsWith('zh') ? 'zh' : 'en');
     try {
       const currentUser = JSON.parse(localStorage.getItem('aero_user') || '{}');
@@ -58,7 +57,12 @@ export default function FollowsModal({
     } catch {
       setViewerId(0);
     }
-  }, [isOpen, initialTab, followersCount, followingCount]);
+  }, [isOpen, initialTab]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setCounts({ followers: Number(followersCount) || 0, following: Number(followingCount) || 0 });
+  }, [isOpen, followersCount, followingCount]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -109,7 +113,7 @@ export default function FollowsModal({
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message || copy.failed);
       setUsers((current) => {
-        if (Number(userId) === viewerId && activeTab === 'following' && !result.is_following) {
+        if (Number(userId) === viewerId && ['following', 'subscriptions'].includes(activeTab) && !result.is_following) {
           return current.filter((item) => Number(item.id) !== Number(user.id));
         }
         return current.map((item) => Number(item.id) === Number(user.id)
@@ -133,17 +137,17 @@ export default function FollowsModal({
   if (!isOpen) return null;
 
   return <div className="follows-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section className="follows-modal-panel" role="dialog" aria-modal="true" aria-label={`${copy.followers} / ${copy.following}`}>
+    <section className="follows-modal-panel" role="dialog" aria-modal="true" aria-label={`${copy.followers} / ${activeTab === 'subscriptions' ? copy.subscribed : copy.following}`}>
       <button type="button" className="follows-modal-close" aria-label={copy.close} onClick={onClose}>×</button>
       <div className="follows-modal-tabs" role="tablist">
-        {['followers', 'following'].map((tab) => <button
+        {['followers', 'following', 'subscriptions'].map((tab) => <button
           key={tab}
           type="button"
           role="tab"
           aria-selected={activeTab === tab}
           className={activeTab === tab ? 'is-active' : ''}
           onClick={() => setActiveTab(tab)}
-        ><span data-i18n={tab === 'followers' ? 'Followers' : 'Following'}>{copy[tab]}</span> <span>{counts[tab]}</span></button>)}
+        ><span data-i18n={tab === 'followers' ? 'Followers' : tab === 'subscriptions' ? 'Subscribed' : 'Following'}>{tab === 'subscriptions' ? copy.subscribed : copy[tab]}</span> <span>{tab === 'subscriptions' ? counts.following : counts[tab]}</span></button>)}
       </div>
       <div className="follows-modal-list" role="tabpanel" aria-busy={loading}>
         {loading ? <p className="follows-modal-state">{copy.loading}</p>

@@ -30,6 +30,7 @@ def _video_payloads(current_user_id):
         "caption": video.caption,
         "track_name": video.track_name,
         "created_at": f"{video.created_at.isoformat()}Z",
+        "authorId": video.user_id,
         "is_bookmarked": video.id in bookmarked_video_ids,
         "author": {
             "id": video.author.id,
@@ -117,7 +118,9 @@ def delete_video(current_user, video_id):
     video = db.session.get(Video, video_id)
     if not video:
         return jsonify({"message": "Video not found"}), 404
-    if video.user_id != current_user.id and not (current_user.is_admin or current_user.role == "admin"):
+    if video.user_id != current_user.id and not (
+        current_user.is_admin or current_user.role in {"admin", "moderator"}
+    ):
         return jsonify({"message": "You are not allowed to delete this video"}), 403
 
     comment_ids = db.session.query(VideoComment.id).filter_by(video_id=video.id).subquery()

@@ -13,11 +13,12 @@ body:has(.follows-modal-backdrop) { overflow: hidden; }
 .follows-modal-panel { position: relative; display: flex; width: 100%; max-width: 440px; max-height: 85vh; max-height: 85dvh; min-height: 0; flex-direction: column; overflow: hidden; box-sizing: border-box; padding: 20px; border: 1px solid var(--modal-border); border-radius: 24px; color: var(--modal-text-primary); background-color: var(--modal-bg); box-shadow: 0 20px 25px -5px rgba(0,0,0,.15), 0 10px 10px -5px rgba(0,0,0,.04); animation: follows-modal-in .2s cubic-bezier(.16,1,.3,1) both; transition: background-color .3s ease, color .3s ease; }
 .follows-modal-close { position: absolute; top: 10px; right: 10px; z-index: 1; width: 36px; height: 36px; border: 0; border-radius: 50%; color: var(--text-primary, var(--aero-text)); background: rgba(128,128,128,.12); cursor: pointer; font-size: 24px; }
 .follows-modal-tabs { position: relative; display: flex; min-height: 58px; flex: 0 0 58px; border-bottom: 1px solid var(--border-subtle, var(--aero-border)); }
-.follows-modal-tabs button { display: flex; flex: 1 1 50%; align-items: center; justify-content: center; gap: 6px; padding: 0 42px 0 12px; border: 0; color: var(--aero-muted); background: transparent; cursor: pointer; font: inherit; font-weight: 650; }
+.follows-modal-tabs button { display: flex; min-width: 0; flex: 1 1 33.333%; align-items: center; justify-content: center; gap: 6px; padding: 0 4px; border: 0; color: var(--aero-muted); background: transparent; cursor: pointer; font: inherit; font-weight: 650; }
 .follows-modal-tabs button.is-active { color: var(--text-primary, var(--aero-text)); }
 .follows-modal-tabs button span { color: var(--aero-muted); font-size: .85em; }
-.follows-modal-tabs::after { position: absolute; bottom: 0; left: 0; width: 50%; height: 3px; border-radius: 3px 3px 0 0; background: var(--aero-accent); content: ''; transition: transform .2s ease; }
+.follows-modal-tabs::after { position: absolute; bottom: 0; left: 0; width: 33.333%; height: 3px; border-radius: 3px 3px 0 0; background: var(--aero-accent); content: ''; transition: transform .2s ease; }
 .follows-modal-tabs:has(button:nth-child(2)[aria-selected="true"])::after { transform: translateX(100%); }
+.follows-modal-tabs:has(button:nth-child(3)[aria-selected="true"])::after { transform: translateX(200%); }
 .follows-modal-list { min-height: 0; flex: 1 1 auto; margin-top: 12px; overflow-y: auto; overscroll-behavior: contain; padding: 0 4px 0 0; -webkit-overflow-scrolling: touch; }
 .follows-modal-user { display: flex; min-height: 64px; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; }
 .follows-modal-user:hover { background-color: var(--hover-bg); }

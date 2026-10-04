@@ -85,7 +85,7 @@
         const stage = document.getElementById('shorts-stage');
         const currentUser = getStoredUser();
         const currentUserId = Number(currentUser.id || currentUser.user_id);
-        const isAdmin = Boolean(currentUser.is_admin || currentUser.role === 'admin');
+        const canModerateVideos = Boolean(currentUser.is_admin || ['admin', 'moderator'].includes(currentUser.role));
         activeMedia?.pause();
         activeMedia = null;
         shortObserver?.disconnect();
@@ -104,7 +104,7 @@
             const avatarUrl = author.avatar_url || video.author_avatar || '';
             const videoSourceType = /\.mov(?:$|\?)/i.test(video.video_url) ? 'video/quicktime' : /\.webm(?:$|\?)/i.test(video.video_url) ? 'video/webm' : /\.m4v(?:$|\?)/i.test(video.video_url) ? 'video/x-m4v' : 'video/mp4';
             const avatar = window.AeroAvatar?.markup({ ...author, avatar_url: avatarUrl }, 'short-author-avatar') || (avatarUrl ? `<img src="${escapeText(mediaUrl(avatarUrl))}" alt="" loading="lazy" decoding="async">` : escapeText((author.username || 'U').charAt(0).toUpperCase()));
-            const canDelete = Number(author.id) === currentUserId || isAdmin;
+            const canDelete = Number(video.authorId ?? author.id) === currentUserId || canModerateVideos;
             return `<section class="short-video-page" data-short-index="${index}"><article class="short-card"><video class="short-video-media" playsinline loop preload="${index === currentIndex ? 'metadata' : 'none'}" data-hdr-fallback="${!window.AeroMediaCapabilities?.isHDRSupported()}"><source src="${escapeText(mediaUrl(video.video_url))}" type="${videoSourceType}"></video><span class="short-playback-indicator" aria-hidden="true"></span><div class="short-card-overlay"><div class="short-card-copy"><div class="short-author">${avatar}<strong>@${escapeText(author.username || 'User')}</strong><button type="button" class="short-subscribe ${video.is_following ? 'subscribed' : ''}" data-user-id="${author.id || ''}">${video.is_following ? 'Subscribed' : 'Subscribe'}</button></div><p>${escapeText(video.caption)}</p><div class="short-track">♫ <span>${escapeText(video.track_name || 'Original audio')}</span></div></div><div class="short-interactions"><button type="button" class="short-action short-like-btn ${video.is_liked ? 'is-liked' : ''}" aria-label="Like" aria-pressed="${Boolean(video.is_liked)}">${icon('heart')}<small>${video.likes_count || 0}</small></button><button type="button" class="short-action short-comment-btn" aria-label="Comments" aria-expanded="false">${icon('comment')}<small>Comments</small></button><button type="button" class="short-action short-share-btn" aria-label="Share">${icon('share')}<small>Share</small></button><button type="button" class="short-audio-cover short-audio-btn" aria-label="Original audio">♫</button><div class="short-more-menu-wrapper"><button type="button" class="short-action short-more-btn" aria-label="More options" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></button><div class="short-dropdown-menu hidden" role="menu"><button type="button" class="short-dropdown-item short-bookmark-btn" role="menuitem">${video.is_bookmarked ? 'Remove bookmark' : 'Bookmark'}</button>${canDelete ? '<button type="button" class="short-dropdown-item short-delete-btn danger" role="menuitem">Delete</button>' : ''}</div></div></div></div></article></section>`;
         }).join('');
 
@@ -170,7 +170,20 @@
                 event.stopPropagation();
                 page.querySelector('.short-dropdown-menu')?.classList.add('hidden');
                 page.querySelector('.short-more-btn')?.setAttribute('aria-expanded', 'false');
-                if (!window.confirm('Delete this video? This action cannot be undone.')) return;
+                const translate = (key) => window.AeroI18n?.t(key) || key;
+                const confirmModal = window.confirmModal;
+                if (typeof confirmModal !== 'function') {
+                    showShortNotice('Unable to open the delete confirmation dialog', 'error');
+                    return;
+                }
+                const confirmed = await confirmModal({
+                    title: translate('deleteVideoTitle'),
+                    description: translate('deleteVideoConfirm'),
+                    confirmLabel: translate('Delete'),
+                    cancelLabel: translate('Cancel'),
+                    danger: true,
+                });
+                if (!confirmed) return;
                 const button = event.currentTarget;
                 button.disabled = true;
                 try {
@@ -197,9 +210,17 @@
                     const response = await fetch(`${apiBase}/users/${button.dataset.userId}/follow`, { method: 'POST', headers: authHeaders() });
                     const result = await response.json();
                     if (!response.ok) throw new Error(result.message || 'Unable to update subscription');
-                    button.textContent = result.is_following ? 'Subscribed' : 'Subscribe';
-                    button.classList.toggle('subscribed', result.is_following);
-                    video.is_following = result.is_following;
+                    const isFollowing = Boolean(result.is_following);
+                    const followedUserId = Number(button.dataset.userId);
+                    videos.forEach((item) => {
+                        const itemAuthorId = Number(item.authorId ?? item.author?.id ?? item.user?.id);
+                        if (itemAuthorId === followedUserId) item.is_following = isFollowing;
+                    });
+                    document.querySelectorAll('.short-subscribe').forEach((subscribeButton) => {
+                        if (Number(subscribeButton.dataset.userId) !== followedUserId) return;
+                        subscribeButton.textContent = isFollowing ? 'Subscribed' : 'Subscribe';
+                        subscribeButton.classList.toggle('subscribed', isFollowing);
+                    });
                     if (result.is_following) window.addContactToChatList?.({ id: Number(button.dataset.userId), name: author.username || 'User', username: author.username || 'User', avatar: avatarUrl });
                 } catch (error) {
                     showShortNotice(error.message || 'Unable to update subscription', 'error');

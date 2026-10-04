@@ -58,7 +58,7 @@
         overlay.id = 'profile-follows-modal';
         overlay.className = 'profile-follows-modal-overlay hidden';
         overlay.setAttribute('role', 'presentation');
-        overlay.innerHTML = `<section class="profile-follows-modal" role="dialog" aria-modal="true" aria-label="Followers and Following"><header class="profile-follows-header"><div class="profile-follows-tabs" role="tablist"><button type="button" data-follows-tab="followers" role="tab"></button><button type="button" data-follows-tab="following" role="tab"></button><span class="profile-follows-indicator"></span></div><button type="button" class="profile-follows-close" aria-label="Close">&times;</button></header><div class="profile-follows-list" role="tabpanel" aria-live="polite"></div></section>`;
+        overlay.innerHTML = `<section class="profile-follows-modal" role="dialog" aria-modal="true" aria-label="Followers and Following"><header class="profile-follows-header"><div class="profile-follows-tabs" role="tablist"><button type="button" data-follows-tab="followers" role="tab"></button><button type="button" data-follows-tab="following" role="tab"></button><button type="button" data-follows-tab="subscriptions" role="tab"></button><span class="profile-follows-indicator"></span></div><button type="button" class="profile-follows-close" aria-label="Close">&times;</button></header><div class="profile-follows-list" role="tabpanel" aria-live="polite"></div></section>`;
         document.body.appendChild(overlay);
         overlay.addEventListener('click', (event) => { if (event.target === overlay) closeFollowsModal(); });
         overlay.querySelector('.profile-follows-close').addEventListener('click', closeFollowsModal);
@@ -82,13 +82,14 @@
         const { tab, counts } = followsModalState;
         overlay.querySelector('[data-follows-tab="followers"]').innerHTML = `<span data-i18n="Followers">${followsText('Followers')}</span> <span>${counts.followers}</span>`;
         overlay.querySelector('[data-follows-tab="following"]').innerHTML = `<span data-i18n="Following">${followsText('Following')}</span> <span>${counts.following}</span>`;
+        overlay.querySelector('[data-follows-tab="subscriptions"]').innerHTML = `<span data-i18n="Subscribed">${followsText('Subscribed')}</span> <span>${counts.following}</span>`;
         overlay.querySelectorAll('[data-follows-tab]').forEach((button) => {
             const active = button.dataset.followsTab === tab;
             button.classList.toggle('is-active', active);
             button.setAttribute('aria-selected', String(active));
         });
         overlay.querySelector('.profile-follows-indicator').dataset.tab = tab;
-        overlay.querySelector('.profile-follows-modal').setAttribute('aria-label', `${followsText('Followers')} / ${followsText('Following')}`);
+        overlay.querySelector('.profile-follows-modal').setAttribute('aria-label', `${followsText('Followers')} / ${followsText(tab === 'subscriptions' ? 'Subscribed' : 'Following')}`);
         overlay.querySelector('.profile-follows-close').setAttribute('aria-label', followsText('Close'));
     }
 
@@ -139,7 +140,7 @@
                     followsModalState.counts.following = Math.max(0, followsModalState.counts.following + (person.is_following ? 1 : -1));
                     followsModalState.onFollowingCountChange?.(followsModalState.counts.following);
                 }
-                if (followsModalState.isOwnProfile && followsModalState.tab === 'following' && wasFollowing && !person.is_following) {
+                if (followsModalState.isOwnProfile && ['following', 'subscriptions'].includes(followsModalState.tab) && wasFollowing && !person.is_following) {
                     followsModalState.users = followsModalState.users.filter((item) => Number(item.id) !== Number(person.id));
                 }
                 renderFollowsTabs();
@@ -183,8 +184,8 @@
         const overlay = ensureFollowsModal();
         followsModalState = {
             userId: Number(userId),
-            initialTab: initialTab === 'following' ? 'following' : 'followers',
-            tab: initialTab === 'following' ? 'following' : 'followers',
+            initialTab: ['following', 'subscriptions'].includes(initialTab) ? initialTab : 'followers',
+            tab: ['following', 'subscriptions'].includes(initialTab) ? initialTab : 'followers',
             counts: { followers: Number(followersCount) || 0, following: Number(followingCount) || 0 },
             isOwnProfile,
             viewerId: Number(JSON.parse(localStorage.getItem('aero_user') || '{}').id || 0),

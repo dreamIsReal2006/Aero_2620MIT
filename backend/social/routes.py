@@ -189,8 +189,8 @@ def get_user_follows(current_user, user_id):
         return jsonify({"message": "This profile is private"}), 403
 
     relationship_type = str(request.args.get("type", "followers")).strip().lower()
-    if relationship_type not in {"followers", "following"}:
-        return jsonify({"message": "Type must be followers or following"}), 400
+    if relationship_type not in {"followers", "following", "subscriptions"}:
+        return jsonify({"message": "Type must be followers, following, or subscriptions"}), 400
     relation_column = Follow.following_id if relationship_type == "followers" else Follow.follower_id
     rows = Follow.query.filter(
         relation_column == user_id,
