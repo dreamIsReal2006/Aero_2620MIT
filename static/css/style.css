@@ -7239,6 +7239,10 @@ html[data-theme="dark"] :is(.mobile-nav-drawer, .mobile-drawer, .hamburger-menu-
 .post-video-placeholder-label { font-size: 13px; font-weight: 600; }
 
 .short-playback-indicator {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 2;
     display: grid;
     width: 72px;
     height: 72px;
@@ -7249,6 +7253,7 @@ html[data-theme="dark"] :is(.mobile-nav-drawer, .mobile-drawer, .hamburger-menu-
     box-shadow: 0 8px 30px rgba(0, 0, 0, .2);
     opacity: 0;
     pointer-events: none;
+    transform: translate(-50%, -50%) scale(.72);
 }
 
 .short-playback-indicator.is-visible {
@@ -7256,10 +7261,10 @@ html[data-theme="dark"] :is(.mobile-nav-drawer, .mobile-drawer, .hamburger-menu-
 }
 
 @keyframes shortPlaybackFeedback {
-    0% { opacity: 0; transform: scale(.72); }
-    18% { opacity: 1; transform: scale(1); }
-    72% { opacity: 1; transform: scale(1); }
-    100% { opacity: 0; transform: scale(1.08); }
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(.72); }
+    18% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    72% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.08); }
 }
 
 .intro-page {

@@ -258,11 +258,13 @@
                 }
             });
             page.querySelector('.short-comment-btn')?.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
                 const drawer = document.getElementById('shorts-comment-drawer');
-                const isOpen = drawer?.classList.contains('open');
-                toggleShortsComments(!isOpen, drawer);
-                event.currentTarget.setAttribute('aria-expanded', String(!isOpen));
-                if (!isOpen) openShortComments(video.id);
+                const wasOpen = drawer?.classList.contains('open');
+                toggleShortsComments(true, drawer);
+                event.currentTarget.setAttribute('aria-expanded', 'true');
+                if (!wasOpen) openShortComments(video.id);
             });
             page.querySelector('.short-audio-btn')?.addEventListener('click', () => showShortNotice(`Original audio: ${video.track_name || 'Original audio'}`));
             card?.addEventListener('animationend', () => card.classList.remove('is-entering-from-next', 'is-entering-from-previous'));
@@ -526,7 +528,7 @@
             const drawer = document.getElementById('shorts-comment-drawer');
             const target = event.target;
             if (!drawer?.classList.contains('open') || !(target instanceof Element)) return;
-            if (drawer.contains(target) || target.closest('#short-comment-btn')) return;
+            if (drawer.contains(target) || target.closest('.short-comment-btn')) return;
             toggleShortsComments(false, drawer);
         });
         document.addEventListener('keydown', (event) => {
