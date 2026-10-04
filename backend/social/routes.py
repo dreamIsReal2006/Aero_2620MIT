@@ -135,7 +135,10 @@ def get_mention_directory(current_user):
 @token_required
 def toggle_follow(current_user, user_id):
     if current_user.id == user_id:
-        return jsonify({"message": "You cannot follow yourself"}), 400
+        return jsonify({
+            "error": "Cannot subscribe to yourself",
+            "message": "你不能订阅你自己",
+        }), 400
 
     target_user = db.session.get(User, user_id)
     if not target_user:
