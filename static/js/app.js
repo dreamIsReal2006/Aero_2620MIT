@@ -596,6 +596,7 @@
                         <div class="profile-stats">
                             <button type="button" class="profile-stat-trigger" data-follows-tab="followers" aria-label="View followers"><strong id="profile-followers-count">${followText(payload.followers_count)}</strong><span data-i18n="Followers" data-i18n-text>Followers</span></button>
                             <button type="button" class="profile-stat-trigger" data-follows-tab="following" aria-label="View following"><strong id="profile-following-count">${followText(payload.following_count)}</strong><span data-i18n="Following" data-i18n-text>Following</span></button>
+                            <button type="button" class="profile-stat-trigger" data-follows-tab="subscriptions" aria-label="View subscriptions"><strong id="profile-subscribed-count">${followText(payload.following_count)}</strong><span data-i18n="Subscribed" data-i18n-text>Subscribed</span></button>
                         </div>
                     </div>
                     <div class="profile-avatar-wrap ${user.is_online ? 'is-online' : ''}">
@@ -611,13 +612,17 @@
             header.querySelectorAll('[data-follows-tab]').forEach((button) => button.addEventListener('click', () => {
                 const followersCount = header.querySelector('#profile-followers-count');
                 const followingCount = header.querySelector('#profile-following-count');
+                const subscribedCount = header.querySelector('#profile-subscribed-count');
                 openFollowsModal({
                     userId: profileUserId,
                     initialTab: button.dataset.followsTab,
                     followersCount: followersCount?.textContent,
                     followingCount: followingCount?.textContent,
                     isOwnProfile,
-                    onFollowingCountChange: (count) => { if (followingCount) followingCount.textContent = String(count); }
+                    onFollowingCountChange: (count) => {
+                        if (followingCount) followingCount.textContent = String(count);
+                        if (subscribedCount) subscribedCount.textContent = String(count);
+                    }
                 });
             }));
             header.querySelector('.profile-edit-btn')?.addEventListener('click', () => openProfileEditor(user));
