@@ -4531,13 +4531,12 @@ const AeroAPI = {
             closeMobileMenu();
             if (target) window.setTimeout(() => target.click(), 0);
         });
-        document.querySelectorAll('[data-mobile-action]').forEach((button) => {
+        document.querySelectorAll('[data-mobile-action]:not([data-mobile-action="compose"])').forEach((button) => {
             button.addEventListener('click', () => {
                 const action = button.dataset.mobileAction;
                 if (action === 'home') document.getElementById('home-nav-btn')?.click();
                 if (action === 'messages') document.getElementById('chat-dock-btn')?.click();
                 if (action === 'profile') document.getElementById('user-avatar-btn')?.click();
-                if (action === 'compose') document.getElementById('global-fab-btn')?.click();
                 if (action === 'shorts') document.getElementById('video-dock-btn')?.click();
             });
         });
@@ -5198,6 +5197,7 @@ function openThreadsCompose(event) {
     event?.preventDefault();
     event?.stopPropagation();
     if (window.requireAuth && !window.requireAuth(null, 'Please sign in before creating a post.')) return;
+    window.closeVideoUploadModal?.();
     const overlay = document.getElementById('threads-compose-overlay');
     if (!overlay) return;
     updateThreadsUser();
@@ -5259,6 +5259,9 @@ function closeThreadsCompose(saveDraft = true) {
     if (pollButton) pollButton.disabled = false;
     document.getElementById('threads-add-chain-btn').disabled = true;
 }
+
+window.openThreadsCompose = openThreadsCompose;
+window.closeThreadsCompose = closeThreadsCompose;
 
 function closeThreadsPanels(exceptId = '') {
     ['threads-topic-menu', 'threads-emoji-picker', 'threads-options-menu', 'threads-schedule-popover', 'threads-gif-picker'].forEach((id) => {
@@ -5486,7 +5489,7 @@ function setupCreatePostExperience() {
     }
     document.addEventListener('click', (event) => {
         if (!(event.target instanceof Element)) return;
-        const button = event.target.closest('#global-fab-btn, #compose-trigger, .compose-trigger-media, [data-mobile-action="compose"], .btn-new-post, #new-post-btn, .share-box-input, [data-action="create-post"]');
+        const button = event.target.closest('#compose-trigger, .compose-trigger-media, .btn-new-post, #new-post-btn, .share-box-input, [data-action="create-post"]');
         if (button) openCreatePostModal(event);
     });
     document.getElementById('compose-trigger')?.addEventListener('keydown', (event) => {

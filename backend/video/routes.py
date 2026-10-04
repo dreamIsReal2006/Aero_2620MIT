@@ -7,7 +7,7 @@ from werkzeug.utils import secure_filename
 
 from backend.auth.routes import token_required
 from backend.video import video_bp
-from backend.models import Follow, Video, VideoComment, VideoCommentLike, VideoLike
+from backend.models import Follow, Video, VideoBookmark, VideoComment, VideoCommentLike, VideoLike
 from backend import db
 from backend.storage import upload_file_to_supabase
 
@@ -21,12 +21,16 @@ def get_videos(current_user):
 
 def _video_payloads(current_user_id):
     videos = Video.query.order_by(Video.created_at.desc()).limit(50).all()
+    bookmarked_video_ids = {
+        item.video_id for item in VideoBookmark.query.filter_by(user_id=current_user_id).all()
+    }
     return [{
         "id": video.id,
         "video_url": video.video_url,
         "caption": video.caption,
         "track_name": video.track_name,
         "created_at": f"{video.created_at.isoformat()}Z",
+        "is_bookmarked": video.id in bookmarked_video_ids,
         "author": {
             "id": video.author.id,
             "username": video.author.username,
@@ -85,6 +89,47 @@ def create_video(current_user):
     db.session.add(video)
     db.session.commit()
     return jsonify({"id": video.id, "message": "Short video uploaded"}), 201
+
+
+@video_bp.post("/shorts/<int:video_id>/bookmark")
+@video_bp.post("/videos/<int:video_id>/bookmark")
+@token_required
+def toggle_video_bookmark(current_user, video_id):
+    if not db.session.get(Video, video_id):
+        return jsonify({"message": "Video not found"}), 404
+    bookmark = VideoBookmark.query.filter_by(
+        user_id=current_user.id, video_id=video_id
+    ).first()
+    if bookmark:
+        db.session.delete(bookmark)
+        bookmarked = False
+    else:
+        db.session.add(VideoBookmark(user_id=current_user.id, video_id=video_id))
+        bookmarked = True
+    db.session.commit()
+    return jsonify({"bookmarked": bookmarked, "video_id": video_id}), 200
+
+
+@video_bp.delete("/shorts/<int:video_id>")
+@video_bp.delete("/videos/<int:video_id>")
+@token_required
+def delete_video(current_user, video_id):
+    video = db.session.get(Video, video_id)
+    if not video:
+        return jsonify({"message": "Video not found"}), 404
+    if video.user_id != current_user.id and not (current_user.is_admin or current_user.role == "admin"):
+        return jsonify({"message": "You are not allowed to delete this video"}), 403
+
+    comment_ids = db.session.query(VideoComment.id).filter_by(video_id=video.id).subquery()
+    VideoCommentLike.query.filter(VideoCommentLike.video_comment_id.in_(comment_ids)).delete(
+        synchronize_session=False
+    )
+    VideoComment.query.filter_by(video_id=video.id).delete(synchronize_session=False)
+    VideoLike.query.filter_by(video_id=video.id).delete(synchronize_session=False)
+    VideoBookmark.query.filter_by(video_id=video.id).delete(synchronize_session=False)
+    db.session.delete(video)
+    db.session.commit()
+    return jsonify({"message": "Short video deleted", "video_id": video_id}), 200
 
 
 @video_bp.get("/shorts/<int:video_id>/comments")

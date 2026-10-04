@@ -159,6 +159,7 @@ def create_app():
         MediaProcessingJob,
         VideoComment,
         VideoCommentLike,
+        VideoBookmark,
         Note,
         VideoLike,
         ModerationLog,
@@ -206,6 +207,7 @@ def create_app():
                     db.metadata.tables["user_custom_gifs"],
                     db.metadata.tables["media_processing_jobs"],
                     db.metadata.tables["video_comment_likes"],
+                    db.metadata.tables["video_bookmarks"],
                 ],
             )
             existing_tables = set(inspect(db.engine).get_table_names())

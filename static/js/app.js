@@ -1065,11 +1065,12 @@
                 loadPosts(feedType);
                 return;
             }
-            const fab = event.target.closest('#global-fab-btn');
-            if (fab && activeView === 'shorts') {
+            const createButton = event.target.closest('#global-fab-btn, [data-mobile-action="compose"]');
+            if (createButton) {
                 event.preventDefault();
                 event.stopImmediatePropagation();
-                window.openVideoUploadModal?.();
+                if (activeView === 'shorts') window.openVideoUploadModal?.();
+                else window.openThreadsCompose?.(event);
             }
         }, true);
         document.getElementById('user-avatar-btn')?.addEventListener('keydown', (event) => {

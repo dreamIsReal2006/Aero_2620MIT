@@ -19,6 +19,7 @@ from backend.models.media_processing_job import MediaProcessingJob
 from backend.models.video_comment import VideoComment
 from backend.models.video_comment_like import VideoCommentLike
 from backend.models.video_like import VideoLike
+from backend.models.video_bookmark import VideoBookmark
 from backend.models.note import Note
 from backend.models.moderation_log import ModerationLog
 from backend.models.appeal_ticket import AppealTicket

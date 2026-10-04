@@ -3007,6 +3007,14 @@ body.dark-mode .action-bar-capsule {
 .short-track span { display: inline-block; animation: trackScroll 8s linear infinite; }
 @keyframes trackScroll { from { transform: translateX(0); } to { transform: translateX(-35%); } }
 .short-interactions { display: grid; align-items: end; gap: 12px; }
+.short-more-menu-wrapper { position: relative; }
+.short-more-btn svg { fill: currentColor; stroke: none; }
+.short-dropdown-menu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 5; display: grid; min-width: 156px; padding: 6px; border: 1px solid rgba(255,255,255,.18); border-radius: 12px; color: var(--text-primary, #202124); background: var(--bg-card, rgba(255,255,255,.96)); box-shadow: 0 10px 30px rgba(0,0,0,.24); }
+.short-dropdown-menu.hidden { display: none; }
+.short-dropdown-item { justify-items: start !important; width: 100%; padding: 10px 12px; border-radius: 8px !important; color: inherit !important; font-size: .9rem !important; text-align: left; white-space: nowrap; }
+.short-dropdown-item:hover,
+.short-dropdown-item:focus-visible { background: rgba(127,127,127,.16); outline: none; }
+.short-dropdown-item.danger { color: #d93025 !important; }
 .short-interactions button { display: grid; gap: 3px; border: 0; color: #fff; background: transparent; cursor: pointer; font-size: 1.25rem; }
 .short-action svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 .short-action.is-liked { color: #ff3b5c; }

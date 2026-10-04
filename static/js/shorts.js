@@ -7,6 +7,7 @@
     let activeMedia = null;
     let shortObserver = null;
     let tapTimer = 0;
+    let tapPage = null;
     let shortsCommentsCloseTimer = 0;
     let shortsCommentsAnimationEnd = null;
     let shortCardPositionAnimation = null;
@@ -24,6 +25,13 @@
     const mediaUrl = (url) => String(url || '').startsWith('http') ? url : `${apiBase.replace(/\/api$/, '')}${url}`;
     const showShortNotice = (message, type = 'info') => {
         if (typeof window.showNotice === 'function') window.showNotice(message, type);
+    };
+    const getStoredUser = () => {
+        try {
+            return JSON.parse(localStorage.getItem('aero_user') || '{}');
+        } catch {
+            return {};
+        }
     };
     const relativeTime = (value) => {
         const timestamp = new Date(value).getTime();
@@ -58,10 +66,35 @@
         share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5 7 7-7 7M21 12H4"></path></svg>',
     })[name];
 
+    function toggleMediaPlayback(page, media) {
+        const indicator = page.querySelector('.short-playback-indicator');
+        if (media.paused) {
+            media.muted = false;
+            media.play().catch((error) => showShortNotice(error.message || 'Unable to play this video', 'error'));
+            indicator.textContent = '▶';
+        } else {
+            media.pause();
+            indicator.textContent = '❚❚';
+        }
+        indicator.classList.remove('is-visible');
+        void indicator.offsetWidth;
+        indicator.classList.add('is-visible');
+    }
+
     function renderCurrentVideo() {
         const stage = document.getElementById('shorts-stage');
+        const currentUser = getStoredUser();
+        const currentUserId = Number(currentUser.id || currentUser.user_id);
+        const isAdmin = Boolean(currentUser.is_admin || currentUser.role === 'admin');
         activeMedia?.pause();
+        activeMedia = null;
         shortObserver?.disconnect();
+        window.clearTimeout(tapTimer);
+        tapTimer = 0;
+        tapPage = null;
+        window.clearTimeout(videoChangeTimeout);
+        videoChangeTimeout = 0;
+        isChangingVideo = false;
         if (!stage || !videos.length) {
             if (stage) stage.innerHTML = `<div class="shorts-empty"><div class="shorts-empty-content"><span>${window.AeroI18n?.t('no_shorts') || 'No Shorts available yet.'}</span><button type="button" id="shorts-empty-upload" class="shorts-empty-upload">${window.AeroI18n?.t('upload_first_video') || '+ Upload First Video'}</button></div></div>`;
             return;
@@ -71,7 +104,8 @@
             const avatarUrl = author.avatar_url || video.author_avatar || '';
             const videoSourceType = /\.mov(?:$|\?)/i.test(video.video_url) ? 'video/quicktime' : /\.webm(?:$|\?)/i.test(video.video_url) ? 'video/webm' : /\.m4v(?:$|\?)/i.test(video.video_url) ? 'video/x-m4v' : 'video/mp4';
             const avatar = window.AeroAvatar?.markup({ ...author, avatar_url: avatarUrl }, 'short-author-avatar') || (avatarUrl ? `<img src="${escapeText(mediaUrl(avatarUrl))}" alt="" loading="lazy" decoding="async">` : escapeText((author.username || 'U').charAt(0).toUpperCase()));
-            return `<section class="short-video-page" data-short-index="${index}"><article class="short-card"><video class="short-video-media" playsinline loop preload="${index === currentIndex ? 'metadata' : 'none'}" data-hdr-fallback="${!window.AeroMediaCapabilities?.isHDRSupported()}"><source src="${escapeText(mediaUrl(video.video_url))}" type="${videoSourceType}"></video><span class="short-playback-indicator" aria-hidden="true"></span><div class="short-card-overlay"><div class="short-card-copy"><div class="short-author">${avatar}<strong>@${escapeText(author.username || 'User')}</strong><button type="button" class="short-subscribe ${video.is_following ? 'subscribed' : ''}" data-user-id="${author.id || ''}">${video.is_following ? 'Subscribed' : 'Subscribe'}</button></div><p>${escapeText(video.caption)}</p><div class="short-track">♫ <span>${escapeText(video.track_name || 'Original audio')}</span></div></div><div class="short-interactions"><button type="button" class="short-action short-like-btn ${video.is_liked ? 'is-liked' : ''}" aria-label="Like" aria-pressed="${Boolean(video.is_liked)}">${icon('heart')}<small>${video.likes_count || 0}</small></button><button type="button" class="short-action short-comment-btn" aria-label="Comments" aria-expanded="false">${icon('comment')}<small>Comments</small></button><button type="button" class="short-action short-share-btn" aria-label="Share">${icon('share')}<small>Share</small></button><button type="button" class="short-audio-cover short-audio-btn" aria-label="Original audio">♫</button></div></div></article></section>`;
+            const canDelete = Number(author.id) === currentUserId || isAdmin;
+            return `<section class="short-video-page" data-short-index="${index}"><article class="short-card"><video class="short-video-media" playsinline loop preload="${index === currentIndex ? 'metadata' : 'none'}" data-hdr-fallback="${!window.AeroMediaCapabilities?.isHDRSupported()}"><source src="${escapeText(mediaUrl(video.video_url))}" type="${videoSourceType}"></video><span class="short-playback-indicator" aria-hidden="true"></span><div class="short-card-overlay"><div class="short-card-copy"><div class="short-author">${avatar}<strong>@${escapeText(author.username || 'User')}</strong><button type="button" class="short-subscribe ${video.is_following ? 'subscribed' : ''}" data-user-id="${author.id || ''}">${video.is_following ? 'Subscribed' : 'Subscribe'}</button></div><p>${escapeText(video.caption)}</p><div class="short-track">♫ <span>${escapeText(video.track_name || 'Original audio')}</span></div></div><div class="short-interactions"><button type="button" class="short-action short-like-btn ${video.is_liked ? 'is-liked' : ''}" aria-label="Like" aria-pressed="${Boolean(video.is_liked)}">${icon('heart')}<small>${video.likes_count || 0}</small></button><button type="button" class="short-action short-comment-btn" aria-label="Comments" aria-expanded="false">${icon('comment')}<small>Comments</small></button><button type="button" class="short-action short-share-btn" aria-label="Share">${icon('share')}<small>Share</small></button><button type="button" class="short-audio-cover short-audio-btn" aria-label="Original audio">♫</button><div class="short-more-menu-wrapper"><button type="button" class="short-action short-more-btn" aria-label="More options" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg></button><div class="short-dropdown-menu hidden" role="menu"><button type="button" class="short-dropdown-item short-bookmark-btn" role="menuitem">${video.is_bookmarked ? 'Remove bookmark' : 'Bookmark'}</button>${canDelete ? '<button type="button" class="short-dropdown-item short-delete-btn danger" role="menuitem">Delete</button>' : ''}</div></div></div></div></article></section>`;
         }).join('');
 
         const pages = [...stage.querySelectorAll('.short-video-page')];
@@ -81,31 +115,79 @@
             const avatarUrl = author.avatar_url || video.author_avatar || '';
             const card = page.querySelector('.short-card');
             const media = page.querySelector('.short-video-media');
-            const togglePlayback = () => {
-                const indicator = page.querySelector('.short-playback-indicator');
-                if (media.paused) {
-                    media.muted = false;
-                    media.play().catch(() => {});
-                    indicator.textContent = '▶';
-                } else {
-                    media.pause();
-                    indicator.textContent = '❚❚';
-                }
-                indicator.classList.remove('is-visible');
-                void indicator.offsetWidth;
-                indicator.classList.add('is-visible');
-            };
-            media.addEventListener('click', () => {
+            const togglePlayback = () => toggleMediaPlayback(page, media);
+            card.addEventListener('click', (event) => {
+                if (!(event.target instanceof Element) || event.target.closest('.short-interactions, .short-card-copy, .short-subscribe')) return;
                 if (tapTimer) {
                     window.clearTimeout(tapTimer);
                     tapTimer = 0;
-                    page.querySelector('.short-like-btn')?.click();
-                    return;
+                    if (tapPage === page) {
+                        tapPage = null;
+                        page.querySelector('.short-like-btn')?.click();
+                        return;
+                    }
                 }
+                tapPage = page;
                 tapTimer = window.setTimeout(() => {
                     tapTimer = 0;
+                    tapPage = null;
                     togglePlayback();
                 }, 240);
+            });
+            page.querySelector('.short-more-btn')?.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const button = event.currentTarget;
+                const menu = page.querySelector('.short-dropdown-menu');
+                const shouldOpen = menu.classList.contains('hidden');
+                document.querySelectorAll('.short-dropdown-menu:not(.hidden)').forEach((openMenu) => {
+                    openMenu.classList.add('hidden');
+                    openMenu.parentElement.querySelector('.short-more-btn')?.setAttribute('aria-expanded', 'false');
+                });
+                menu.classList.toggle('hidden', !shouldOpen);
+                button.setAttribute('aria-expanded', String(shouldOpen));
+            });
+            page.querySelector('.short-bookmark-btn')?.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                const button = event.currentTarget;
+                button.disabled = true;
+                try {
+                    if (!window.requireAuth?.(null, 'Please sign in before saving a video.')) return;
+                    const response = await fetch(`${apiBase}/shorts/${video.id}/bookmark`, { method: 'POST', headers: authHeaders() });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.message || 'Unable to update video bookmark');
+                    video.is_bookmarked = Boolean(result.bookmarked);
+                    button.textContent = video.is_bookmarked ? 'Remove bookmark' : 'Bookmark';
+                    showShortNotice(video.is_bookmarked ? 'Saved to bookmarks' : 'Removed from bookmarks', 'success');
+                } catch (error) {
+                    showShortNotice(error.message || 'Unable to update video bookmark', 'error');
+                } finally {
+                    button.disabled = false;
+                    page.querySelector('.short-dropdown-menu')?.classList.add('hidden');
+                    page.querySelector('.short-more-btn')?.setAttribute('aria-expanded', 'false');
+                }
+            });
+            page.querySelector('.short-delete-btn')?.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                page.querySelector('.short-dropdown-menu')?.classList.add('hidden');
+                page.querySelector('.short-more-btn')?.setAttribute('aria-expanded', 'false');
+                if (!window.confirm('Delete this video? This action cannot be undone.')) return;
+                const button = event.currentTarget;
+                button.disabled = true;
+                try {
+                    const response = await fetch(`${apiBase}/shorts/${video.id}`, { method: 'DELETE', headers: authHeaders() });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(result.message || 'Unable to delete video');
+                    toggleShortsComments(false);
+                    videos.splice(index, 1);
+                    currentIndex = videos.length
+                        ? Math.min(currentIndex > index ? currentIndex - 1 : currentIndex, videos.length - 1)
+                        : 0;
+                    renderCurrentVideo();
+                    showShortNotice('Video deleted', 'success');
+                } catch (error) {
+                    showShortNotice(error.message || 'Unable to delete video', 'error');
+                    button.disabled = false;
+                }
             });
             page.querySelector('.short-subscribe')?.addEventListener('click', async (event) => {
                 const button = event.currentTarget;
@@ -205,7 +287,7 @@
         const payload = await response.json().catch(() => []);
         if (!response.ok) throw new Error(payload.message || 'Unable to load Shorts');
         videos = Array.isArray(payload) ? payload : [];
-        currentIndex = Math.min(currentIndex, Math.max(videos.length - 1, 0));
+        currentIndex = Math.max(0, Math.min(currentIndex, Math.max(videos.length - 1, 0)));
         renderCurrentVideo();
     }
 
@@ -356,7 +438,13 @@
 
     window.toggleShortsComments = toggleShortsComments;
 
-    window.openVideoUploadModal = () => document.getElementById('short-upload-modal')?.classList.remove('hidden');
+    window.openVideoUploadModal = () => {
+        if (!document.getElementById('threads-compose-overlay')?.classList.contains('hidden')) {
+            window.closeThreadsCompose?.(true);
+        }
+        document.getElementById('short-upload-modal')?.classList.remove('hidden');
+    };
+    window.closeVideoUploadModal = () => document.getElementById('short-upload-modal')?.classList.add('hidden');
     window.cleanupShortsPlayback = () => {
         shortObserver?.disconnect();
         shortObserver = null;
@@ -366,6 +454,36 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         window.addEventListener('aero:view-change', (event) => { if (event.detail.view === 'shorts') loadShorts(); });
+        document.addEventListener('click', (event) => {
+            if (!(event.target instanceof Element) || event.target.closest('.short-more-menu-wrapper')) return;
+            document.querySelectorAll('.short-dropdown-menu:not(.hidden)').forEach((menu) => {
+                menu.classList.add('hidden');
+                menu.parentElement.querySelector('.short-more-btn')?.setAttribute('aria-expanded', 'false');
+            });
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                document.querySelectorAll('.short-dropdown-menu:not(.hidden)').forEach((menu) => {
+                    menu.classList.add('hidden');
+                    menu.parentElement.querySelector('.short-more-btn')?.setAttribute('aria-expanded', 'false');
+                });
+                return;
+            }
+            if (event.code !== 'Space' || event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
+            const activeElement = document.activeElement;
+            if (activeElement instanceof HTMLElement && (
+                activeElement.isContentEditable ||
+                ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(activeElement.tagName) ||
+                activeElement.closest('[role="button"], [contenteditable="true"]')
+            )) return;
+            if (document.querySelector('#short-upload-modal:not(.hidden), #threads-compose-overlay:not(.hidden)')) return;
+            if (document.getElementById('view-shorts')?.classList.contains('hidden')) return;
+            const media = activeMedia || document.querySelector(`#shorts-stage [data-short-index="${currentIndex}"] .short-video-media`);
+            if (!media) return;
+            event.preventDefault();
+            const page = media.closest('.short-video-page');
+            if (page) toggleMediaPlayback(page, media);
+        });
         document.addEventListener('click', (event) => {
             if (event.target.closest('#shorts-empty-upload')) window.openVideoUploadModal();
         });
