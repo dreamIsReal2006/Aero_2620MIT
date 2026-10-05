@@ -3288,7 +3288,27 @@ body.dark-mode .chat-info-doc, html.dark-mode body.light-mode .chat-info-doc, :r
 .chat-date-divider { align-self: center; max-width: 100%; margin: 8px auto; padding: 5px 12px; border: 1px solid var(--border-subtle); border-radius: 999px; color: var(--text-secondary); background: var(--card-bg); box-shadow: 0 1px 3px rgba(0,0,0,.08); font-size: .75rem; line-height: 1.2; text-align: center; }
 .chat-system-message { align-self: center; max-width: min(90%, 520px); margin: 8px auto; padding: 4px 12px; border: 1px solid color-mix(in srgb, var(--border-subtle) 70%, transparent); border-radius: 12px; color: var(--text-secondary); background: color-mix(in srgb, var(--text-primary) 5%, var(--card-bg)); font-size: 12px; line-height: 1.4; text-align: center; overflow-wrap: anywhere; }
 :root { --message-bg-incoming: color-mix(in srgb, var(--text-primary) 7%, var(--card-bg)); --message-bg-outgoing: var(--accent-primary); }
-.chat-message { align-self: flex-start; max-width: 75%; padding: var(--g2-frame-inset); border-radius: var(--g2-radius-inner) var(--g2-radius-inner) var(--g2-radius-inner) 4px; background: var(--message-bg-incoming); }
+.chat-message { align-self: flex-start; max-width: 75%; padding: var(--g2-frame-inset); border-radius: var(--g2-radius-inner) var(--g2-radius-inner) var(--g2-radius-inner) 4px; color: var(--text-primary); background: var(--message-bg-incoming); }
+.chat-message:not(.mine) .chat-message-meta,
+.chat-message:not(.mine) .message-status:not(.read) { color: var(--text-secondary); }
+:root[data-theme="dark"] .chat-message:not(.mine),
+html.dark-mode .chat-message:not(.mine),
+body.dark-mode .chat-message:not(.mine),
+.dark-theme .chat-message:not(.mine) {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #f0f2f5;
+    background: #262938;
+}
+:root[data-theme="dark"] .chat-message:not(.mine) .chat-message-meta,
+:root[data-theme="dark"] .chat-message:not(.mine) .message-status:not(.read),
+html.dark-mode .chat-message:not(.mine) .chat-message-meta,
+html.dark-mode .chat-message:not(.mine) .message-status:not(.read),
+body.dark-mode .chat-message:not(.mine) .chat-message-meta,
+body.dark-mode .chat-message:not(.mine) .message-status:not(.read),
+.dark-theme .chat-message:not(.mine) .chat-message-meta,
+.dark-theme .chat-message:not(.mine) .message-status:not(.read) {
+    color: #9a9ea7;
+}
 .chat-message.mine { align-self: flex-end; border-radius: var(--g2-radius-inner) var(--g2-radius-inner) 4px var(--g2-radius-inner); color: #fff; background: var(--message-bg-outgoing); }
 .chat-bubble-content { display: grid; gap: 4px; }
 .chat-gif-media { max-width: 200px; max-height: 200px; border-radius: var(--g2-radius-control); object-fit: cover; margin-top: 4px; }

@@ -3299,6 +3299,91 @@ async function waitForPostMediaJob(jobId, onProgress) {
     throw new Error('Video processing timed out. Please try again.');
 }
 
+function renderPostPoll(post, currentUser) {
+    const poll = post.poll;
+    const options = Array.isArray(poll?.options)
+        ? poll.options.map((option) => typeof option === 'string' ? { text: option, votes: 0 } : option)
+        : [];
+    if (!poll || !options.length) return null;
+
+    const totalVotes = Number(poll.total_votes ?? options.reduce((total, option) => total + Number(option.votes || 0), 0));
+    const expired = Boolean(poll.expired) || Boolean(poll.expires_at && Date.parse(poll.expires_at) <= Date.now());
+    const viewerId = currentUser?.id;
+    const voterOption = viewerId === null || viewerId === undefined ? -1 : options.findIndex((option) => Array.isArray(option.voters)
+        && option.voters.some((voterId) => String(voterId) === String(viewerId)));
+    const selectedOption = poll.user_voted_option != null ? Number(poll.user_voted_option) : voterOption;
+    const hasVoted = Number.isInteger(selectedOption) && selectedOption >= 0;
+    const showResults = hasVoted || expired;
+    const section = document.createElement('section');
+    section.className = 'thread-poll-container';
+    section.setAttribute('aria-label', 'Post poll');
+
+    options.forEach((option, index) => {
+        const votes = Number(option.votes || 0);
+        const percentage = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `thread-poll-option${showResults ? ' voted' : ''}${selectedOption === index ? ' selected' : ''}`;
+        button.disabled = hasVoted || expired;
+        button.setAttribute('aria-pressed', String(selectedOption === index));
+        const progress = document.createElement('span');
+        progress.className = 'poll-progress-fill';
+        progress.style.width = `${percentage}%`;
+        progress.hidden = !showResults;
+        const label = document.createElement('span');
+        label.className = 'poll-option-label';
+        label.textContent = String(option.text ?? '');
+        button.append(progress, label);
+        if (showResults) {
+            const result = document.createElement('span');
+            result.className = 'poll-option-percent';
+            result.textContent = `${percentage}%`;
+            button.appendChild(result);
+        }
+        section.appendChild(button);
+
+        button.addEventListener('click', async () => {
+            if (button.disabled || !isLoggedIn()) {
+                if (!isLoggedIn()) showLoginModal();
+                return;
+            }
+            section.querySelectorAll('button').forEach((optionButton) => { optionButton.disabled = true; });
+            section.querySelector('.thread-poll-error')?.remove();
+            try {
+                const response = await fetch(`${API_BASE}/posts/${encodeURIComponent(post.id)}/vote`, {
+                    method: 'POST',
+                    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ option_index: index }),
+                });
+                const result = await response.json().catch(() => ({}));
+                const updatedPoll = result.poll || result.post?.poll;
+                if (!response.ok) throw new Error(result.message || 'Unable to submit vote');
+                if (!updatedPoll || !Array.isArray(updatedPoll.options)) throw new Error('Invalid poll response');
+                post.poll = updatedPoll;
+                section.replaceWith(renderPostPoll(post, currentUser));
+            } catch (error) {
+                const message = document.createElement('p');
+                message.className = 'thread-poll-error';
+                message.setAttribute('role', 'alert');
+                message.textContent = error.message || 'Unable to submit vote';
+                section.appendChild(message);
+                section.querySelectorAll('button').forEach((optionButton) => { optionButton.disabled = expired; });
+            }
+        });
+    });
+
+    const footer = document.createElement('footer');
+    footer.className = 'thread-poll-footer';
+    const isChinese = window.AeroI18n?.getLanguage?.() === 'zh';
+    const status = document.createElement('span');
+    status.textContent = expired ? (isChinese ? '投票已结束' : 'Voting ended') : (isChinese ? '投票进行中' : 'Voting in progress');
+    const voteCount = document.createElement('span');
+    voteCount.textContent = isChinese ? `${totalVotes} 人已投票` : `${totalVotes} ${totalVotes === 1 ? 'vote' : 'votes'}`;
+    footer.append(status, voteCount);
+    section.appendChild(footer);
+    return section;
+}
+
 const AeroAPI = {
     // Auth API
     async signin(username, password) {
@@ -4083,6 +4168,8 @@ const AeroAPI = {
                 });
                 postEl.appendChild(threadList);
             }
+            const pollComponent = renderPostPoll(post, currentUser);
+            if (pollComponent) postEl.appendChild(pollComponent);
             const actions = document.createElement('div');
             actions.className = 'post-actions';
             const actionCapsule = document.createElement('div');
