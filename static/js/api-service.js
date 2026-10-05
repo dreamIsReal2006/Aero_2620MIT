@@ -362,6 +362,21 @@ const feedVideoObserver = 'IntersectionObserver' in window
     }, { threshold: [0, 0.6] })
     : null;
 
+function autoFitPostVideo(video) {
+    const applyVideoRatio = () => {
+        if (!video.videoWidth || !video.videoHeight) return;
+        const container = video.closest('.post-video-container');
+        if (!container) return;
+        const ratio = video.videoWidth / video.videoHeight;
+        container.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+        container.style.setProperty('--post-video-ratio', String(ratio));
+        container.dataset.videoOrientation = ratio < 1 ? 'portrait' : 'landscape';
+    };
+
+    video.addEventListener('loadedmetadata', applyVideoRatio, { once: true });
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) applyVideoRatio();
+}
+
 function toggleFeedVideo(video, feedback = true) {
     if (video.paused) {
         isUserInteractedWithFeedVideo = true;
@@ -4232,6 +4247,7 @@ const AeroAPI = {
                         videoElement.muted = true;
                         videoElement.tabIndex = 0;
                         videoElement.setAttribute('aria-label', `Play or pause video ${index + 1} of ${mediaList.length}`);
+                        autoFitPostVideo(videoElement);
                         videoElement.addEventListener('keydown', (event) => {
                             if (event.key !== 'Enter') return;
                             event.preventDefault();
