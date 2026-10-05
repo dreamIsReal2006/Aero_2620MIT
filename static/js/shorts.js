@@ -34,6 +34,7 @@
         }
     };
     const relativeTime = (value) => {
+        if (window.AeroFormatRelativeTime) return window.AeroFormatRelativeTime(value);
         const timestamp = new Date(value).getTime();
         if (!Number.isFinite(timestamp)) return '';
         const seconds = Math.round((timestamp - Date.now()) / 1000);
@@ -352,7 +353,7 @@
                 const username = comment.username || 'User';
                 const avatarUrl = window.AeroAvatar?.getUrl({ id: comment.user_id, username, avatar_url: comment.avatar_url }) || (comment.avatar_url ? mediaUrl(comment.avatar_url) : '');
                 const avatar = `<span class="short-comment-avatar" data-user-id="${escapeText(comment.user_id || '')}" data-fallback="${escapeText(username.charAt(0).toUpperCase())}">${avatarUrl ? `<img src="${escapeText(avatarUrl)}" alt="" loading="lazy" decoding="async">` : escapeText(username.charAt(0).toUpperCase())}</span>`;
-                return `<article class="short-comment" data-comment-user-id="${escapeText(comment.user_id || '')}">${avatar}<div class="short-comment-body"><div class="short-comment-meta"><strong>@${escapeText(username)}</strong><time datetime="${escapeText(comment.created_at || '')}">${escapeText(relativeTime(comment.created_at))}</time></div>${gif.text ? `<p>${escapeText(gif.text)}</p>` : ''}${gif.url ? `<img src="${escapeText(gif.url)}" class="comment-gif" alt="GIF" loading="lazy">` : ''}<div class="short-comment-actions"><button type="button" class="short-comment-like ${comment.is_liked ? 'is-liked' : ''}" data-comment-like="${escapeText(comment.id)}" aria-label="Like comment" aria-pressed="${Boolean(comment.is_liked)}">♥ <span>${Number(comment.likes_count) || 0}</span></button><button type="button" data-reply-user="${escapeText(username)}">Reply</button></div></div></article>`;
+                return `<article class="short-comment" data-comment-user-id="${escapeText(comment.user_id || '')}">${avatar}<div class="short-comment-body"><div class="short-comment-meta"><strong>@${escapeText(username)}</strong><time class="short-comment-relative-time" datetime="${escapeText(comment.created_at || '')}">${escapeText(relativeTime(comment.created_at))}</time></div>${gif.text ? `<p>${escapeText(gif.text)}</p>` : ''}${gif.url ? `<img src="${escapeText(gif.url)}" class="comment-gif" alt="GIF" loading="lazy">` : ''}<div class="short-comment-actions"><button type="button" class="short-comment-like ${comment.is_liked ? 'is-liked' : ''}" data-comment-like="${escapeText(comment.id)}" aria-label="Like comment" aria-pressed="${Boolean(comment.is_liked)}">♥ <span>${Number(comment.likes_count) || 0}</span></button><button type="button" data-reply-user="${escapeText(username)}">Reply</button></div></div></article>`;
             }).join('') || `<div class="shorts-empty">${window.AeroI18n?.t('no_comments') || 'No comments yet.'}</div>`;
             list.querySelectorAll('.short-comment-avatar img').forEach((image) => {
                 image.addEventListener('error', () => {

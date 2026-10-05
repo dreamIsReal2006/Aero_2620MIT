@@ -284,7 +284,13 @@ document.addEventListener('click', async (event) => {
 }, true);
 
 function formatRelativeTime(timestamp) {
-    if (timestamp === null || timestamp === undefined || timestamp === '') return 'Just now';
+    const language = window.AeroI18n?.getLanguage?.()
+        || localStorage.getItem('aero_user_lang')
+        || localStorage.getItem('aero_language')
+        || localStorage.getItem('lang')
+        || 'en';
+    const isChinese = language.toLowerCase().startsWith('zh');
+    if (timestamp === null || timestamp === undefined || timestamp === '') return isChinese ? '刚刚' : 'Just now';
     let date;
     if (typeof timestamp === 'number' || (typeof timestamp === 'string' && /^\d+(?:\.\d+)?$/.test(timestamp.trim()))) {
         const numericTimestamp = Number(timestamp);
@@ -297,23 +303,30 @@ function formatRelativeTime(timestamp) {
         date = new Date(normalizedTimestamp);
     }
     const dateValue = date.getTime();
-    if (Number.isNaN(dateValue)) return 'Just now';
+    if (Number.isNaN(dateValue)) return isChinese ? '刚刚' : 'Just now';
     const elapsedSeconds = Math.max(0, (Date.now() - dateValue) / 1000);
-    const isChinese = window.AeroI18n?.getLanguage?.() === 'zh';
     if (elapsedSeconds < 60) return isChinese ? '刚刚' : 'Just now';
     const minutes = Math.floor(elapsedSeconds / 60);
-    if (minutes < 60) return isChinese ? `${minutes}分钟` : `${minutes}m ago`;
+    if (minutes < 60) return isChinese ? `${minutes}分钟前` : `${minutes}m ago`;
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return isChinese ? `${hours}小时` : `${hours}h ago`;
+    if (hours < 24) return isChinese ? `${hours}小时前` : `${hours}h ago`;
     const days = Math.floor(hours / 24);
-    if (days < 30) return isChinese ? `${days}天` : `${days}d ago`;
+    if (days < 30) return isChinese ? `${days}天前` : `${days}d ago`;
     const months = Math.floor(days / 30);
-    if (months < 12) return isChinese ? `${months}个月` : `${months}mo ago`;
+    if (months < 12) return isChinese ? `${months}个月前` : `${months}mo ago`;
     const years = Math.floor(months / 12);
-    return isChinese ? `${years}年` : `${years}y ago`;
+    return isChinese ? `${years}年前` : `${years}y ago`;
 }
 
 window.AeroFormatRelativeTime = formatRelativeTime;
+
+function refreshCommentRelativeTimes() {
+    document.querySelectorAll('.comment-relative-time, .short-comment-relative-time').forEach((time) => {
+        if (time.dateTime) time.textContent = formatRelativeTime(time.dateTime);
+    });
+}
+
+window.addEventListener('aero:language-change', refreshCommentRelativeTimes);
 
 function createAvatarElement(username, avatarUrl, className = 'post-avatar', isOnline = false) {
     const avatar = document.createElement('span');
