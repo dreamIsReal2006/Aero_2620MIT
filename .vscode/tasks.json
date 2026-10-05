@@ -2,7 +2,26 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Start Aero Next.js app",
+			"label": "Start Aero backend (Render standard)",
+			"type": "shell",
+			"command": "D:\\foundation_in_computing\\Sem 3\\MIT\\Aero(github)\\Aero_2620MIT\\.venv\\Scripts\\python.exe",
+			"args": [
+				"-m",
+				"uvicorn",
+				"main:app",
+				"--host",
+				"0.0.0.0",
+				"--port",
+				"8000"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "Start Aero Next.js frontend",
 			"type": "shell",
 			"command": "npm",
 			"args": [
@@ -12,6 +31,9 @@
 				"--hostname",
 				"127.0.0.1"
 			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
 			"isBackground": true,
 			"problemMatcher": []
 		}

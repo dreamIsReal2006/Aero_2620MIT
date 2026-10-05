@@ -2,11 +2,13 @@
 // From: environment and hostname -> To: window.AeroConfig used by all client modules
 (function configureAeroApi() {
     const productionApiOrigin = 'https://aero-2620mit.onrender.com';
+    const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    const apiOrigin = isLocalHost ? window.location.origin : productionApiOrigin;
 
     window.AeroConfig = Object.freeze({
-        API_ORIGIN: productionApiOrigin,
-        API_BASE_URL: `${productionApiOrigin}/api`,
-        ADMIN_API_BASE: `${productionApiOrigin}/api/admin`,
+        API_ORIGIN: apiOrigin,
+        API_BASE_URL: `${apiOrigin}/api`,
+        ADMIN_API_BASE: `${apiOrigin}/api/admin`,
         SUPABASE_URL: 'https://tamzlrygqskxscofwnho.supabase.co',
         SUPABASE_ANON_KEY: 'sb_publishable_6aNejtXmFMJ984mqQY2kQA_o0Kuei_4'
     });

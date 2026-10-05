@@ -15,7 +15,7 @@ not fall back to a local SQLite database when PostgreSQL is unavailable; a
 connection failure is logged and startup stops. Hashtag and feed schema changes
 are maintained through the backend model and migration process.
 
-The backend uses `pool_pre_ping=true`, `pool_recycle=280`, and `pool_size=10` for PostgreSQL. Start it locally with `uvicorn main:app --host 0.0.0.0 --port 8000`; Render uses the command defined in `render.yaml`.
+The backend uses `pool_pre_ping=true`, `pool_recycle=280`, and `pool_size=10` for PostgreSQL. Configure `AERO_SECRET_KEY` (at least 32 characters) and `DATABASE_URL` in `.env` before starting it locally with `uvicorn main:app --host 0.0.0.0 --port 8000`, or use the VS Code task **Start Aero backend (Render standard)**. This serves the same legacy homepage and API as Render. The separate Next.js task is for the migrated frontend and does not represent the current Render homepage. Render uses the command defined in `render.yaml`.
 
 ## Next.js frontend
 
