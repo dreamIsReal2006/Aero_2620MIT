@@ -8,6 +8,7 @@ from flask import Flask, g, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect, text
+from sqlalchemy.engine import make_url
 
 
 logger = logging.getLogger(__name__)
@@ -78,14 +79,14 @@ def create_app():
         raise RuntimeError("DATABASE_URL must point to the Supabase PostgreSQL database")
     app.config["SQLALCHEMY_DATABASE_URI"] = database_uri
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    engine_options = {
         "pool_pre_ping": True,
         "pool_recycle": 280,
         "pool_size": 10,
-    } if database_uri.startswith(("postgresql://", "postgresql+")) else {
-        "pool_pre_ping": True,
-        "pool_recycle": 280,
     }
+    if make_url(database_uri).get_driver_name() == "psycopg":
+        engine_options["connect_args"] = {"prepare_threshold": None}
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = engine_options
     app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
     required_origins = [
         "https://aero-group4.netlify.app",
