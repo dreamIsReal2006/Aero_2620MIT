@@ -5096,6 +5096,15 @@ function staticPollText(key, values = {}) {
     return window.AeroI18n?.t(key, values) || key;
 }
 
+function staticHashtagText(key) {
+    const defaults = {
+        'hashtag.trending_tags': 'Trending Tags',
+        'hashtag.searching_tags': 'Searching tags...',
+        'hashtag.no_tags_found': 'No tags found'
+    };
+    return window.AeroI18n?.t(key) || defaults[key] || key;
+}
+
 function renderStaticPollUI() {
     const options = staticPollState.options.map((option, index) => {
         const label = staticPollText('poll_option_placeholder', { number: index + 1 });
@@ -5244,7 +5253,7 @@ function showMentionMenuMessage(message, input) {
     if (mentionPickerState.match?.kind === 'hashtag' && !mentionPickerState.match.query) {
         const header = document.createElement('div');
         header.className = 'mention-section-header';
-        header.textContent = '热门标签';
+        header.textContent = staticHashtagText('hashtag.trending_tags');
         children.push(header);
     }
     children.push(status);
@@ -5281,7 +5290,7 @@ function renderMentionMenu(payload, input, currentMatch) {
         if (!currentMatch.query) {
             const header = document.createElement('div');
             header.className = 'mention-section-header';
-            header.textContent = '热门标签';
+            header.textContent = staticHashtagText('hashtag.trending_tags');
             menu.appendChild(header);
         }
         mentionPickerState.items.forEach((item, index) => {
@@ -5307,7 +5316,7 @@ function renderMentionMenu(payload, input, currentMatch) {
         if (mentionPickerState.items.length) {
             menu.classList.remove('hidden');
             positionMentionMenu(input);
-        } else showMentionMenuMessage('暂无热门标签', input);
+        } else showMentionMenuMessage(staticHashtagText('hashtag.no_tags_found'), input);
         return;
     }
     const groups = [
@@ -5349,7 +5358,7 @@ function updateMentionPicker(input) {
         return;
     }
     mentionPickerState.match = match;
-    showMentionMenuMessage(match.kind === 'hashtag' ? '正在寻找标签...' : '正在寻找用户...', input);
+    showMentionMenuMessage(match.kind === 'hashtag' ? staticHashtagText('hashtag.searching_tags') : '正在寻找用户...', input);
     const currentMatch = match;
     window.clearTimeout(mentionPickerState.timer);
     const requestId = ++mentionPickerState.requestId;
@@ -5365,6 +5374,13 @@ function updateMentionPicker(input) {
         }
     }, 80);
 }
+
+window.addEventListener('aero:language-change', () => {
+    const input = document.querySelector('#threads-compose-editor .threads-textarea');
+    if (input && mentionPickerState.match && !mentionPickerState.menu?.classList.contains('hidden')) {
+        updateMentionPicker(input);
+    }
+});
 
 function onMentionKeydown(event) {
     const menu = mentionPickerState.menu;

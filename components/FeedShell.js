@@ -25,6 +25,7 @@ const composerTranslations = {
     selected_gif: 'Selected GIF', remove_gif: 'Remove GIF', choose_topic: 'Choose community or topic', post_attachments: 'Post attachments and tools',
     poll_option_placeholder: 'Option {number}', add_poll_option: 'Add another option', remove_poll_option: 'Remove option', remove_poll: 'Remove poll', poll_duration: 'Poll duration', poll_1_hour: '1 hour', poll_6_hours: '6 hours', poll_12_hours: '12 hours', poll_24_hours: '24 hours', poll_3_days: '3 days', poll_7_days: '7 days', poll_option_required: 'Enter text for every poll option.', poll_options_distinct: 'Poll options must be different.', poll_thread_unavailable: 'Polls can only be added to a single post.',
     unsupported_voice: 'Voice input is not supported in this browser.', unsupported_audio: 'Audio attachments are not available yet.', unable_upload: 'Unable to upload media', unable_publish: 'Unable to publish post', optimizing_media: 'Optimizing media…', uploading_media: 'Uploading media…', compressing_video: 'Compressing video…', publishing_post: 'Publishing post…',
+    'hashtag.trending_tags': 'Trending Tags', 'hashtag.searching_tags': 'Searching tags...', 'hashtag.no_tags_found': 'No tags found',
     device_location: 'This device cannot provide a location.', location_failed: 'Unable to get your location.', remove_thread_post: 'Remove thread post',
   },
   zh: {
@@ -37,6 +38,7 @@ const composerTranslations = {
     selected_gif: '所选 GIF', remove_gif: '移除 GIF', choose_topic: '选择社群或话题', post_attachments: '帖子附件和工具',
     poll_option_placeholder: '选项 {number}', add_poll_option: '添加另一选项', remove_poll_option: '移除选项', remove_poll: '移除投票', poll_duration: '投票时长', poll_1_hour: '1 小时', poll_6_hours: '6 小时', poll_12_hours: '12 小时', poll_24_hours: '24 小时', poll_3_days: '3 天', poll_7_days: '7 天', poll_option_required: '请填写所有投票选项。', poll_options_distinct: '投票选项不能重复。', poll_thread_unavailable: '投票仅支持单条帖子。',
     unsupported_voice: '此浏览器暂不支持语音输入。', unsupported_audio: '音频附件暂不可用。', unable_upload: '无法上传媒体', unable_publish: '无法发布帖子', optimizing_media: '正在优化媒体…', uploading_media: '正在上传媒体…', compressing_video: '正在压缩视频…', publishing_post: '正在发布帖子…',
+    'hashtag.trending_tags': '热门标签', 'hashtag.searching_tags': '正在寻找标签...', 'hashtag.no_tags_found': '未找到相关标签',
     device_location: '此设备无法获取位置。', location_failed: '无法获取位置。', remove_thread_post: '删除串文',
   },
 };
@@ -139,6 +141,11 @@ async function getFeedPage(feedType, userId, cursor, limit) {
   }
 }
 
+function translateComposerText(key) {
+  const language = window.AeroI18n?.getLanguage?.() || localStorage.getItem('aero_user_lang') || 'en';
+  return window.AeroI18n?.t(key) || composerTranslations[language === 'zh' ? 'zh' : 'en'][key] || key;
+}
+
 function installMentionPicker(textarea) {
   const menu = document.createElement('div');
     menu.className = 'mention-dropdown-menu hidden';
@@ -167,7 +174,7 @@ function installMentionPicker(textarea) {
     if (match?.kind === 'hashtag' && !match.query) {
       const header = document.createElement('div');
       header.className = 'mention-section-header';
-      header.textContent = '热门标签';
+      header.textContent = translateComposerText('hashtag.trending_tags');
       children.push(header);
     }
     children.push(status);
@@ -220,7 +227,7 @@ function installMentionPicker(textarea) {
       if (!currentMatch.query) {
         const header = document.createElement('div');
         header.className = 'mention-section-header';
-        header.textContent = '热门标签';
+        header.textContent = translateComposerText('hashtag.trending_tags');
         menu.appendChild(header);
       }
       items.forEach((item, index) => {
@@ -244,7 +251,7 @@ function installMentionPicker(textarea) {
         menu.appendChild(button);
       });
       if (items.length) { menu.classList.remove('hidden'); position(); }
-      else showMessage('暂无热门标签');
+      else showMessage(translateComposerText('hashtag.no_tags_found'));
       return;
     }
     const groups = [{ label: 'Following', users: payload.friends || [] }, { label: 'Other people', users: payload.others || [] }];
@@ -300,7 +307,7 @@ function installMentionPicker(textarea) {
     if (kind === 'mention' && !/^[A-Za-z0-9_ ]*$/.test(found[3])) { hide(); return; }
     if (kind === 'hashtag' && found[3].includes(' ')) { hide(); return; }
     match = { start: textarea.selectionStart - found[0].length + found[1].length, end: textarea.selectionStart, query: found[3], kind };
-    showMessage(kind === 'hashtag' ? '正在寻找标签...' : '正在寻找用户...');
+    showMessage(kind === 'hashtag' ? translateComposerText('hashtag.searching_tags') : '正在寻找用户...');
     const currentMatch = match;
     window.clearTimeout(timer);
     const currentRequest = ++requestId;
@@ -312,6 +319,9 @@ function installMentionPicker(textarea) {
           if (currentRequest === requestId) render(await response.json(), currentMatch);
       } catch { if (currentRequest === requestId) showMessage(currentMatch.kind === 'hashtag' ? '暂时无法加载标签' : '暂时无法加载用户'); }
     }, 80);
+  };
+  const refreshForLanguageChange = () => {
+    if (!menu.classList.contains('hidden')) update();
   };
   const onKeydown = (event) => {
     if (menu.classList.contains('hidden')) return;
@@ -340,6 +350,7 @@ function installMentionPicker(textarea) {
   document.addEventListener('click', onDocumentClick);
   window.addEventListener('resize', onWindowChange);
   window.addEventListener('scroll', onWindowChange, true);
+  window.addEventListener('aero:language-change', refreshForLanguageChange);
   return () => {
     requestId += 1;
     window.clearTimeout(timer);
@@ -351,6 +362,7 @@ function installMentionPicker(textarea) {
     document.removeEventListener('click', onDocumentClick);
     window.removeEventListener('resize', onWindowChange);
     window.removeEventListener('scroll', onWindowChange, true);
+    window.removeEventListener('aero:language-change', refreshForLanguageChange);
     menu.remove();
   };
 }
