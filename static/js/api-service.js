@@ -320,6 +320,114 @@ function formatRelativeTime(timestamp) {
 
 window.AeroFormatRelativeTime = formatRelativeTime;
 
+let isUserInteractedWithFeedVideo = false;
+let activeFeedVideo = null;
+document.addEventListener('click', () => { isUserInteractedWithFeedVideo = true; }, { once: true });
+document.addEventListener('keydown', () => { isUserInteractedWithFeedVideo = true; }, { once: true });
+
+const feedVideoObserver = 'IntersectionObserver' in window
+    ? new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            const video = entry.target;
+            if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+                video.dataset.feedVideoInView = 'true';
+                if (activeFeedVideo && activeFeedVideo !== video) {
+                    activeFeedVideo.pause();
+                    activeFeedVideo.classList.remove('is-playing');
+                }
+                activeFeedVideo = video;
+                video.muted = !isUserInteractedWithFeedVideo;
+                video.play().then(() => {
+                    if (video.dataset.feedVideoInView === 'true' && !video.paused) video.classList.add('is-playing');
+                }).catch((error) => {
+                    if (video.dataset.feedVideoInView === 'true' && video.isConnected && !video.muted) {
+                        console.warn('Feed video autoplay with sound was blocked; retrying muted.', error);
+                        video.muted = true;
+                        video.play().then(() => {
+                            if (video.dataset.feedVideoInView === 'true' && !video.paused) video.classList.add('is-playing');
+                        }).catch((fallbackError) => {
+                            console.warn('Feed video autoplay was blocked.', fallbackError);
+                        });
+                        return;
+                    }
+                    if (video.dataset.feedVideoInView === 'true') console.warn('Feed video autoplay was blocked.', error);
+                });
+            } else {
+                video.dataset.feedVideoInView = 'false';
+                video.pause();
+                video.classList.remove('is-playing');
+                if (activeFeedVideo === video) activeFeedVideo = null;
+            }
+        });
+    }, { threshold: [0, 0.6] })
+    : null;
+
+function toggleFeedVideo(video, feedback = true) {
+    if (video.paused) {
+        isUserInteractedWithFeedVideo = true;
+        video.muted = false;
+        video.play().then(() => {
+            if (!video.paused) video.classList.add('is-playing');
+        }).catch((error) => {
+            console.warn('Feed video playback with sound was blocked; retrying muted.', error);
+            video.muted = true;
+            video.play().then(() => {
+                if (!video.paused) video.classList.add('is-playing');
+            }).catch((fallbackError) => {
+                console.warn('Feed video playback was blocked.', fallbackError);
+            });
+        });
+        if (feedback) showFeedVideoFeedback(video, 'play');
+    } else {
+        video.pause();
+        video.classList.remove('is-playing');
+        if (feedback) showFeedVideoFeedback(video, 'pause');
+    }
+}
+
+function showFeedVideoFeedback(video, action) {
+    const feedback = video.closest('.post-video-container')?.querySelector('.post-video-feedback');
+    if (!feedback) return;
+    feedback.textContent = action === 'play' ? '▶' : 'Ⅱ';
+    feedback.classList.remove('is-visible');
+    void feedback.offsetWidth;
+    feedback.classList.add('is-visible');
+}
+
+document.addEventListener('click', (event) => {
+    if (!(event.target instanceof Element)) return;
+    const video = event.target.closest('.post-video-container')?.querySelector('.post-feed-video');
+    if (!video) return;
+    event.preventDefault();
+    event.stopPropagation();
+    toggleFeedVideo(video);
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.code !== 'Space' || event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
+    const activeElement = document.activeElement;
+    if (activeElement instanceof HTMLElement && (
+        activeElement.isContentEditable ||
+        ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(activeElement.tagName)
+    )) return;
+    const feed = document.getElementById('posts-feed');
+    if (!feed || document.getElementById('view-main')?.classList.contains('hidden')) return;
+    const viewportCenter = window.innerHeight / 2;
+    const visibleVideos = [...feed.querySelectorAll('.post-feed-video')].filter((video) => {
+        const rect = video.getBoundingClientRect();
+        return rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth;
+    });
+    const currentVideo = visibleVideos.sort((left, right) => {
+        const leftRect = left.getBoundingClientRect();
+        const rightRect = right.getBoundingClientRect();
+        return Math.abs((leftRect.top + leftRect.bottom) / 2 - viewportCenter)
+            - Math.abs((rightRect.top + rightRect.bottom) / 2 - viewportCenter);
+    })[0];
+    if (!currentVideo) return;
+    event.preventDefault();
+    toggleFeedVideo(currentVideo);
+});
+
 function refreshCommentRelativeTimes() {
     document.querySelectorAll('.comment-relative-time, .short-comment-relative-time').forEach((time) => {
         if (time.dateTime) time.textContent = formatRelativeTime(time.dateTime);
@@ -3878,6 +3986,12 @@ const AeroAPI = {
             feedTypeState = feedType;
             loadedFeedPostIds.clear();
             feedLoadObserver?.disconnect();
+            feedContainer.querySelectorAll('.post-feed-video').forEach((video) => {
+                feedVideoObserver?.unobserve(video);
+                video.dataset.feedVideoInView = 'false';
+                video.pause();
+            });
+            activeFeedVideo = null;
             feedContainer.innerHTML = '';
         } else {
             document.getElementById('feed-load-sentinel')?.remove();
@@ -4108,13 +4222,28 @@ const AeroAPI = {
                 mediaList.forEach((mediaUrl, index) => {
                     const isVideo = /\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(mediaUrl);
                     if (isVideo) {
-                        const playButton = document.createElement('button');
-                        playButton.type = 'button';
-                        playButton.className = 'post-media-item post-video-placeholder';
-                        playButton.setAttribute('aria-label', `Play video ${index + 1} of ${mediaList.length}`);
-                        playButton.innerHTML = '<span class="post-video-placeholder-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg></span><span class="post-video-placeholder-label">Play video</span>';
-                        playButton.addEventListener('click', event => { event.stopPropagation(); window.openThreadsMediaViewer(mediaList, index); });
-                        media.appendChild(playButton);
+                        const videoContainer = document.createElement('div');
+                        videoContainer.className = 'post-media-item post-video-container';
+                        const videoElement = document.createElement('video');
+                        videoElement.className = 'post-feed-video';
+                        videoElement.src = mediaUrl;
+                        videoElement.playsInline = true;
+                        videoElement.preload = 'metadata';
+                        videoElement.muted = true;
+                        videoElement.tabIndex = 0;
+                        videoElement.setAttribute('aria-label', `Play or pause video ${index + 1} of ${mediaList.length}`);
+                        videoElement.addEventListener('keydown', (event) => {
+                            if (event.key !== 'Enter') return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            toggleFeedVideo(videoElement);
+                        });
+                        const feedback = document.createElement('span');
+                        feedback.className = 'post-video-feedback';
+                        feedback.setAttribute('aria-hidden', 'true');
+                        videoContainer.append(videoElement, feedback);
+                        media.appendChild(videoContainer);
+                        feedVideoObserver?.observe(videoElement);
                     } else {
                         const mediaElement = document.createElement('img');
                         mediaElement.className = 'post-media-item';
@@ -4162,11 +4291,13 @@ const AeroAPI = {
                     (Array.isArray(threadPost.images) ? threadPost.images : []).filter(Boolean).forEach((mediaUrl) => {
                         if (/\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(mediaUrl)) {
                             const video = document.createElement('video');
-                            video.className = 'post-thread-item-media';
+                            video.className = 'post-thread-item-media post-feed-video';
                             video.src = mediaUrl;
                             video.controls = true;
                             video.playsInline = true;
                             video.preload = 'metadata';
+                            video.muted = true;
+                            feedVideoObserver?.observe(video);
                             threadItem.appendChild(video);
                         } else {
                             const image = document.createElement('img');

@@ -4348,6 +4348,51 @@ body.dark-mode .comment-composer input::placeholder {
     outline-offset: -2px;
 }
 
+.post-video-container {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: #111;
+}
+
+.post-video-container .post-feed-video {
+    width: 100%;
+    height: 100%;
+    max-height: 430px;
+    cursor: pointer;
+    object-fit: contain;
+}
+
+.post-video-container .post-feed-video:focus-visible {
+    outline: 2px solid var(--accent-primary, #0a84ff);
+    outline-offset: -2px;
+}
+
+.post-video-feedback {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: grid;
+    width: 52px;
+    height: 52px;
+    place-items: center;
+    border-radius: 50%;
+    color: #fff;
+    background: rgba(0, 0, 0, .55);
+    font-size: 1.4rem;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(.85);
+}
+
+.post-video-feedback.is-visible {
+    animation: postVideoFeedback .5s ease both;
+}
+
+@keyframes postVideoFeedback {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1); }
+}
+
 .post-media-carousel {
     display: flex;
     gap: 8px;

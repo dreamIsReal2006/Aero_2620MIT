@@ -5,6 +5,7 @@
     let videos = [];
     let currentIndex = 0;
     let activeMedia = null;
+    let isUserUnmuted = false;
     let shortObserver = null;
     let tapTimer = 0;
     let tapPage = null;
@@ -70,8 +71,8 @@
     function toggleMediaPlayback(page, media) {
         const indicator = page.querySelector('.short-playback-indicator');
         if (media.paused) {
-            media.muted = false;
-            media.play().catch((error) => showShortNotice(error.message || 'Unable to play this video', 'error'));
+            isUserUnmuted = true;
+            playShortVideo(media);
             indicator.textContent = '▶';
         } else {
             media.pause();
@@ -80,6 +81,40 @@
         indicator.classList.remove('is-visible');
         void indicator.offsetWidth;
         indicator.classList.add('is-visible');
+    }
+
+    function updateMuteButtonUI(media) {
+        const button = media.closest('.short-video-page')?.querySelector('.short-mute-toggle-btn');
+        if (!button) return;
+        button.innerHTML = media.muted
+            ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"></path><path d="m17 9 5 6m0-6-5 6"></path></svg>'
+            : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7m3-10a9 9 0 0 1 0 13"></path></svg>';
+        button.setAttribute('aria-label', media.muted ? 'Unmute video' : 'Mute video');
+        button.title = media.muted ? 'Unmute video' : 'Mute video';
+        button.setAttribute('aria-pressed', String(!media.muted));
+    }
+
+    async function playShortVideo(media) {
+        if (!media) return;
+        media.muted = !isUserUnmuted;
+        updateMuteButtonUI(media);
+        try {
+            await media.play();
+        } catch (error) {
+            if (media !== activeMedia) return;
+            if (!media.muted) {
+                console.warn('Short video audio playback was blocked; retrying muted.', error);
+                media.muted = true;
+                updateMuteButtonUI(media);
+                try {
+                    await media.play();
+                } catch (fallbackError) {
+                    console.warn('Short video playback failed.', fallbackError);
+                }
+                return;
+            }
+            console.warn('Short video playback failed.', error);
+        }
     }
 
     function renderCurrentVideo() {
@@ -122,6 +157,14 @@
             const avatarUrl = author.avatar_url || video.author_avatar || '';
             const card = page.querySelector('.short-card');
             const media = page.querySelector('.short-video-media');
+            media.muted = true;
+            const muteButton = document.createElement('button');
+            muteButton.type = 'button';
+            muteButton.className = 'short-action short-mute-toggle-btn';
+            muteButton.setAttribute('aria-pressed', 'false');
+            page.querySelector('.short-interactions')?.insertBefore(muteButton, page.querySelector('.short-audio-btn'));
+            updateMuteButtonUI(media);
+            media.addEventListener('volumechange', () => updateMuteButtonUI(media));
             const togglePlayback = () => toggleMediaPlayback(page, media);
             card.addEventListener('click', (event) => {
                 if (!(event.target instanceof Element) || event.target.closest('.short-interactions, .short-card-copy, .short-subscribe')) return;
@@ -273,6 +316,13 @@
                 event.currentTarget.setAttribute('aria-expanded', 'true');
                 if (!wasOpen) openShortComments(video.id);
             });
+            muteButton.addEventListener('click', (event) => {
+                event.stopPropagation();
+                media.muted = !media.muted;
+                isUserUnmuted = !media.muted;
+                updateMuteButtonUI(media);
+                if (!media.muted && media.paused) playShortVideo(media);
+            });
             page.querySelector('.short-audio-btn')?.addEventListener('click', () => showShortNotice(`Original audio: ${video.track_name || 'Original audio'}`));
             card?.addEventListener('animationend', () => card.classList.remove('is-entering-from-next', 'is-entering-from-previous'));
         });
@@ -284,8 +334,13 @@
                 if (entry.intersectionRatio >= 0.8) {
                     currentIndex = Number(entry.target.dataset.shortIndex) || 0;
                     activeMedia = media;
-                    media.muted = true;
-                    media.play().catch(() => {});
+                    pages.forEach((page) => {
+                        const otherMedia = page.querySelector('.short-video-media');
+                        if (!otherMedia || otherMedia === media) return;
+                        otherMedia.pause();
+                        otherMedia.currentTime = 0;
+                    });
+                    playShortVideo(media);
                 } else {
                     media.pause();
                     if (activeMedia === media) activeMedia = null;
@@ -483,6 +538,9 @@
     };
 
     document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('click', (event) => {
+            if (event.isTrusted) isUserUnmuted = true;
+        }, { once: true, capture: true });
         window.addEventListener('aero:view-change', (event) => { if (event.detail.view === 'shorts') loadShorts(); });
         document.addEventListener('click', (event) => {
             if (!(event.target instanceof Element) || event.target.closest('.short-more-menu-wrapper')) return;
